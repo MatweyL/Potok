@@ -33,14 +33,31 @@ class MetricCollector:
         self._duration = perf_counter() - self._start_counter
         return self._duration
 
+    @property
+    def last_metrics(self):
+        if not self.metrics_history:
+            return {
+            'time': int((self.system_time.current - self.system_time.start).total_seconds()),
+            'executionCount': 0,
+            'queuedCount': 0,
+            'waitingCount': 0,
+            'queuedAvgDuration': 0,
+            'executionAvgDuration': 0,
+            'returnFrequency': 0,
+            'succeedFrequency': 0,
+            'completed': 0,
+            'total': self.metric_provider.get_total_count()
+        }
+        return self.metrics_history[-1]
+
     def collect(self):
         metrics = {
             'time': int((self.system_time.current - self.system_time.start).total_seconds()),
             'executionCount': self.metric_provider.get_execution_count_total(),
             'queuedCount': self.metric_provider.get_queued_count_total(),
             'waitingCount': self.metric_provider.get_waiting_count_total(),
-            'queuedAvgDuration': round(self.metric_provider.get_queued_average_duration(), 2),
-            'executionAvgDuration': round(self.metric_provider.get_execution_average_duration(), 2),
+            'queuedAvgDuration': round(self.metric_provider.get_queued_average_duration(), 3),
+            'executionAvgDuration': round(self.metric_provider.get_execution_average_duration(), 3),
             'returnFrequency': round(self.metric_provider.get_return_frequency(), 4),
             'succeedFrequency': round(self.metric_provider.get_succeed_frequency(), 4),
             'completed': self.metric_provider.get_completed_count(),

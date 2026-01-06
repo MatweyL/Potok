@@ -50,7 +50,7 @@ class PeriodicRunner:
                 else:
                     self._method()
             except BaseException as e:
-                logger.error(f"got error {e} in periodically running function {self._run_name}")
+                logger.error(f"got error {e.__class__.__name__}: {e} in periodically running function {self._run_name}")
                 if self._verbose_exception:
                     logger.exception(e)
             logger.debug(f"will sleep {self._timeout.value} before run {self._run_name}")

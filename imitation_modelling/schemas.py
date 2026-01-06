@@ -59,11 +59,13 @@ class TaskExecution:
 
 class TaskBatchProviderType(str, enum.Enum):
     CONSTANT_SIZE = "CONSTANT_SIZE"
+    PID = "PID"
+    AIMD = "AIMD"
 
 
 class SimulationParams(BaseModel):
-    handlers_amount: int = 10
-    handler_max_tasks: int = 1
+    handlers_amount: int = 5
+    handler_max_tasks: int = 4
     execution_confirm_timeout: int = 300
     tasks_part_from_all_for_high_load: float = 0.9
     temp_error_probability_at_high_load: float = 0.1
@@ -78,6 +80,8 @@ class SimulationParams(BaseModel):
     task_batch_provider_params: Dict[str, Any] = Field(default={"batch_size": 100})
     task_batch_provider_type: TaskBatchProviderType = TaskBatchProviderType.CONSTANT_SIZE
     config_file_name: str = 'default'
+
+    max_run_seconds: int = 60
 
     @cached_property
     def run_name(self) -> str:

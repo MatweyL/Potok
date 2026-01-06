@@ -62,7 +62,7 @@ class TaskRunStatusRepo:
     def get_total_count_by_period(self, task_run_statuses: Set[TaskRunStatus], period: int) -> int:
         total = 0
         for task_status_logs in self._task_status_log_by_task_run_id.values():
-            for task_status_log in task_status_logs:
+            for task_status_log in reversed(task_status_logs):
                 record_in_period = task_status_log.created_timestamp + timedelta(
                     seconds=period) > self.system_time.current
                 if not record_in_period:
@@ -160,3 +160,13 @@ class TaskRunMetricProvider:
                                                                      TaskRunStatus.ERROR,
                                                                      TaskRunStatus.CANCELLED, },
                                                                     self._period) / self._period
+    def get_succeed_by_period(self) -> int:
+        return self._task_run_status_repo.get_total_count_by_period({TaskRunStatus.SUCCEED,
+                                                                     TaskRunStatus.ERROR,
+                                                                     TaskRunStatus.CANCELLED, },
+                                                                    self._period)
+
+    def get_error_by_period(self) -> int:
+        return self._task_run_status_repo.get_total_count_by_period({TaskRunStatus.INTERRUPTED,
+                                                                     TaskRunStatus.TEMP_ERROR},
+                                                                    self._period)

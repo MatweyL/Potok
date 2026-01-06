@@ -22,7 +22,7 @@ def setup_logging(
         log_file: Путь к файлу для записи логов (опционально)
     """
     if format_string is None:
-        format_string = '%(asctime)s - %(name)s - %(levelname)s - %(pathname)s:%(funcName)s:%(lineno)d - %(message)s'
+        format_string = '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s'
 
     # Очищаем существующие обработчики
     for handler in logger.handlers[:]:
