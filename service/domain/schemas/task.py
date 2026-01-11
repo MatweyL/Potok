@@ -35,7 +35,7 @@ class TaskStatusLogPK(BaseModel):
     status_updated_at: datetime
 
     def __eq__(self, other):
-        return isinstance(other, TaskStatusLogPK) and self.task_run_id == other.task_run_id
+        return isinstance(other, TaskStatusLogPK) and self.task_id == other.task_id
 
     def __hash__(self):
         return hash(self.id)

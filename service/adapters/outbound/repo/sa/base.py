@@ -1,9 +1,6 @@
-from datetime import datetime
-from functools import cached_property
-from typing import Set
 from uuid import uuid4
 
-from sqlalchemy import MetaData, UUID, DateTime, func, BIGINT, inspect
+from sqlalchemy import MetaData, UUID, DateTime, func, BIGINT, inspect, Column
 from sqlalchemy.orm import mapped_column, Mapped, declared_attr, registry
 
 
@@ -99,7 +96,7 @@ class Base(_Base, ):
         """Преобразует модель в словарь, исключает первичные ключи равные None """
         return {c.key: getattr(self, c.key)
                 for c in inspect(self).mapper.column_attrs
-                if not(c.key in self.pk and getattr(self, c.key) is None)}
+                if not (c.key in self.pk and getattr(self, c.key) is None)}
 
 
 class TablenameMixin:
@@ -113,8 +110,8 @@ class SerialPKMixin:
 
 
 class UUIDPKMixin:
-    uid: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    uid = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
 
 
 class LoadTimestampMixin:
-    load_timestamp: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    loaded_at = Column(DateTime, default=func.now)

@@ -61,16 +61,17 @@ class CreateTaskRunsUC(UseCase):
                                                       status_updated_at=status_updated_at,
                                                       status=TaskStatus.EXECUTION, ))
                 payload = payload_by_task_pk[task_to_create_run]
-                execution_bounds = execution_bounds_by_task_pk[task_to_create_run]
-                task_runs_to_create.append(TaskRun(task_id=task_to_create_run.id,
-                                                   group_name=task_to_create_run.group_name,
-                                                   priority=task_to_create_run.priority,
-                                                   type=task_to_create_run.type,
-                                                   payload=payload,
-                                                   execution_bounds=execution_bounds,
-                                                   execution_arguments=task_to_create_run.execution_arguments,
-                                                   status=TaskRunStatus.WAITING,
-                                                   status_updated_at=status_updated_at, ))
+                execution_bounds_list = execution_bounds_by_task_pk[task_to_create_run]
+                for execution_bounds in execution_bounds_list:
+                    task_runs_to_create.append(TaskRun(task_id=task_to_create_run.id,
+                                                       group_name=task_to_create_run.group_name,
+                                                       priority=task_to_create_run.priority,
+                                                       type=task_to_create_run.type,
+                                                       payload=payload,
+                                                       execution_bounds=execution_bounds,
+                                                       execution_arguments=task_to_create_run.execution_arguments,
+                                                       status=TaskRunStatus.WAITING,
+                                                       status_updated_at=status_updated_at, ))
 
             task_runs_created = await self._task_run_repo.create_all(task_runs_to_create, transaction=transaction)
             task_run_status_logs = [TaskRunStatusLog(task_run_id=task_run_created.id,

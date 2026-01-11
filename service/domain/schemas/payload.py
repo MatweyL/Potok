@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 class PayloadPK(BaseModel):
-    id: int
+    id: int = None
 
     def __eq__(self, other):
         return isinstance(other, PayloadPK) and self.id == other.id
