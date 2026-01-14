@@ -3,9 +3,11 @@ from datetime import datetime
 from service.domain.schemas.enums import TaskStatus, TaskRunStatus
 from service.domain.schemas.task import TaskPK, Task, TaskStatusLog, TaskStatusLogPK
 from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK
+from service.domain.services.payload_provider import PayloadProvider
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import UpdateFields
+from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
 from service.ports.outbound.repo.transaction import TransactionFactory
 
 
@@ -25,22 +27,22 @@ class CreateTaskRunsUC(UseCase):
                  task_status_log_repo: Repo[TaskStatusLog, TaskStatusLog, TaskStatusLogPK],
                  task_run_status_log_repo: Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
                  transaction_factory: TransactionFactory,
-                 tasks_to_execute_provider,
+                 tasks_to_execute_provider_registry: TaskToExecuteProviderRegistry,
                  execution_bounds_provider,
-                 payload_provider, ):
+                 payload_provider: PayloadProvider, ):
         self._task_repo = task_repo
         self._task_run_repo = task_run_repo
         self._task_status_log_repo = task_status_log_repo
         self._task_run_status_log_repo = task_run_status_log_repo
         self._transaction_factory = transaction_factory
-        self._tasks_to_execute_provider = tasks_to_execute_provider
+        self._tasks_to_execute_provider_registry = tasks_to_execute_provider_registry
         self._execution_bounds_provider = execution_bounds_provider
         self._payload_provider = payload_provider
 
     async def apply(self, request: CreateTaskRunsUCRq) -> CreateTaskRunsUCRs:
         async with self._transaction_factory.create() as transaction:
             # Получаем новые задачи
-            tasks_to_create_runs = await self._tasks_to_execute_provider.provide()
+            tasks_to_create_runs = await self._tasks_to_execute_provider_registry.provide_tasks_to_execute()
             # Обновляем статусы задач на "ВЫПОЛНЕНИЕ"
             status_updated_at = datetime.now()
             await self._task_repo.update_all({tasks_to_create_run: UpdateFields.multiple({
@@ -49,7 +51,7 @@ class CreateTaskRunsUC(UseCase):
                 for tasks_to_create_run in tasks_to_create_runs}, transaction=transaction)
 
             # Для каждой задачи получаем полезную нагрузку
-            payload_by_task_pk = await self._payload_provider.provide_batch(tasks_to_create_runs)
+            payload_by_task_pk = await self._payload_provider.provide(tasks_to_create_runs)
             # Для каждой задачи получаем границы выполнения
             execution_bounds_by_task_pk = await self._execution_bounds_provider.provide_batch(tasks_to_create_runs)
             # Создаем массив записей для сохранения в журнал смены статуса задач

@@ -4,7 +4,10 @@ import pytest_asyncio
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.base import Base
 from service.adapters.outbound.repo.sa.database import Database
+from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAPeriodicMonitoringAlgorithmRepo, \
+    SAMonitoringAlgorithmRepo
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
+from service.adapters.outbound.repo.sa.impls.task import SATaskRepo
 from service.domain.services.payload_provider import PayloadProvider
 
 
@@ -38,6 +41,18 @@ def sa_payload_repo(database):
     return SAPayloadRepo(database, models.Payload)
 
 
+@pytest.fixture
+def sa_monitoring_algorithm_repo(database):
+    return SAMonitoringAlgorithmRepo(database, models.MonitoringAlgorithm)
+
+
+@pytest.fixture
+def sa_periodic_monitoring_algorithm_repo(database):
+    return SAPeriodicMonitoringAlgorithmRepo(database, models.PeriodicMonitoringAlgorithm)
+
+@pytest.fixture
+def sa_task_repo(database):
+    return SATaskRepo(database, models.Task)
 @pytest.fixture
 def payload_provider(sa_payload_repo):
     return PayloadProvider(sa_payload_repo)

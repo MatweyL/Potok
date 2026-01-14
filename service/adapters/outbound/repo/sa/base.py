@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from sqlalchemy import MetaData, UUID, DateTime, func, BIGINT, inspect, Column
+from sqlalchemy import MetaData, UUID, DateTime, func, BIGINT, inspect, Column, INT
 from sqlalchemy.orm import mapped_column, Mapped, declared_attr, registry
 
 
@@ -105,8 +105,12 @@ class TablenameMixin:
         return camel_to_snake(cls.__name__)
 
 
-class SerialPKMixin:
+class SerialBigIntPKMixin:
     id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
+
+
+class SerialIntPKMixin:
+    id: Mapped[int] = mapped_column(INT, primary_key=True, autoincrement=True)
 
 
 class UUIDPKMixin:

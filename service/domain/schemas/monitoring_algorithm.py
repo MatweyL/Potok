@@ -10,6 +10,7 @@ class MonitoringAlgorithmPK(BaseModel):
 
 
 class MonitoringAlgorithm(MonitoringAlgorithmPK):
+    """ Для каждого алгоритма мониторинга свой провайдер задач, готовых к выполнению """
     type: MonitoringAlgorithmType
 
 
@@ -25,7 +26,7 @@ class SingleMonitoringAlgorithm(MonitoringAlgorithm):
     type: MonitoringAlgorithmType = MonitoringAlgorithmType.SINGLE
     timeouts: List[float] = Field(default_factory=list,
                                   description="Таймауты для сна после выполнения задачи. "
-                                              "Длина списка - сколько раз задача будет выполнена. "
+                                              "Длина списка минус один - сколько раз задача будет выполнена. "
                                               "Если длина равна нулю, то считается, что задача будет выполнена "
                                               "1 раз при первой возможности выполнения. ")
     timeout_noize: float = 0
