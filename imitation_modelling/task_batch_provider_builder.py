@@ -32,4 +32,5 @@ class TaskBatchProviderBuilder:
                                          **params)
         return PIDTaskBatchProvider(self._broker, self._task_run_status_repo, self._task_run_metric_provider,
                                     self._system_time,
-                                    self._metric_collector, )
+                                    self._metric_collector,
+                                    **params)

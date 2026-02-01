@@ -361,7 +361,7 @@ class PIDTaskBatchProvider(TaskBatchProvider):
         super().__init__(broker, task_run_status_repo, task_run_metric_provider, system_time, **kwargs)
         self.metric_collector = metric_collector
         self.phase = ControllerPhase.COLD_START
-        self.cold_start = ColdStartProber()
+        self.cold_start = ColdStartProber(initial_batch=50)
 
         # Тактический уровень (PID)
         pid_config = pid_params or {}

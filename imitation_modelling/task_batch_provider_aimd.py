@@ -16,6 +16,7 @@ def clip(value, value_min=None, value_max=None, ) -> int | float:
         return value_min
     return value
 
+
 class AIMDTaskBatchProvider(TaskBatchProvider):
     type: TaskBatchProviderType = TaskBatchProviderType.AIMD
 

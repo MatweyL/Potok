@@ -7,7 +7,7 @@ from service.domain.schemas.enums import TaskType, TaskStatus, PriorityType
 
 
 class TaskPK(BaseModel):
-    id: int
+    id: int = None
 
     def __eq__(self, other):
         return isinstance(other, TaskPK) and self.id == other.id

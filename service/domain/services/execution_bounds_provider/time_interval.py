@@ -1,4 +1,0 @@
-
-
-class TimeIntervalExecutionBoundsProvider:
-    pass

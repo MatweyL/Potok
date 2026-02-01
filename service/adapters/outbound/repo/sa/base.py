@@ -1,6 +1,9 @@
+import json
+from datetime import date, datetime, time
+from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import MetaData, UUID, DateTime, func, BIGINT, inspect, Column, INT
+from sqlalchemy import MetaData, UUID, DateTime, func, BIGINT, inspect, Column, INT, JSON, TypeDecorator
 from sqlalchemy.orm import mapped_column, Mapped, declared_attr, registry
 
 
@@ -119,3 +122,53 @@ class UUIDPKMixin:
 
 class LoadTimestampMixin:
     loaded_at = Column(DateTime, default=func.now)
+
+
+class JSONWithDatetime(TypeDecorator):
+    """
+    JSON / JSONB колонка, которая автоматически преобразует datetime/date/time
+    в ISO-строки при записи и обратно при чтении.
+
+    Работает с PostgreSQL JSONB и обычным JSON (sqlite, mysql и др.)
+    """
+
+    impl = JSON
+    cache_ok = True
+
+    # Можно переопределить для конкретной диалектной колонки
+    # impl_for_dialect = { 'postgresql': JSONB }
+
+    def process_bind_param(self, value: Any | None, dialect) -> str | None:
+        """Сериализация при записи в базу (Python → JSON)"""
+        if value is None:
+            return None
+
+        def default(obj: Any) -> str:
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if isinstance(obj, date):
+                return obj.isoformat()
+            if isinstance(obj, time):
+                return obj.isoformat()
+            if isinstance(obj, (set, frozenset)):
+                return list(obj)  # опционально — полезно для многих
+            raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+        return json.dumps(value, default=default, ensure_ascii=False)
+
+    def process_result_value(self, value: str | None, dialect) -> Any | None:
+        """Десериализация при чтении из базы (JSON → Python)"""
+        if value is None:
+            return None
+
+        def object_hook(obj: dict) -> Any:
+            for k, v in obj.items():
+                if isinstance(v, str):
+                    try:
+                        if len(v) == 19 or 'T' in v:  # YYYY-MM-DDTHH:MM:SS
+                            obj[k] = datetime.fromisoformat(v)
+                    except ValueError:
+                        pass  # оставляем как строку
+            return obj
+
+        return json.loads(value, object_hook=object_hook)

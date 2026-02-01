@@ -6,7 +6,7 @@ from service.domain.schemas.enums import MonitoringAlgorithmType
 
 
 class MonitoringAlgorithmPK(BaseModel):
-    id: int
+    id: int = None
 
 
 class MonitoringAlgorithm(MonitoringAlgorithmPK):

@@ -3,6 +3,7 @@ from datetime import datetime
 from service.domain.schemas.enums import TaskStatus, TaskRunStatus
 from service.domain.schemas.task import TaskPK, Task, TaskStatusLog, TaskStatusLogPK
 from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK
+from service.domain.services.execution_bounds_provider import ExecutionBoundsProvider
 from service.domain.services.payload_provider import PayloadProvider
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.repo.abstract import Repo
@@ -28,7 +29,7 @@ class CreateTaskRunsUC(UseCase):
                  task_run_status_log_repo: Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
                  transaction_factory: TransactionFactory,
                  tasks_to_execute_provider_registry: TaskToExecuteProviderRegistry,
-                 execution_bounds_provider,
+                 execution_bounds_provider: ExecutionBoundsProvider,
                  payload_provider: PayloadProvider, ):
         self._task_repo = task_repo
         self._task_run_repo = task_run_repo
@@ -70,7 +71,7 @@ class CreateTaskRunsUC(UseCase):
                                                        priority=task_to_create_run.priority,
                                                        type=task_to_create_run.type,
                                                        payload=payload,
-                                                       execution_bounds=execution_bounds,
+                                                       execution_bounds=[execution_bounds],
                                                        execution_arguments=task_to_create_run.execution_arguments,
                                                        status=TaskRunStatus.WAITING,
                                                        status_updated_at=status_updated_at, ))
