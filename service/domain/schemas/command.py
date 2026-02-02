@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from service.domain.schemas.enums import CommandType, TaskRunStatus
 from service.domain.schemas.execution_results import ExecutionResults
@@ -21,3 +22,4 @@ class CommandResponse(BaseModel):
     status: TaskRunStatus
     description: Optional[str] = None
     result: Optional[ExecutionResults] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)

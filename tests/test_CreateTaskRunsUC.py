@@ -103,4 +103,3 @@ async def test_apply_one_task_null_run(create_task_runs_uc, create_payload, crea
     assert response.task_runs_created == 0
     task_runs = await sa_task_run_repo.get_all()
     assert len(task_runs) == response.task_runs_created
-
