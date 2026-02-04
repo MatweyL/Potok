@@ -9,7 +9,7 @@ from service.ports.common.convert_utils import to_bytes
 class DataProducerI(ABC):
 
     async def produce_list(self,
-                           items: List[bytes | dict | str | Type[BaseModel]],
+                           items: List[bytes | dict | str | BaseModel],
                            to: str,
                            headers: List[dict] = None,
                            item_params: Dict = None):
@@ -17,7 +17,7 @@ class DataProducerI(ABC):
             await self.produce(item, to, headers=headers, item_params=item_params)
 
     @abstractmethod
-    async def produce(self, item: bytes | dict | str | Type[BaseModel],
+    async def produce(self, item: bytes | dict | str | BaseModel,
                       to: str, headers: dict = None, item_params: dict = None) -> bool:
         pass
 

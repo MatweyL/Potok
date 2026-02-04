@@ -1,4 +1,5 @@
 from datetime import datetime
+from functools import cached_property
 from typing import Optional, Dict, Any, List
 
 from pydantic import BaseModel
@@ -31,6 +32,10 @@ class TaskRun(TaskRunPK):
     status: TaskRunStatus
     status_updated_at: datetime
     description: Optional[str] = None
+
+    @cached_property
+    def queue_name(self):
+        return f"{self.group_name}.{self.type}.{self.priority}"
 
 
 class TaskRunStatusLogPK(BaseModel):
