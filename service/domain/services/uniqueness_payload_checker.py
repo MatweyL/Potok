@@ -13,6 +13,11 @@ class CheckUniquenessPayloadResponse(BaseModel):
 
 
 class UniquenessPayloadChecker:
+    """
+    Возвращает в ответе два списка:
+    1. Полезная нагрузка, которая уже существует в хранилище;
+    2. Полезная нагрузка, которую необходимо создать.
+    """
 
     def __init__(self, payload_repo: Repo[Payload, Payload, PayloadPK]):
         self._payload_repo = payload_repo

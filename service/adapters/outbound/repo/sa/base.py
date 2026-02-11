@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import date, datetime, time
 from typing import Any
 from uuid import uuid4
@@ -152,6 +153,8 @@ class JSONWithDatetime(TypeDecorator):
                 return obj.isoformat()
             if isinstance(obj, (set, frozenset)):
                 return list(obj)  # опционально — полезно для многих
+            if isinstance(obj, uuid.UUID):
+                return str(obj)
             raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
         return json.dumps(value, default=default, ensure_ascii=False)

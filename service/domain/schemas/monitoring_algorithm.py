@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 from pydantic import BaseModel, Field
 
@@ -30,3 +30,6 @@ class SingleMonitoringAlgorithm(MonitoringAlgorithm):
                                               "Если длина равна нулю, то считается, что задача будет выполнена "
                                               "1 раз при первой возможности выполнения. ")
     timeout_noize: float = 0
+
+
+MonitoringAlgorithmUnion = Union[PeriodicMonitoringAlgorithm, SingleMonitoringAlgorithm]

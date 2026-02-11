@@ -4,6 +4,7 @@ from service.domain.schemas.task import Task
 
 class TaskMapper:
     """ Код маппинга вынесен в отдельный класс т.к. он используется в нескольких местах """
+
     @staticmethod
     def to_model(obj: Task) -> models.Task:
         return models.Task(id=obj.id,
@@ -14,7 +15,8 @@ class TaskMapper:
                            execution_arguments=obj.execution_arguments,
                            status=obj.status,
                            status_updated_at=obj.status_updated_at,
-                           payload_id=obj.payload_id, )
+                           payload_id=obj.payload_id,
+                           loaded_at=obj.loaded_at, )
 
     @staticmethod
     def to_domain(obj: models.Task) -> Task:
@@ -26,4 +28,5 @@ class TaskMapper:
                     execution_arguments=obj.execution_arguments,
                     status=obj.status,
                     status_updated_at=obj.status_updated_at,
-                    payload_id=obj.payload_id, )
+                    payload_id=obj.payload_id,
+                    loaded_at=obj.loaded_at, )

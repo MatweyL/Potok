@@ -28,6 +28,7 @@ class Task(TaskPK, TaskConfiguration):
     status: TaskStatus
     status_updated_at: datetime
     payload_id: int = Field(description="Идентификатор полезной нагрузки задачи")
+    loaded_at: Optional[datetime] = None
 
 
 class TaskStatusLogPK(BaseModel):

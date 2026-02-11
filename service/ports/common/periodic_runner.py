@@ -1,6 +1,6 @@
 import asyncio
 from asyncio import Task
-from typing import Callable, Awaitable, Any, Union
+from typing import Callable, Awaitable, Any, Union, List, Dict
 
 from service.ports.common.changeable_parameter import ChangeableFloatParameter
 from service.ports.common.logs import logger
@@ -9,15 +9,19 @@ from service.ports.common.logs import logger
 class PeriodicRunner:
 
     def __init__(self,
-                 method: Callable[[], Union[Any, Awaitable]],
+                 method: Callable[[...], Union[Any, Awaitable]],
                  timeout: float | ChangeableFloatParameter,
                  before_first_run_timeout: int = 0,
                  run_name: str = None,
-                 verbose_exception: bool = False, ):
+                 verbose_exception: bool = False,
+                 method_args: List = None,
+                 method_kwargs: Dict = None):
         self._run_name = run_name or method.__name__
         self._timeout = ChangeableFloatParameter(name=self._run_name,
                                                  value=timeout) if isinstance(timeout, (float, int)) else timeout
         self._method = method
+        self._method_args = tuple(method_args) if method_args else tuple()
+        self._method_kwargs = method_kwargs if method_kwargs else {}
         self._before_first_run_timeout = before_first_run_timeout
         self._verbose_exception = verbose_exception
 
@@ -46,9 +50,9 @@ class PeriodicRunner:
         while True:
             try:
                 if self._is_coroutine_function:
-                    await self._method()
+                    await self._method(*self._method_args, **self._method_kwargs)
                 else:
-                    self._method()
+                    self._method(*self._method_args, **self._method_kwargs)
             except BaseException as e:
                 logger.error(f"got error {e.__class__.__name__}: {e} in periodically running function {self._run_name}")
                 if self._verbose_exception:

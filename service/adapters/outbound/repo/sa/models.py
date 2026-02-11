@@ -1,8 +1,7 @@
 from datetime import datetime
-from tkinter.tix import INTEGER, TEXT
 from typing import Dict, List
 
-from sqlalchemy import JSON, BIGINT, ForeignKey, VARCHAR, Enum, INT, DateTime, FLOAT
+from sqlalchemy import JSON, BIGINT, ForeignKey, VARCHAR, Enum, INT, DateTime, FLOAT, TEXT, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from service.adapters.outbound.repo.sa.base import Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin, \
@@ -12,6 +11,7 @@ from service.domain.schemas.enums import TaskStatus, TaskType, PriorityType, Mon
 
 class Payload(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     data: Mapped[dict] = mapped_column(JSONWithDatetime, )
+    checksum: Mapped[str] = mapped_column(UUID, nullable=False)
 
 
 class Task(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):

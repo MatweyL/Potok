@@ -17,8 +17,9 @@ class ServiceSettings(BaseSettings):
 
     rmq_consumer_connection: RMQConsumerConnectionSettings
     rmq_consumer: RMQConsumerSettings
+    rmq_task_run_execution_status_queue: str
 
     rmq_producer_connection: RMQProducerConnectionSettings
-    rmq_producer: RMQProducerSettings
+    rmq_producer_task_run: RMQProducerSettings
 
     database_uri: str
