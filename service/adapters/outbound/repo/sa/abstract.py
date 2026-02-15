@@ -219,4 +219,6 @@ def filter_field_as_sqlalchemy_literal(filter_field: FilterField, model_class: T
         return column.is_not(None)
     if filter_field.operation == ConditionOperation.IN:
         return column.in_(filter_field.value)
+    if filter_field.operation == ConditionOperation.NOT_IN:
+        return column.notin_(filter_field.value)
     raise RuntimeError(f"Unknown operation type: {filter_field.operation}")

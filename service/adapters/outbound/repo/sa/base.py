@@ -100,7 +100,7 @@ class Base(_Base, ):
         """Преобразует модель в словарь, исключает первичные ключи равные None """
         return {c.key: getattr(self, c.key)
                 for c in inspect(self).mapper.column_attrs
-                if not (c.key in self.pk and getattr(self, c.key) is None)}
+                if not (c.key in self.pk and getattr(self, c.key) is None) and not (c.key == 'loaded_at' and getattr(self, c.key) is None)}
 
 
 class TablenameMixin:
@@ -122,8 +122,12 @@ class UUIDPKMixin:
 
 
 class LoadTimestampMixin:
-    loaded_at = Column(DateTime, default=func.now)
-
+    loaded_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),          # ← server_default лучше для автозаполнения на стороне БД
+        nullable=False,
+        # insert_default=func.now()         # можно и так, но server_default предпочтительнее
+    )
 
 class JSONWithDatetime(TypeDecorator):
     """

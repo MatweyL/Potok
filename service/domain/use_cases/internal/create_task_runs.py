@@ -2,7 +2,8 @@ from datetime import datetime
 
 from service.domain.schemas.enums import TaskStatus, TaskRunStatus
 from service.domain.schemas.task import TaskPK, Task, TaskStatusLog, TaskStatusLogPK
-from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK
+from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK, \
+    TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK
 from service.domain.services.execution_bounds_provider import ExecutionBoundsProvider
 from service.domain.services.payload_provider import PayloadProvider
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
@@ -27,6 +28,8 @@ class CreateTaskRunsUC(UseCase):
                  task_run_repo: Repo[TaskRun, TaskRun, TaskRunPK],
                  task_status_log_repo: Repo[TaskStatusLog, TaskStatusLog, TaskStatusLogPK],
                  task_run_status_log_repo: Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
+                 task_run_time_interval_execution_bounds_repo: Repo[
+                     TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK],
                  transaction_factory: TransactionFactory,
                  tasks_to_execute_provider_registry: TaskToExecuteProviderRegistry,
                  execution_bounds_provider: ExecutionBoundsProvider,
@@ -35,6 +38,7 @@ class CreateTaskRunsUC(UseCase):
         self._task_run_repo = task_run_repo
         self._task_status_log_repo = task_status_log_repo
         self._task_run_status_log_repo = task_run_status_log_repo
+        self._task_run_time_interval_execution_bounds_repo = task_run_time_interval_execution_bounds_repo
         self._transaction_factory = transaction_factory
         self._tasks_to_execute_provider_registry = tasks_to_execute_provider_registry
         self._execution_bounds_provider = execution_bounds_provider
@@ -59,6 +63,7 @@ class CreateTaskRunsUC(UseCase):
             task_status_logs = []
             # Создаем массив запусков задач
             task_runs_to_create = []
+            # Создаем массив границ выполнения задач
             for task_to_create_run in tasks_to_create_runs:
                 task_status_logs.append(TaskStatusLog(task_id=task_to_create_run.id,
                                                       status_updated_at=status_updated_at,
@@ -71,17 +76,24 @@ class CreateTaskRunsUC(UseCase):
                                                        priority=task_to_create_run.priority,
                                                        type=task_to_create_run.type,
                                                        payload=payload,
-                                                       execution_bounds=[execution_bounds],
+                                                       execution_bounds=execution_bounds,
                                                        execution_arguments=task_to_create_run.execution_arguments,
                                                        status=TaskRunStatus.WAITING,
                                                        status_updated_at=status_updated_at, ))
 
             task_runs_created = await self._task_run_repo.create_all(task_runs_to_create, transaction=transaction)
+            task_runs_time_interval_execution_bounds = [TaskRunTimeIntervalExecutionBounds(
+                task_run_id=task_run_created.id,
+                task_id=task_run_created.task_id,
+                execution_bounds=task_run_created.execution_bounds
+            ) for task_run_created in task_runs_created]
             task_run_status_logs = [TaskRunStatusLog(task_run_id=task_run_created.id,
                                                      status_updated_at=status_updated_at,
                                                      status=task_run_created.status)
                                     for task_run_created in task_runs_created]
 
+            await self._task_run_time_interval_execution_bounds_repo.create_all(
+                task_runs_time_interval_execution_bounds, transaction=transaction)
             await self._task_status_log_repo.create_all(task_status_logs, transaction=transaction)
             await self._task_run_status_log_repo.create_all(task_run_status_logs, transaction=transaction)
         return CreateTaskRunsUCRs(success=True, request=request, task_runs_created=len(task_runs_created))

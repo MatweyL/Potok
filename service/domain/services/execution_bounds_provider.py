@@ -4,10 +4,7 @@ from typing import Dict, List, Protocol, runtime_checkable
 from service.domain.schemas.enums import TaskType
 from service.domain.schemas.execution_bounds import ExecutionBounds, TimeIntervalBounds
 from service.domain.schemas.task import Task
-from service.domain.schemas.task_progress import (
-    TimeIntervalTaskProgress,
-    TimeIntervalTaskProgressPK,
-)
+from service.domain.schemas.task_run import TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import FilterFieldsDNF, ConditionOperation
 
@@ -30,13 +27,15 @@ class DefaultExecutionBoundsProvider:
 
     def __init__(
             self,
-            time_interval_progress_repo: Repo[
-                TimeIntervalTaskProgress, TimeIntervalTaskProgress, TimeIntervalTaskProgressPK
+            task_run_time_interval_execution_bounds_repo: Repo[
+                TaskRunTimeIntervalExecutionBounds,
+                TaskRunTimeIntervalExecutionBounds,
+                TaskRunTimeIntervalExecutionBoundsPK
             ],
             default_left_date: datetime = None,
             default_first_interval_days: int = 31,
     ):
-        self._time_interval_progress_repo = time_interval_progress_repo
+        self._task_run_time_interval_execution_bounds_repo = task_run_time_interval_execution_bounds_repo
         self._default_left_date = default_left_date or datetime(2010, 1, 1)
         self._default_first_interval_days = default_first_interval_days
 
@@ -79,12 +78,12 @@ class DefaultExecutionBoundsProvider:
         """
 
         task_ids = [task.id for task in tasks]
-        progress_records: List[TimeIntervalTaskProgress] = await self._time_interval_progress_repo.filter(
+        progress_records: List[TaskRunTimeIntervalExecutionBounds] = await self._task_run_time_interval_execution_bounds_repo.filter(
             FilterFieldsDNF.single("task_id", task_ids, ConditionOperation.IN)
         )
 
         # Группируем прогресс по task_id
-        progress_by_task_id: Dict[int, List[TimeIntervalTaskProgress]] = {}
+        progress_by_task_id: Dict[int, List[TaskRunTimeIntervalExecutionBounds]] = {}
         for record in progress_records:
             progress_by_task_id.setdefault(record.task_id, []).append(record)
 
@@ -108,18 +107,8 @@ class DefaultExecutionBoundsProvider:
                 continue
 
             # Находим последний завершённый интервал
-            latest_progress = max(task_progress, key=lambda p: p.right_bound_at)
-
-            # Предполагаем, что интервал завершён, если collected_data_amount == saved_data_amount
-            # Или просто берём последний по времени — зависит от твоей бизнес-логики
-            if latest_progress.collected_data_amount == latest_progress.saved_data_amount:
-                # Можно продолжать — следующий интервал начинается после latest.right_bound_at
-                next_left = latest_progress.right_bound_at
-            else:
-                # Последний интервал не завершён — возможно, нужно его перезапустить?
-                # Или пропустить? Зависит от требований.
-                # Пока просто создаём новый после него
-                next_left = latest_progress.right_bound_at
+            latest_progress = max(task_progress, key=lambda p: p.execution_bounds.right_bound_at)
+            next_left = latest_progress.execution_bounds.right_bound_at
 
             bounds = [TimeIntervalBounds(right_bound_at=now, left_bound_at=next_left)]
             result[task] = bounds

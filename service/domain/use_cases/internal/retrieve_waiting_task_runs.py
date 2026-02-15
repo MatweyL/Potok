@@ -5,7 +5,7 @@ from service.domain.schemas.enums import TaskRunStatus
 from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.repo.abstract import Repo
-from service.ports.outbound.repo.fields import FilterFieldsDNF
+from service.ports.outbound.repo.fields import FilterFieldsDNF, UpdateFields
 from service.ports.outbound.repo.transaction import TransactionFactory
 
 
@@ -33,6 +33,10 @@ class RetrieveWaitingTaskRunsUC(UseCase):
             task_runs = await self._task_run_repo.filter(FilterFieldsDNF.single('status', TaskRunStatus.WAITING, ),
                                                          transaction)
             status_updated_at = datetime.now()
+            await self._task_run_repo.update_all({task_run: UpdateFields.multiple({
+                'status': TaskRunStatus.QUEUED,
+                'status_updated_at': status_updated_at,
+            }) for task_run in task_runs})
             task_run_status_logs = [TaskRunStatusLog(task_run_id=task_run.id,
                                                      status_updated_at=status_updated_at,
                                                      status=TaskRunStatus.QUEUED)

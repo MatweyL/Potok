@@ -1,6 +1,7 @@
 import asyncio
 from typing import Type, Optional, Dict
 
+import aio_pika
 from aio_pika import connect_robust, Message
 from aio_pika.abc import AbstractConnection, AbstractExchange, AbstractChannel
 from pydantic import BaseModel
@@ -11,7 +12,7 @@ from service.ports.common.convert_utils import to_bytes
 from service.ports.common.interfaces import Startable
 from service.ports.common.logs import logger
 from service.ports.outbound.dto import RabbitMQURI
-from service.ports.outbound.producer import DataProducerI
+from service.ports.outbound.producer import DataProducerI, QueueCreator
 
 
 class AioPikaRMQProducerConnection(Startable):
@@ -74,6 +75,13 @@ class AioPikaRMQProducer(DataProducerI, Startable):
         self._channel: AbstractChannel = None
         self._exchange: AbstractExchange = None
 
+    @property
+    def channel(self):
+        return self._channel
+    @property
+    def exchange(self):
+        return self._exchange
+
     @classmethod
     def from_settings(cls, settings: RMQProducerSettings, connection: AioPikaRMQProducerConnection):
         return cls(connection=connection,
@@ -117,3 +125,38 @@ class AioPikaRMQProducer(DataProducerI, Startable):
                 return True
         logger.error(f'failed to produce message after {self._max_retries} retries: {exception}')
         return False
+
+
+class AioPikaRMQQueueBoundToExchangeCreator(QueueCreator):
+
+    def __init__(self,
+                 producer: AioPikaRMQProducer,
+                 connection: AioPikaRMQProducerConnection):
+        self._producer = producer
+        self._connection = connection
+
+        self._existing_queues = set()
+
+    async def is_queue_exists(self, name: str) -> bool:
+        if name in self._existing_queues:
+            return True
+        channel = await self._connection.connection.channel()
+        try:
+            await channel.declare_queue(name, passive=True)
+            self._existing_queues.add(name)
+            return True
+        except aio_pika.exceptions.ChannelClosed as e:
+            return False
+        finally:
+            await channel.close()
+
+    async def create_queue(self, name: str) -> bool:
+        channel = await self._connection.connection.channel()
+        try:
+            queue = await channel.declare_queue(name, )
+            await queue.bind(self._producer.exchange, name)
+            return True
+        except BaseException:
+            return False
+        finally:
+            await channel.close()

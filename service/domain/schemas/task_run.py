@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 
 from service.domain.schemas.enums import TaskRunStatus, PriorityType, TaskType
-from service.domain.schemas.execution_bounds import ExecutionBounds
+from service.domain.schemas.execution_bounds import ExecutionBounds, TimeIntervalBounds
 from service.domain.schemas.payload import Payload
 
 
@@ -26,7 +26,7 @@ class TaskRun(TaskRunPK):
     priority: PriorityType = PriorityType.MEDIUM
     type: TaskType = TaskType.UNDEFINED
     payload: Optional[Payload] = None
-    execution_bounds: Optional[List[ExecutionBounds]] = None
+    execution_bounds: Optional[ExecutionBounds] = None
     execution_arguments: Optional[Dict[str, Any]] = None
 
     status: TaskRunStatus
@@ -35,7 +35,7 @@ class TaskRun(TaskRunPK):
 
     @cached_property
     def queue_name(self):
-        return f"{self.group_name}.{self.type}.{self.priority}"
+        return f"{self.group_name}.{self.type.value}.{self.priority.value}"
 
 
 class TaskRunStatusLogPK(BaseModel):
@@ -52,3 +52,12 @@ class TaskRunStatusLogPK(BaseModel):
 class TaskRunStatusLog(TaskRunStatusLogPK):
     status: TaskRunStatus
     description: Optional[str] = None
+
+
+class TaskRunTimeIntervalExecutionBoundsPK(BaseModel):
+    task_run_id: int
+
+
+class TaskRunTimeIntervalExecutionBounds(TaskRunTimeIntervalExecutionBoundsPK):
+    task_id: int
+    execution_bounds: TimeIntervalBounds

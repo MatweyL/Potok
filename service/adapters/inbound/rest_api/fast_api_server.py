@@ -42,7 +42,7 @@ class FastAPIServer(Startable):
         self._allow_methods = allow_methods
         self._allow_headers = allow_headers
 
-        self._app = FastAPI(title=title, description=description)
+        self._app: FastAPI = FastAPI(title=title, description=description)
         self._app.add_middleware(
             CORSMiddleware,
             allow_origins=origins,

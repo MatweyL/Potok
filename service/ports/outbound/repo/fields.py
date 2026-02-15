@@ -13,6 +13,7 @@ class ConditionOperation(str, enum.Enum):
     IS_NULL = "IS_NULL"
     NOT_NULL = "NOT_NULL"
     IN = "IN"
+    NOT_IN = "NOT_IN"
 
 
 class LogicOperation(str, enum.Enum):

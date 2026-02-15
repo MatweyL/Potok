@@ -43,3 +43,17 @@ class DirectDataProducer(DataProducerI):
                            item_params: List[dict] = None) :
         for index, item in enumerate(items):
             await self.produce(item, to, headers=headers, item_params=item_params)
+
+
+from abc import abstractmethod
+
+
+class QueueCreator:
+
+    @abstractmethod
+    async def is_queue_exists(self, name: str) -> bool:
+        pass
+
+    @abstractmethod
+    async def create_queue(self, name: str) -> bool:
+        pass
