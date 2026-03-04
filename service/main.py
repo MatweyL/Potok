@@ -23,11 +23,19 @@ from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.di import set_use_case_facade
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
 from service.domain.services.payload_provider import PayloadProvider
+from service.domain.services.task_progress_provider import ActualTimeIntervalExecutionBoundsProvider
 from service.domain.services.uniqueness_payload_checker import UniquenessPayloadChecker
 from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.facade import UseCaseFacade
+from service.domain.use_cases.external.get_payload import GetPayloadUC
+from service.domain.use_cases.external.get_payloads import GetPayloadsUC
+from service.domain.use_cases.external.get_task import GetTaskUC
+from service.domain.use_cases.external.get_task_progress import GetTaskProgressUC
+from service.domain.use_cases.external.get_task_runs import GetTaskRunsUC
+from service.domain.use_cases.external.get_tasks import GetTasksUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
     GetAllMonitoringAlgorithmsUC
+from service.domain.use_cases.external.update_payload import UpdatePayloadUC
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC, CreateTaskRunsUCRq
 from service.domain.use_cases.internal.receive_task_run_execution_status import ReceiveTaskRunExecutionStatusUC, \
     ReceiveTaskRunExecutionStatusUCRq
@@ -80,6 +88,7 @@ async def main():
     )
     payload_provider = PayloadProvider(payload_repo)
     uniqueness_payload_checker = UniquenessPayloadChecker(payload_repo)
+    actual_execution_bounds_provider = ActualTimeIntervalExecutionBoundsProvider(time_interval_task_progress_repo)
 
     # USE CASE
     create_monitoring_algorithm_uc = CreateMonitoringAlgorithmUC(monitoring_algorithm_repo,
@@ -87,15 +96,26 @@ async def main():
                                                                  single_monitoring_algorithm_repo,
                                                                  transaction_factory)
     get_all_monitoring_algorithms_uc = GetAllMonitoringAlgorithmsUC(monitoring_algorithms)
-    create_tasks_uc = CreateTasksUC(transaction_factory, uniqueness_payload_checker, payload_repo, task_repo, task_status_log_repo)
-    use_case_facade = UseCaseFacade(create_tasks_uc, create_monitoring_algorithm_uc, get_all_monitoring_algorithms_uc)
+    create_tasks_uc = CreateTasksUC(transaction_factory, uniqueness_payload_checker, payload_repo, task_repo,
+                                    task_status_log_repo)
+    get_tasks_uc = GetTasksUC(task_repo)
+    get_task_uc = GetTaskUC(task_repo)
+    get_task_runs_uc = GetTaskRunsUC(task_repo, task_run_repo)
+    get_task_progress_uc = GetTaskProgressUC(task_repo, time_interval_task_progress_repo)
+    get_payload_uc = GetPayloadUC(payload_repo)
+    get_payloads_uc = GetPayloadsUC(payload_repo)
+    update_payload_uc = UpdatePayloadUC(payload_repo)
+
+    use_case_facade = UseCaseFacade(create_tasks_uc, create_monitoring_algorithm_uc, get_all_monitoring_algorithms_uc,
+                                    get_tasks_uc, get_task_uc, get_task_runs_uc, get_task_progress_uc, get_payloads_uc,
+                                    get_payload_uc, update_payload_uc)
     set_use_case_facade(use_case_facade)
 
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,
                                            task_run_time_interval_execution_bounds_repo,
                                            transaction_factory, task_to_execute_provider_registry,
                                            execution_bounds_provider,
-                                           payload_provider)
+                                           payload_provider, actual_execution_bounds_provider)
     receive_task_run_execution_status_uc = ReceiveTaskRunExecutionStatusUC(task_run_repo,
                                                                            task_run_status_log_repo,
                                                                            time_interval_task_progress_repo,
@@ -120,13 +140,12 @@ async def main():
                                                                                          task_run_status_log_repo,
                                                                                          transaction_factory)
 
-    transit_task_status_uc =  TransitTaskStatusUC(
+    transit_task_status_uc = TransitTaskStatusUC(
         task_repo=task_repo,
         task_run_repo=task_run_repo,
         task_status_log_repo=task_status_log_repo,
         transaction_factory=transaction_factory,
     )
-
 
     rmq_consumer_connection = AioPikaRMQConsumerConnection.from_settings(settings.rmq_consumer_connection)
     rmq_consumer = AioPikaRMQConsumer.from_settings(settings.rmq_consumer, rmq_consumer_connection)

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel
 
@@ -21,3 +21,6 @@ class TimeIntervalTaskProgress(TimeIntervalTaskProgressPK):
     left_bound_at: Optional[datetime] = None
     collected_data_amount: int
     saved_data_amount: int
+
+
+TaskProgress = Union[TimeIntervalTaskProgress]
