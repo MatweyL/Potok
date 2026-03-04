@@ -16,10 +16,11 @@ from service.domain.use_cases.external.monitoring_algorithm import CreateMonitor
 from service.domain.schemas.payload import PayloadBody
 from service.domain.schemas.task import TaskConfiguration
 from service.domain.schemas.monitoring_algorithm import PeriodicMonitoringAlgorithm, SingleMonitoringAlgorithm
+from service.ports.common.path_utils import get_project_root
 from service.ports.outbound.repo.fields import PaginationQuery
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=get_project_root().joinpath("templates"))
 
 
 # ---------------------------------------------------------------------------

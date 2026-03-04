@@ -11,7 +11,7 @@ from service.domain.schemas.enums import TaskStatus, TaskType, PriorityType, Mon
 
 class Payload(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     data: Mapped[dict] = mapped_column(JSONWithDatetime, )
-    checksum: Mapped[str] = mapped_column(UUID, nullable=False)
+    checksum: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
 
 
 class Task(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):

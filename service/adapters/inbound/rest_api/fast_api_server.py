@@ -9,9 +9,11 @@ from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.staticfiles import StaticFiles
 
 from service.ports.common.interfaces import Startable
 from service.ports.common.logs import logger
+from service.ports.common.path_utils import get_project_root
 from .annotations import HTTPMethod, EveryType
 from .router import router as api_router
 from .html_router import router as html_router
@@ -53,6 +55,7 @@ class FastAPIServer(Startable):
         )
         self._app.include_router(api_router)
         self._app.include_router(html_router)
+        self._app.mount("/static", StaticFiles(directory=get_project_root().joinpath('static')), name="static")
         handle_422_exceptions(self._app)
 
         self._server_task: Task = None

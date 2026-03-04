@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - Task System{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-3xl font-bold">Tasks</h1>
+        <p class="text-base-content/70 mt-1">Manage and monitor task execution</p>
+    </div>
+    <button
+        class="btn btn-primary"
+        hx-get="/tasks/create/modal"
+        hx-target="#modal-container"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Create Task
+    </button>
+</div>
+
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <div class="overflow-x-auto">
+            <table class="table table-zebra">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Group Name</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tasks-table-body">
+                    {% for task in tasks %}
+                    {% include 'tasks/task_row.html' %}
+                    {% endfor %}
+
+                    {% if not tasks %}
+                    <tr>
+                        <td colspan="6" class="text-center text-base-content/50 py-8">
+                            No tasks found. Create your first task!
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

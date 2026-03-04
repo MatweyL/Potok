@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Task System{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-3xl font-bold">Dashboard</h1>
+    <p class="text-base-content/70 mt-2">Overview of your task orchestration system</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="stats shadow">
+        <div class="stat">
+            <div class="stat-figure text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+            </div>
+            <div class="stat-title">Total Tasks</div>
+            <div class="stat-value text-primary">{{ total_tasks }}</div>
+            <div class="stat-desc">
+                <a href="/tasks" class="link link-primary">View all tasks</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats shadow">
+        <div class="stat">
+            <div class="stat-figure text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <div class="stat-title">Active</div>
+            <div class="stat-value text-secondary">-</div>
+            <div class="stat-desc">Currently running</div>
+        </div>
+    </div>
+
+    <div class="stats shadow">
+        <div class="stat">
+            <div class="stat-figure text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-8 h-8 stroke-current">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <div class="stat-title">Completed</div>
+            <div class="stat-value text-success">-</div>
+            <div class="stat-desc">Last 24h</div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-8">
+    <div class="flex gap-4">
+        <a href="/tasks" class="btn btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Create New Task
+        </a>
+        <a href="/monitoring-algorithms" class="btn btn-outline">
+            Configure Algorithms
+        </a>
+    </div>
+</div>
+{% endblock %}

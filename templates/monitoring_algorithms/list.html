@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoring Algorithms - Task System{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-3xl font-bold">Monitoring Algorithms</h1>
+        <p class="text-base-content/70 mt-1">Configure task execution strategies</p>
+    </div>
+    <button
+        class="btn btn-primary"
+        hx-get="/monitoring-algorithms/create/modal"
+        hx-target="#modal-container"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Create Algorithm
+    </button>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {% for algorithm in algorithms %}
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">
+                {% if algorithm.type == 'PERIODIC' %}
+                <span class="badge badge-primary">PERIODIC</span>
+                {% elif algorithm.type == 'SINGLE' %}
+                <span class="badge badge-secondary">SINGLE</span>
+                {% endif %}
+                Algorithm #{{ algorithm.id }}
+            </h2>
+
+            <div class="space-y-2 mt-4">
+                {% if algorithm.type == 'PERIODIC' %}
+                <div>
+                    <span class="text-sm opacity-60">Timeout:</span>
+                    <span class="font-semibold">{{ algorithm.timeout }}s</span>
+                </div>
+                <div>
+                    <span class="text-sm opacity-60">Noise:</span>
+                    <span class="font-semibold">{{ algorithm.timeout_noize }}s</span>
+                </div>
+                {% elif algorithm.type == 'SINGLE' %}
+                <div>
+                    <span class="text-sm opacity-60">Timeouts:</span>
+                    <code class="text-sm">{{ algorithm.timeouts }}</code>
+                </div>
+                <div>
+                    <span class="text-sm opacity-60">Executions:</span>
+                    <span class="font-semibold">{{ (algorithm.timeouts|length + 1) if algorithm.timeouts else 1 }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not algorithms %}
+    <div class="col-span-2 card bg-base-100 shadow-xl">
+        <div class="card-body text-center text-base-content/50 py-12">
+            No algorithms found. Create your first monitoring algorithm!
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
