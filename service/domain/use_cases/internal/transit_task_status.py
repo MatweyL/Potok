@@ -91,7 +91,7 @@ class TransitTaskStatusUC(UseCase):
                 elif error_count:
                     error_tasks_ids.append(executed_task_id)
 
-            status_updated_at = datetime.utcnow()
+            status_updated_at = datetime.now()
             # Формируем данные для пакетного обновления статусов
             tasks_to_update = {TaskPK(id=task_id): UpdateFields.multiple({'status': TaskStatus.SUCCEED,
                                                                           'status_updated_at': status_updated_at})

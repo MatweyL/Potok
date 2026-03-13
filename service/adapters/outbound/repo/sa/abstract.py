@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Type
 from pydantic import BaseModel
 from sqlalchemy import update, select, or_, ColumnElement, and_, asc, desc, func
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.sql.operators import gt, eq, ge, lt, le
+from sqlalchemy.sql.operators import gt, eq, ge, lt, le, ne
 
 from service.adapters.outbound.repo.sa.base import Base
 from service.adapters.outbound.repo.sa.database import Database
@@ -205,6 +205,8 @@ def filter_field_as_sqlalchemy_literal(filter_field: FilterField, model_class: T
     column: ColumnElement = getattr(model_class, filter_field.name)
     if filter_field.operation == ConditionOperation.EQ:
         return eq(column, filter_field.value)
+    if filter_field.operation == ConditionOperation.NE:
+        return ne(column, filter_field.value)
     if filter_field.operation == ConditionOperation.GT:
         return gt(column, filter_field.value)
     if filter_field.operation == ConditionOperation.GTE:

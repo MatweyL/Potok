@@ -47,7 +47,7 @@ class CreateTasksUC(UseCase):
                     transaction
                 )
                 task_configuration_dict = request.task_configuration.model_dump()
-                status_updated_at = datetime.utcnow()
+                status_updated_at = datetime.now()
                 tasks = [Task(payload_id=payload.id,
                               status=TaskStatus.NEW,
                               status_updated_at=status_updated_at,

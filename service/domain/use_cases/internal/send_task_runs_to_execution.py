@@ -1,5 +1,6 @@
 from typing import List
 
+from service.domain.schemas.command import Command
 from service.domain.schemas.task_run import TaskRun
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.producer import DataProducerI, QueueCreator
@@ -23,5 +24,6 @@ class SendTaskRunsToExecutionUC(UseCase):
             is_queue_exists = await self._queue_creator.is_queue_exists(task_run.queue_name)
             if not is_queue_exists:
                 await self._queue_creator.create_queue(task_run.queue_name)
-            await self._task_runs_producer.produce(task_run, task_run.queue_name)
+            command = Command(task_run=task_run)
+            await self._task_runs_producer.produce(command, task_run.queue_name)
         return SendTaskRunsToExecutionUCRs(request=request, success=True)

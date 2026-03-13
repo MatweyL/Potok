@@ -17,6 +17,7 @@ from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import 
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
 from service.domain.services.payload_provider import PayloadProvider
+from service.domain.services.task_progress_provider import ActualTimeIntervalExecutionBoundsProvider
 from service.domain.services.uniqueness_payload_checker import UniquenessPayloadChecker
 from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
@@ -112,21 +113,30 @@ def sa_time_interval_task_progress_repo(database):
 
 
 @pytest.fixture
-def execution_bounds_provider(sa_time_interval_task_progress_repo):
-    return DefaultExecutionBoundsProvider(sa_time_interval_task_progress_repo)
+def execution_bounds_provider(sa_task_run_time_interval_execution_bounds_repo):
+    return DefaultExecutionBoundsProvider(sa_task_run_time_interval_execution_bounds_repo)
 
 @pytest.fixture
 def sa_task_run_time_interval_execution_bounds_repo(database):
     return SATaskRunTimeIntervalExecutionBoundsRepo(database, models.TaskRunTimeIntervalExecutionBounds)
+
+
+@pytest.fixture
+def actual_execution_bounds_provider(sa_time_interval_task_progress_repo):
+    return ActualTimeIntervalExecutionBoundsProvider(sa_time_interval_task_progress_repo)
+
+
 @pytest.fixture
 def create_task_runs_uc(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo, sa_task_run_status_log_repo,
                         sa_time_interval_task_progress_repo, sa_task_run_time_interval_execution_bounds_repo,
                         sa_transaction_factory,
-                        task_to_execute_provider_registry, execution_bounds_provider, payload_provider):
+                        task_to_execute_provider_registry, execution_bounds_provider, payload_provider,
+                        actual_execution_bounds_provider,):
     return CreateTaskRunsUC(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo, sa_task_run_status_log_repo,
                             sa_task_run_time_interval_execution_bounds_repo,
                             sa_transaction_factory, task_to_execute_provider_registry, execution_bounds_provider,
-                            payload_provider, )
+                            payload_provider,
+                            actual_execution_bounds_provider)
 
 
 @pytest.fixture

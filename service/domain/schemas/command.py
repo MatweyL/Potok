@@ -22,4 +22,4 @@ class CommandResponse(BaseModel):
     status: TaskRunStatus
     description: Optional[str] = None
     result: Optional[ExecutionResults] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now)

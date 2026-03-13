@@ -31,7 +31,7 @@ class GetTaskProgressUC(UseCase):
         task = await self._task_repo.get(TaskPK(id=request.task_id))
         if not task:
             return GetTaskProgressUCRs(success=False, error="Not found", request=request)
-        task_progress = None
+        task_progress = []
         if task.type == TaskType.TIME_INTERVAL:
             task_progress = await self._time_interval_task_progress_repo.filter(
                 FilterFieldsDNF.single('task_id', request.task_id))

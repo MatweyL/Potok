@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from service.domain.schemas.enums import TaskStatus, TaskRunStatus
+from service.domain.schemas.enums import TaskStatus, TaskRunStatus, TaskType
 from service.domain.schemas.task import TaskPK, Task, TaskStatusLog, TaskStatusLogPK
 from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK, \
     TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK
@@ -30,7 +30,9 @@ class CreateTaskRunsUC(UseCase):
                  task_status_log_repo: Repo[TaskStatusLog, TaskStatusLog, TaskStatusLogPK],
                  task_run_status_log_repo: Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
                  task_run_time_interval_execution_bounds_repo: Repo[
-                     TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK],
+                     TaskRunTimeIntervalExecutionBounds,
+                     TaskRunTimeIntervalExecutionBounds,
+                     TaskRunTimeIntervalExecutionBoundsPK],
                  transaction_factory: TransactionFactory,
                  tasks_to_execute_provider_registry: TaskToExecuteProviderRegistry,
                  execution_bounds_provider: ExecutionBoundsProvider,
@@ -76,27 +78,38 @@ class CreateTaskRunsUC(UseCase):
                 payload = payload_by_task_pk[task_to_create_run]
                 execution_bounds_list = execution_bounds_by_task_pk[task_to_create_run]
                 execution_bounds_cutter = execution_bounds_cutter_by_task_id.get(task_to_create_run.id)
-                for execution_bounds in execution_bounds_list:
-                    if not execution_bounds_cutter:
-                        correct_execution_bounds = execution_bounds
-                    else:
-                        correct_execution_bounds = execution_bounds_cutter.cut(execution_bounds)
+                if not execution_bounds_list:
                     task_runs_to_create.append(TaskRun(task_id=task_to_create_run.id,
                                                        group_name=task_to_create_run.group_name,
                                                        priority=task_to_create_run.priority,
                                                        type=task_to_create_run.type,
                                                        payload=payload,
-                                                       execution_bounds=correct_execution_bounds,
+                                                       execution_bounds=None,
                                                        execution_arguments=task_to_create_run.execution_arguments,
                                                        status=TaskRunStatus.WAITING,
                                                        status_updated_at=status_updated_at, ))
+                else:
+                    for execution_bounds in execution_bounds_list:
+                        if not execution_bounds_cutter:
+                            correct_execution_bounds = execution_bounds
+                        else:
+                            correct_execution_bounds = execution_bounds_cutter.cut(execution_bounds)
+                        task_runs_to_create.append(TaskRun(task_id=task_to_create_run.id,
+                                                           group_name=task_to_create_run.group_name,
+                                                           priority=task_to_create_run.priority,
+                                                           type=task_to_create_run.type,
+                                                           payload=payload,
+                                                           execution_bounds=correct_execution_bounds,
+                                                           execution_arguments=task_to_create_run.execution_arguments,
+                                                           status=TaskRunStatus.WAITING,
+                                                           status_updated_at=status_updated_at, ))
 
             task_runs_created = await self._task_run_repo.create_all(task_runs_to_create, transaction=transaction)
             task_runs_time_interval_execution_bounds = [TaskRunTimeIntervalExecutionBounds(
                 task_run_id=task_run_created.id,
                 task_id=task_run_created.task_id,
                 execution_bounds=task_run_created.execution_bounds
-            ) for task_run_created in task_runs_created]
+            ) for task_run_created in task_runs_created if task_run_created.type == TaskType.TIME_INTERVAL]
             task_run_status_logs = [TaskRunStatusLog(task_run_id=task_run_created.id,
                                                      status_updated_at=status_updated_at,
                                                      status=task_run_created.status)

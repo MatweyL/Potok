@@ -10,6 +10,7 @@ class ConditionOperation(str, enum.Enum):
     GTE = "GTE"
     LTE = "LTE"
     EQ = "EQ"
+    NE = "NE"
     IS_NULL = "IS_NULL"
     NOT_NULL = "NOT_NULL"
     IN = "IN"

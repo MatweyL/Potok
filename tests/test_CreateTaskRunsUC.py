@@ -3,12 +3,15 @@ from typing import Dict
 
 import pytest
 
-from service.domain.schemas.enums import TaskType, TaskStatus, MonitoringAlgorithmType
+from service.domain.schemas.enums import TaskType, TaskStatus, MonitoringAlgorithmType, TaskRunStatus
+from service.domain.schemas.execution_bounds import TimeIntervalBounds
 from service.domain.schemas.monitoring_algorithm import MonitoringAlgorithm, PeriodicMonitoringAlgorithm
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task
 from service.domain.schemas.task_progress import TimeIntervalTaskProgress
+from service.domain.schemas.task_run import TaskRunTimeIntervalExecutionBounds, TaskRun
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUCRq
+from service.ports.outbound.repo.fields import FilterFieldsDNF, ConditionOperation
 
 
 @pytest.fixture
@@ -55,14 +58,28 @@ def create_task_v2(sa_task_repo, ):
 
 
 @pytest.fixture
-def create_time_interval_task_progress(sa_time_interval_task_progress_repo):
+def create_time_interval_task_progress(sa_time_interval_task_progress_repo,
+                                       sa_task_run_time_interval_execution_bounds_repo,
+                                       sa_task_run_repo):
     async def _inner(task: Task, right_bound_at: datetime = None, left_bound_at: datetime = None, ):
         right_bound_at = right_bound_at or datetime.now() - timedelta(days=1)
-        t = TimeIntervalTaskProgress(task_id=task.id, right_bound_at=right_bound_at,left_bound_at=left_bound_at,
+        left_bound_at = left_bound_at if left_bound_at else datetime.min
+        t = TimeIntervalTaskProgress(task_id=task.id, right_bound_at=right_bound_at, left_bound_at=left_bound_at,
                                      collected_data_amount=10, saved_data_amount=10)
+        execution_bounds = TimeIntervalBounds(right_bound_at=t.right_bound_at,
+                                              left_bound_at=t.left_bound_at)
+        task_run = TaskRun(task_id=task.id, group_name=task.group_name, priority=task.priority, type=task.type,
+                           payload=None, execution_bounds=execution_bounds, status=TaskRunStatus.SUCCEED,
+                           status_updated_at=datetime.now())
+        task_run = await sa_task_run_repo.create(task_run)
+        await sa_task_run_time_interval_execution_bounds_repo.create(TaskRunTimeIntervalExecutionBounds(
+            task_run_id=task_run.id, task_id=task.id, execution_bounds=execution_bounds
+        ))
         t_created = await sa_time_interval_task_progress_repo.create(t)
         return t_created
+
     return _inner
+
 
 @pytest.mark.asyncio
 async def test_apply_one_task_two_runs(create_task_runs_uc, sa_task_run_repo, create_payload, create_task_v2,
@@ -80,26 +97,32 @@ async def test_apply_one_task_two_runs(create_task_runs_uc, sa_task_run_repo, cr
 
 @pytest.mark.asyncio
 async def test_apply_one_task_one_run(create_task_runs_uc, create_payload, create_task_v2,
-                                      create_periodic_monitoring_algorithm,create_time_interval_task_progress, sa_task_run_repo):
+                                      create_periodic_monitoring_algorithm, create_time_interval_task_progress,
+                                      sa_task_run_repo):
     payload = await create_payload()
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
     task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.SUCCEED, )
-    await create_time_interval_task_progress(task)
+    time_interval_task_progress = await create_time_interval_task_progress(task)
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
     assert response.task_runs_created == 1
-    task_runs = await sa_task_run_repo.get_all()
+    task_runs = await sa_task_run_repo.filter(FilterFieldsDNF.single('status', TaskRunStatus.SUCCEED, ConditionOperation.NE))
+
     assert len(task_runs) == response.task_runs_created
     for task_run in task_runs:
         assert task_run.task_id == task.id
 
+
 @pytest.mark.asyncio
 async def test_apply_one_task_null_run(create_task_runs_uc, create_payload, create_task_v2,
-                                      create_periodic_monitoring_algorithm,create_time_interval_task_progress, sa_task_run_repo):
+                                       create_periodic_monitoring_algorithm, create_time_interval_task_progress,
+                                       sa_task_run_repo):
     payload = await create_payload()
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
-    task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.EXECUTION, status_update_elapsed_seconds=5 )
+    task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.EXECUTION,
+                                status_update_elapsed_seconds=5)
     await create_time_interval_task_progress(task)
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
     assert response.task_runs_created == 0
     task_runs = await sa_task_run_repo.get_all()
-    assert len(task_runs) == response.task_runs_created
+    assert len(task_runs) == 1
+    assert task_runs[0].status == TaskRunStatus.SUCCEED

@@ -1,6 +1,8 @@
 import asyncio
+import json
 import logging
 from datetime import datetime
+from typing import Any
 
 from service.adapters.inbound.consumer.rmq import AioPikaRMQConsumer, AioPikaRMQConsumerConnection, RMQQueueConsumer
 from service.adapters.inbound.rest_api.fast_api_server import FastAPIServer
@@ -48,12 +50,19 @@ from service.domain.use_cases.internal.transit_task_run_status.impls import Tran
     TransitStatusFromQueuedToInterruptedUC, TransitStatusFromInterruptedToWaitingUC, \
     TransitStatusFromTempErrorToWaitingUC
 from service.domain.use_cases.internal.transit_task_status import TransitTaskStatusUC, TransitTaskStatusUCRq
-from service.ports.common.input_converter import FromStrOrBytesToPydantic
+from service.ports.common.input_converter import FromStrOrBytesToPydantic, InputConverterI
 from service.ports.common.logs import logger, set_log_level
 from service.ports.common.periodic_runner import PeriodicRunner
 from service.ports.outbound.producer import DirectDataProducer
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
 from service.settings import ServiceSettings
+
+
+class CommandResponseToReceiveTaskRunExecutionStatusUCRq(InputConverterI):
+
+    def convert(self, raw_message: Any) -> Any:
+        command_response = json.loads(raw_message)
+        return ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
 
 
 async def main():
@@ -152,8 +161,7 @@ async def main():
     rmq_task_run_execution_status_consumer = RMQQueueConsumer(rmq_consumer,
                                                               settings.rmq_task_run_execution_status_queue,
                                                               receive_task_run_execution_status_uc.apply,
-                                                              FromStrOrBytesToPydantic(
-                                                                  ReceiveTaskRunExecutionStatusUCRq))
+                                                              CommandResponseToReceiveTaskRunExecutionStatusUCRq())
 
     fastapi_server = FastAPIServer.from_settings(settings.fastapi_server)
 

@@ -78,10 +78,10 @@ class DefaultExecutionBoundsProvider:
         """
 
         task_ids = [task.id for task in tasks]
-        progress_records: List[TaskRunTimeIntervalExecutionBounds] = await self._task_run_time_interval_execution_bounds_repo.filter(
+        progress_records: List[
+            TaskRunTimeIntervalExecutionBounds] = await self._task_run_time_interval_execution_bounds_repo.filter(
             FilterFieldsDNF.single("task_id", task_ids, ConditionOperation.IN)
         )
-
         # Группируем прогресс по task_id
         progress_by_task_id: Dict[int, List[TaskRunTimeIntervalExecutionBounds]] = {}
         for record in progress_records:
@@ -107,7 +107,10 @@ class DefaultExecutionBoundsProvider:
                 continue
 
             # Находим последний завершённый интервал
-            latest_progress = max(task_progress, key=lambda p: p.execution_bounds.right_bound_at)
+            latest_progress = max(task_progress,
+                                  key=lambda p: p.execution_bounds.right_bound_at
+                                  if p.execution_bounds.right_bound_at
+                                  else datetime.min)
             next_left = latest_progress.execution_bounds.right_bound_at
 
             bounds = [TimeIntervalBounds(right_bound_at=now, left_bound_at=next_left)]
