@@ -44,3 +44,8 @@ class CommandType(str, enum.Enum):
 class MonitoringAlgorithmType(str, enum.Enum):
     PERIODIC = "PERIODIC"
     SINGLE = "SINGLE"
+
+
+class AppUserRole(str, enum.Enum):
+    ADMIN = "ADMIN"
+    OPERATOR = "OPERATOR"

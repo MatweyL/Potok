@@ -83,7 +83,6 @@ class FastAPIServer(Startable):
         server = uvicorn.Server(config=config)
         await server.serve()
 
-
     async def stop(self):
         logger.warning("unable to stop Rest API server")
 
