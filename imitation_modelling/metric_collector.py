@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from time import perf_counter
 
@@ -37,17 +38,17 @@ class MetricCollector:
     def last_metrics(self):
         if not self.metrics_history:
             return {
-            'time': int((self.system_time.current - self.system_time.start).total_seconds()),
-            'executionCount': 0,
-            'queuedCount': 0,
-            'waitingCount': 0,
-            'queuedAvgDuration': 0,
-            'executionAvgDuration': 0,
-            'returnFrequency': 0,
-            'succeedFrequency': 0,
-            'completed': 0,
-            'total': self.metric_provider.get_total_count()
-        }
+                'time': int((self.system_time.current - self.system_time.start).total_seconds()),
+                'executionCount': 0,
+                'queuedCount': 0,
+                'waitingCount': 0,
+                'queuedAvgDuration': 0,
+                'executionAvgDuration': 0,
+                'returnFrequency': 0,
+                'succeedFrequency': 0,
+                'completed': 0,
+                'total': self.metric_provider.get_total_count()
+            }
         return self.metrics_history[-1]
 
     def collect(self):
@@ -69,12 +70,14 @@ class MetricCollector:
 
     def save(self, ):
         duration = self.duration
-        print(f"saving; duration: {duration} s")
+        logging.info(f"saving; duration: {duration} s")
 
+        succeed_tasks_count_by_tries_count = self.metric_provider.get_succeed_tasks_count_by_tries_count()
         d = {'history': self.metrics_history,
              'params': self.params.model_dump(),
              'duration': duration,
-             'run_name': self.params.run_name}
+             'run_name': self.params.run_name,
+             'succeed_tasks_count_by_tries_count': succeed_tasks_count_by_tries_count}
         file_dir = Path("simulation_results")
         file_dir.mkdir(parents=True, exist_ok=True)
         file = file_dir.joinpath(self.params.run_name + '.json')

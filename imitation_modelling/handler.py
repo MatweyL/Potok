@@ -44,9 +44,22 @@ class Handler:
         self.tasks_part_from_all_for_high_load = tasks_part_from_all_for_high_load
         self.temp_error_probability_at_high_load = temp_error_probability_at_high_load
         self.system_time = system_time
+        self._terminated = False
+
+    def copy(self, handler_id: str) -> 'Handler':
+        return Handler(handler_id,
+                       self.broker,
+                       self.system_time,
+                       self.task_execution_duration_generator,
+                       self.max_tasks,
+                       int(self.execution_confirm_timeout.total_seconds()),
+                       self.tasks_part_from_all_for_high_load,
+                       self.temp_error_probability_at_high_load)
 
     @property
     def can_consume(self) -> bool:
+        if self._terminated:
+            return False
         if not self.max_tasks or self.max_tasks <= 0:
             return True
         return len(self.handling_task_by_id) < self.max_tasks
@@ -104,6 +117,15 @@ class Handler:
                 self.broker.send_task_run_status_log(task_run_status_log)
                 self.handling_task_by_id.pop(task_run_id)
 
+    def terminate(self):
+        self._terminated = True
+        for task in self.handling_task_by_id.values():
+            task_run_status_log = TaskRunStatusLog(task_run_id=task.task_run.id,
+                                                   status=TaskRunStatus.INTERRUPTED,
+                                                   created_timestamp=self.system_time.current)
+            self.broker.send_task_run_status_log(task_run_status_log)
+        self.handling_task_by_id.clear()
+
 
 class HandlerPool:
 
@@ -129,3 +151,15 @@ class HandlerPool:
     def handle_tasks_runs(self):
         for handler in self.handlers:
             handler.handle_task_runs()
+
+    def terminate(self, number: int):
+        number = min(number, len(self.handlers))
+        handlers_to_terminate = self.handlers[:number]
+        self.handlers = self.handlers[number:]
+        for handler_to_terminate in handlers_to_terminate:
+            handler_to_terminate.terminate()
+
+    def increase(self, number: int):
+        handler_with_max_id = max(self.handlers, key=lambda h: h.handler_id)
+        for i in range(number):
+            self.handlers.append(handler_with_max_id.copy(handler_with_max_id.handler_id + f"_iteration_{i}"))

@@ -2,7 +2,7 @@ import enum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -57,10 +57,25 @@ class TaskExecution:
     next_execution_confirm_time: datetime
 
 
+class ScaleDirection(str, enum.Enum):
+    """Направление масштабирования пула обработчиков"""
+    INCREASE = "INCREASE"
+    DECREASE = "DECREASE"
+
+
+class InputHandlerScalingRule(BaseModel):
+    """Одно правило автоскейлинга по прогрессу задач"""
+    direction: ScaleDirection
+    threshold: float      # раньше complete_ratio
+    amount: int
+
+
+class HandlerScalingRule(InputHandlerScalingRule):
+    executed: bool = False
 class TaskBatchProviderType(str, enum.Enum):
     CONSTANT_SIZE = "CONSTANT_SIZE"
-    PID = "PID"
     AIMD = "AIMD"
+    MOVING_PID = "MOVING_PID"
 
 
 class SimulationParams(BaseModel):
@@ -76,6 +91,8 @@ class SimulationParams(BaseModel):
     run_timeout: int = 30
     metric_provider_period: int = 150
     time_step_seconds: int = 25
+    broker_task_ttl: int = 300
+    handler_scaling_rules: List[InputHandlerScalingRule] = Field(default_factory=list)
 
     task_batch_provider_params: Dict[str, Any] = Field(default={"batch_size": 100})
     task_batch_provider_type: TaskBatchProviderType = TaskBatchProviderType.CONSTANT_SIZE

@@ -164,7 +164,7 @@ def main():
     configs = generator.generate_mixed_configs(count=100)
 
     # Сохраняем конфигурации
-    generator.save_configs(configs, prefix="sim_config")
+    # generator.save_configs(configs, prefix="sim_config")
 
     # Опционально: сохранить все в один файл
     generator.save_batch_config(configs, filename="all_configs.json")

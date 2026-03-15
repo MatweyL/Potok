@@ -5,8 +5,7 @@ from imitation_modelling.metric_collector import MetricCollector
 from imitation_modelling.repo import TaskRunMetricProvider, TaskRunStatusRepo
 from imitation_modelling.schemas import SystemTime, TaskBatchProviderType
 from imitation_modelling.task_batch_provider import ConstantSizeTaskBatchProvider
-from imitation_modelling.task_batch_provider_aimd import AIMDTaskBatchProvider
-from imitation_modelling.task_batch_provider_pid import PIDTaskBatchProvider
+from imitation_modelling.batch_provider.task_batch_provider_aimd import AIMDTaskBatchProvider
 
 
 class TaskBatchProviderBuilder:
@@ -30,7 +29,4 @@ class TaskBatchProviderBuilder:
             return AIMDTaskBatchProvider(self._broker, self._task_run_status_repo, self._task_run_metric_provider,
                                          self._system_time,
                                          **params)
-        return PIDTaskBatchProvider(self._broker, self._task_run_status_repo, self._task_run_metric_provider,
-                                    self._system_time,
-                                    self._metric_collector,
-                                    **params)
+        raise RuntimeError("unknown type")

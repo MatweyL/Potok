@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import timedelta, datetime
 from functools import cached_property
 from typing import List, Dict, Set, Iterator
@@ -112,8 +113,26 @@ class TaskRunStatusRepo:
 
         return total_duration / total_count if total_count else 0
 
+    def get_task_run_status_count(self, task_run_id: str, status: TaskRunStatus) -> int:
+        logs = self._task_status_log_by_task_run_id[task_run_id]
+        status_count = 0
+        for log in logs:
+            if log.status == status:
+                status_count += 1
+        return status_count
+
 
 class TaskRunMetricProvider:
+
+    def get_succeed_tasks_count_by_tries_count(self) -> Dict[int, int]:
+        succeed_tasks_count_by_tries_count = defaultdict(int)
+        for task_run in self._task_run_status_repo.iter_actual_statuses({TaskRunStatus.SUCCEED,
+                                                                         TaskRunStatus.ERROR,
+                                                                         TaskRunStatus.CANCELLED}):
+            tries_count = self._task_run_status_repo.get_task_run_status_count(task_run.task_run_id,
+                                                                               TaskRunStatus.WAITING)
+            succeed_tasks_count_by_tries_count[tries_count] += 1
+        return dict(succeed_tasks_count_by_tries_count)
 
     def get_completed_count(self) -> int:
         return self._task_run_status_repo.get_current_count({TaskRunStatus.SUCCEED,
@@ -160,6 +179,7 @@ class TaskRunMetricProvider:
                                                                      TaskRunStatus.ERROR,
                                                                      TaskRunStatus.CANCELLED, },
                                                                     self._period) / self._period
+
     def get_succeed_by_period(self) -> int:
         return self._task_run_status_repo.get_total_count_by_period({TaskRunStatus.SUCCEED,
                                                                      TaskRunStatus.ERROR,
