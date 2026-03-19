@@ -51,7 +51,7 @@ class MetricCollector:
             }
         return self.metrics_history[-1]
 
-    def collect(self):
+    def collect(self, batch_size: int):
         metrics = {
             'time': int((self.system_time.current - self.system_time.start).total_seconds()),
             'executionCount': self.metric_provider.get_execution_count_total(),
@@ -62,7 +62,8 @@ class MetricCollector:
             'returnFrequency': round(self.metric_provider.get_return_frequency(), 4),
             'succeedFrequency': round(self.metric_provider.get_succeed_frequency(), 4),
             'completed': self.metric_provider.get_completed_count(),
-            'total': self.metric_provider.get_total_count()
+            'total': self.metric_provider.get_total_count(),
+            'batch_size': batch_size
         }
         self.metrics_history.append(metrics)
         if self._start_counter is None:

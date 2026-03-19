@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import List, Iterator, Dict, Any, Type
+from typing import List, Iterator
 
 from imitation_modelling.broker import Broker
 from imitation_modelling.repo import TaskRunMetricProvider, TaskRunStatusRepo
@@ -18,23 +18,14 @@ class TaskBatchProvider(ABC):
         return list(self.iter())
 
     @abstractmethod
-    def iter(self) -> Iterator[TaskRunStatusLog]:
+    def calculate_batch_size(self) -> int:
         pass
 
-
-class ConstantSizeTaskBatchProvider(TaskBatchProvider):
-    type: TaskBatchProviderType = TaskBatchProviderType.CONSTANT_SIZE
-
-    def __init__(self, broker: Broker, task_run_status_repo: TaskRunStatusRepo,
-                 task_run_metric_provider: TaskRunMetricProvider, system_time: SystemTime,
-                 batch_size: int, ):
-        super().__init__(broker, task_run_status_repo, task_run_metric_provider, system_time)
-        self._batch_size = batch_size
-
     def iter(self) -> Iterator[TaskRunStatusLog]:
+        batch_size = self.calculate_batch_size()
         tasks_count = 0
         for actual_task_run_status_log in self._task_run_status_repo.iter_actual_statuses({TaskRunStatus.WAITING}):
             yield actual_task_run_status_log
             tasks_count += 1
-            if tasks_count >= self._batch_size:
+            if tasks_count >= batch_size:
                 break

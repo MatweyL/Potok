@@ -66,40 +66,81 @@ class ScaleDirection(str, enum.Enum):
 class InputHandlerScalingRule(BaseModel):
     """Одно правило автоскейлинга по прогрессу задач"""
     direction: ScaleDirection
-    threshold: float      # раньше complete_ratio
+    threshold: float  # раньше complete_ratio
     amount: int
 
 
 class HandlerScalingRule(InputHandlerScalingRule):
     executed: bool = False
+
+
 class TaskBatchProviderType(str, enum.Enum):
     CONSTANT_SIZE = "CONSTANT_SIZE"
     AIMD = "AIMD"
     MOVING_PID = "MOVING_PID"
 
 
+class SystemParams(BaseModel):
+    handlers_amount: int = Field(default=5, description="Количество обработчиков")
+    handler_max_tasks: int = Field(default=4, description="Максимальное количество задач,"
+                                                          " которые обработчик может выполнять одновременно")
+    execution_confirm_timeout: int = Field(default=300, description="Подтверждать выполнение задачи каждые"
+                                                                    " N виртуальных секунд."
+                                                                    " Значение обязательно должно быть меньше, чем"
+                                                                    " таймаут перевода задачи в статус прерванной")
+    tasks_part_from_all_for_high_load: float = Field(default=0.9,
+                                                     description="Загруженность обработчика, при которой появляется "
+                                                                 "вероятность отказа выполняющейся задачи. "
+                                                                 "Загруженность вычисляется "
+                                                                 "как tasks_in_work / handler_max_tasks")
+    temp_error_probability_at_high_load: float = Field(default=0.1, description="Вероятность отказа для задачи"
+                                                                                " в загруженном сборщике")
+    random_timeout_generator_left: int = Field(default=10, description="Минимальное время выполнения задачи,"
+                                                                       " виртуальные секунды")
+    random_timeout_generator_right: int = Field(default=15, description="Максимальное время выполнения задачи,"
+                                                                        " виртуальные секунды")
+    tasks_amount: int = Field(default=1000, description="Количество задач в постановщике задач,"
+                                                        " на которых проводится тест")
+    interrupted_timeout: int = Field(default=400, description="Таймаут перевода задачи в статус прерванной для"
+                                                              " постановщика задач, виртуальные секунды")
+    run_timeout: int = Field(default=30, description="Период отправки задач на постановщиком задач в очередь,"
+                                                     " виртуальные секунды")
+    metric_provider_period: int = Field(default=150, description="Период, за который класс предоставления метрик"
+                                                                 " считает частоты появления статусов,"
+                                                                 " виртуальные секунды")
+    time_step_seconds: int = Field(default=25, description="Количество виртуальных секунд, которые проходят за один"
+                                                           " tick виртуальных часов")
+    broker_task_ttl: int = Field(default=400, description="Время жизни задачи в очереди в виртуальных секундах."
+                                                          " Значение обязательно должно"
+                                                          " быть меньше, чем таймаут перевода"
+                                                          " задачи в статус выполненной")
+    handler_scaling_rules: List[InputHandlerScalingRule] = Field(default_factory=list,
+                                                                 description="Правила для увеличения или уменьшения"
+                                                                             " количества обработчиков в системе"
+                                                                             " после выполнения определенной доли задач")
+    config_name: str = Field(default='default', description="Название текущей конфигурации")
+
+    max_run_seconds: int = Field(default=180,
+                                 description="Максимальная длительность исследования в реальном мире"
+                                             " в секундах. Для удобства сравнения результатов работы алгоритмов"
+                                             " лучше всегда держать постоянным, например, 180 секунд в каждом запуске")
+
+
+class TaskBatchProviderParams(BaseModel):
+    arguments: Dict[str, Any] = Field(description="Параметры выбранного алгоритма формирования размера пачки задач")
+    type: TaskBatchProviderType = Field(description="Тип выбранного алгоритма формирования размера пачки задач")
+
+    description: str = Field(description="Краткий комментарий об используемой конфигурации")
+    system_config_name: str = Field(description="Указание конфигурации симуляции, для которой применяется этот конфиг")
+    batch_min: int = Field(description="Минимальный размер пачки задач")
+    batch_opt: int = Field(description="Оптимальный размер пачки задач для симуляции")
+    batch_max: int = Field(description="Максимальный размер пачки задач для симуляции")
+
+
 class SimulationParams(BaseModel):
-    handlers_amount: int = 5
-    handler_max_tasks: int = 4
-    execution_confirm_timeout: int = 300
-    tasks_part_from_all_for_high_load: float = 0.9
-    temp_error_probability_at_high_load: float = 0.1
-    random_timeout_generator_left: int = 25
-    random_timeout_generator_right: int = 25
-    tasks_amount: int = 1000
-    interrupted_timeout: int = 400
-    run_timeout: int = 30
-    metric_provider_period: int = 150
-    time_step_seconds: int = 25
-    broker_task_ttl: int = 300
-    handler_scaling_rules: List[InputHandlerScalingRule] = Field(default_factory=list)
-
-    task_batch_provider_params: Dict[str, Any] = Field(default={"batch_size": 100})
-    task_batch_provider_type: TaskBatchProviderType = TaskBatchProviderType.CONSTANT_SIZE
-    config_file_name: str = 'default'
-
-    max_run_seconds: int = 60
+    system_params: SystemParams
+    task_batch_provider_params: TaskBatchProviderParams
 
     @cached_property
     def run_name(self) -> str:
-        return f"{self.config_file_name}__{self.task_batch_provider_type.value}"
+        return f"{self.task_batch_provider_params.type.value}__{self.task_batch_provider_params.description}__{self.system_params.config_name}"

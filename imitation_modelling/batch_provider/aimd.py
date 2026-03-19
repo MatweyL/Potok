@@ -1,8 +1,6 @@
-from typing import Iterator
-
 from imitation_modelling.broker import Broker
 from imitation_modelling.repo import TaskRunStatusRepo, TaskRunMetricProvider
-from imitation_modelling.schemas import TaskRunStatusLog, SystemTime, TaskBatchProviderType, TaskRunStatus
+from imitation_modelling.schemas import SystemTime, TaskBatchProviderType
 from imitation_modelling.task_batch_provider import TaskBatchProvider
 from service.ports.common.logs import logger
 
@@ -22,7 +20,8 @@ class AIMDTaskBatchProvider(TaskBatchProvider):
 
     def __init__(self, broker: Broker, task_run_status_repo: TaskRunStatusRepo,
                  task_run_metric_provider: TaskRunMetricProvider, system_time: SystemTime,
-                 delta: int, beta: float,
+                 delta: int,
+                 beta: float,
                  base_batch_size: int,
                  batch_size_min: int,
                  batch_size_max: int, ):
@@ -33,7 +32,7 @@ class AIMDTaskBatchProvider(TaskBatchProvider):
         self.batch_size_min = batch_size_min
         self.batch_size_max = batch_size_max
 
-    def iter(self) -> Iterator[TaskRunStatusLog]:
+    def calculate_batch_size(self) -> int:
         succeed = self._task_run_metric_provider.get_succeed_by_period()
         error = self._task_run_metric_provider.get_error_by_period()
         total = error + succeed
@@ -43,11 +42,5 @@ class AIMDTaskBatchProvider(TaskBatchProvider):
         elif succeed_frequency_by_period < 0.7:
             self.current_batch_size *= self.beta
         self.current_batch_size = clip(self.current_batch_size, self.batch_size_min, self.batch_size_max)
-        logger.info(f"{self.current_batch_size=}")
-        tasks_count = 0
-        current_batch_size = self.current_batch_size
-        for actual_task_run_status_log in self._task_run_status_repo.iter_actual_statuses({TaskRunStatus.WAITING}):
-            yield actual_task_run_status_log
-            tasks_count += 1
-            if tasks_count >= current_batch_size:
-                break
+        logger.info(f"AIMD {self.current_batch_size=}")
+        return self.current_batch_size

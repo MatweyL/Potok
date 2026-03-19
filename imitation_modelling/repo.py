@@ -80,10 +80,10 @@ class TaskRunStatusRepo:
             before_newest_appearance = None
             oldest_appearance = None
             status_streak_ended = False
-            for index in range(len(task_status_logs) - 1, -1, -1):
+            for index in range(len(task_status_logs) - 1, -1, -1):  # Итерируемся от самых новых логов к старым
                 task_status_log: TaskRunStatusLog = task_status_logs[index]
                 status_in_period = task_status_log.created_timestamp + timedelta(
-                    seconds=period) > self.system_time.current
+                    seconds=period) > self.system_time.current  # проверяем содержание лога в нужном временном диапазоне
                 if not status_in_period and not has_suitable_status_in_period:
                     break
 
@@ -97,14 +97,16 @@ class TaskRunStatusRepo:
                     oldest_appearance = task_status_log
                 elif oldest_appearance:
                     status_streak_ended = True
-                if has_suitable_status_in_period and oldest_appearance != before_newest_appearance and status_streak_ended:
-                    if not before_newest_appearance:
-                        end_time = self.system_time.current
-                    else:
+
+                # Если есть подходящий статус в периоде и найдены границы статуса, то вычисляем длительность нахождения
+                # задачи в этом статусе
+                if has_suitable_status_in_period and status_streak_ended:
+                    if before_newest_appearance:
+
                         end_time = before_newest_appearance.created_timestamp
-                    duration = (end_time - oldest_appearance.created_timestamp).total_seconds()
-                    total_count += 1
-                    total_duration += duration
+                        duration = (end_time - oldest_appearance.created_timestamp).total_seconds()
+                        total_count += 1
+                        total_duration += duration
 
                     before_newest_appearance = None
                     oldest_appearance = None
@@ -156,10 +158,14 @@ class TaskRunMetricProvider:
     def get_queued_count_total(self) -> int:
         return self._task_run_status_repo.get_current_count({TaskRunStatus.QUEUED})
 
+    def get_temp_error_count_total(self) -> int:
+        return self._task_run_status_repo.get_current_count({TaskRunStatus.TEMP_ERROR})
+
+    def get_interrupted_count_total(self) -> int:
+        return self._task_run_status_repo.get_current_count({TaskRunStatus.INTERRUPTED})
+
     def get_waiting_count_total(self) -> int:
-        return self._task_run_status_repo.get_current_count({TaskRunStatus.WAITING,
-                                                             TaskRunStatus.INTERRUPTED,
-                                                             TaskRunStatus.TEMP_ERROR})
+        return self._task_run_status_repo.get_current_count({TaskRunStatus.WAITING})
 
     def get_queued_average_duration(self) -> float:
         return self._task_run_status_repo.get_average_by_period(TaskRunStatus.QUEUED,

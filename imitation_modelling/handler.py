@@ -111,9 +111,10 @@ class Handler:
         for task_run_status, task_run_ids in task_run_ids_by_status.items():
             for task_run_id in task_run_ids:
                 task_execution = self.handling_task_by_id[task_run_id]
+                created_timestamp = self.system_time.current if task_run_status == TaskRunStatus.TEMP_ERROR else task_execution.finish_time
                 task_run_status_log = TaskRunStatusLog(task_run_id=task_execution.task_run.id,
                                                        status=task_run_status,
-                                                       created_timestamp=self.system_time.current)
+                                                       created_timestamp=created_timestamp)
                 self.broker.send_task_run_status_log(task_run_status_log)
                 self.handling_task_by_id.pop(task_run_id)
 

@@ -1,11 +1,12 @@
 from typing import Dict, Any
 
+from imitation_modelling.batch_provider.aimd import AIMDTaskBatchProvider
+from imitation_modelling.batch_provider.constant import ConstantSizeTaskBatchProvider
+from imitation_modelling.batch_provider.moving_pid import MovingPIDProvider
 from imitation_modelling.broker import Broker
 from imitation_modelling.metric_collector import MetricCollector
 from imitation_modelling.repo import TaskRunMetricProvider, TaskRunStatusRepo
 from imitation_modelling.schemas import SystemTime, TaskBatchProviderType
-from imitation_modelling.task_batch_provider import ConstantSizeTaskBatchProvider
-from imitation_modelling.batch_provider.task_batch_provider_aimd import AIMDTaskBatchProvider
 
 
 class TaskBatchProviderBuilder:
@@ -22,11 +23,21 @@ class TaskBatchProviderBuilder:
         if not task_batch_provider_type:
             raise RuntimeError(f"Unexpected task batch provider type: {task_batch_provider_type}")
         if task_batch_provider_type == TaskBatchProviderType.CONSTANT_SIZE:
-            return ConstantSizeTaskBatchProvider(self._broker, self._task_run_status_repo,
-                                                 self._task_run_metric_provider, self._system_time,
+            return ConstantSizeTaskBatchProvider(self._broker,
+                                                 self._task_run_status_repo,
+                                                 self._task_run_metric_provider,
+                                                 self._system_time,
                                                  **params)
         if task_batch_provider_type == TaskBatchProviderType.AIMD:
-            return AIMDTaskBatchProvider(self._broker, self._task_run_status_repo, self._task_run_metric_provider,
+            return AIMDTaskBatchProvider(self._broker,
+                                         self._task_run_status_repo,
+                                         self._task_run_metric_provider,
                                          self._system_time,
                                          **params)
+        if task_batch_provider_type == TaskBatchProviderType.MOVING_PID:
+            return MovingPIDProvider(self._broker,
+                                     self._task_run_status_repo,
+                                     self._task_run_metric_provider,
+                                     self._system_time,
+                                     **params)
         raise RuntimeError("unknown type")

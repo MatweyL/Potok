@@ -30,17 +30,23 @@ class TaskManager:
                 break
             self._task_run_status_repo.add(task_run_status_log)
 
-    def run_send_tasks(self):
+    def run_send_tasks(self) -> int:
+        """ Возвращает количество отправленных задач """
+        tasks_amount = 0
         if self.next_send_tasks_time <= self.system_time.current:
-            self.send_tasks()
+            tasks_amount = self.send_tasks()
             self.next_send_tasks_time = self.system_time.current + self._run_timeout
+        return tasks_amount
 
-    def send_tasks(self):
+    def send_tasks(self) -> int:
+        amount = 0
         for task_run_status_log in self._task_batch_provider.iter():
             self._task_run_status_repo.add(TaskRunStatusLog(task_run_id=task_run_status_log.task_run_id,
                                                             status=TaskRunStatus.QUEUED,
                                                             created_timestamp=self.system_time.current))
             self._broker.send_task_run(TaskRun(id=task_run_status_log.task_run_id))
+            amount += 1
+        return amount
 
     def transit_from_temp_error_or_interrupted_to_waiting(self):
         for actual_task_run_status_log in self._task_run_status_repo.iter_actual_statuses({TaskRunStatus.TEMP_ERROR,

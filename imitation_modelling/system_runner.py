@@ -7,7 +7,7 @@ from imitation_modelling.handlers_scalling_controller import HandlerScalingContr
 from imitation_modelling.metric_collector import MetricCollector
 from imitation_modelling.repo import TaskRunMetricProvider, TaskRunStatusRepo
 from imitation_modelling.schemas import SystemTime, TaskRunStatusLog, TaskRunStatus, SimulationParams
-from imitation_modelling.batch_provider.task_batch_provider_builder import TaskBatchProviderBuilder
+from imitation_modelling.batch_provider.builder import TaskBatchProviderBuilder
 from imitation_modelling.task_manager import TaskManager
 from service.ports.common.logs import logger
 
@@ -59,17 +59,18 @@ class SystemRunner:
             self.task_manager.consume_statuses()
             self.task_manager.transit_from_queued_or_execution_to_interrupted()
             self.task_manager.transit_from_temp_error_or_interrupted_to_waiting()
-            self.task_manager.run_send_tasks()
+            batch_size = self.task_manager.run_send_tasks()
             self.handler_pool.consume()
             self.handler_pool.handle_tasks_runs()
-            self.metric_collector.collect()
+            self.metric_collector.collect(batch_size)
             self.handler_scaling_controller.apply_scaling()
         self.metric_collector.stop()
         logger.info("progress: 100%")
         self.metric_collector.save()
 
 
-def build_system_runner(params: SimulationParams):
+def build_system_runner(simulation_params: SimulationParams):
+    params = simulation_params.system_params
     time_step_seconds = params.time_step_seconds
     system_time = SystemTime(time_step_seconds=time_step_seconds)
     broker = Broker(Queue(), Queue(), params.broker_task_ttl)
@@ -95,14 +96,14 @@ def build_system_runner(params: SimulationParams):
     metric_provider_period = params.metric_provider_period
     task_run_status_repo = TaskRunStatusRepo(system_time, task_run_status_logs_by_task_run_id)
     metric_provider = TaskRunMetricProvider(task_run_status_repo, metric_provider_period)
-    metric_collector = MetricCollector(system_time, metric_provider, params)
+    metric_collector = MetricCollector(system_time, metric_provider, simulation_params)
     task_batch_provider_builder = TaskBatchProviderBuilder(broker,
                                                            task_run_status_repo,
                                                            metric_provider,
                                                            system_time,
                                                            metric_collector)
-    task_batch_provider = task_batch_provider_builder.build(params.task_batch_provider_type,
-                                                            params.task_batch_provider_params)
+    task_batch_provider = task_batch_provider_builder.build(simulation_params.task_batch_provider_params.type,
+                                                            simulation_params.task_batch_provider_params.arguments)
     task_manager = TaskManager(interrupted_timeout, broker, system_time, run_timeout,
                                task_batch_provider,
                                task_run_status_repo, )

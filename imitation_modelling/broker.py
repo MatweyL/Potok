@@ -1,5 +1,4 @@
 from queue import Queue, Empty
-from queue import Queue, Empty
 from time import perf_counter
 from typing import Optional, Any, Dict, List
 
