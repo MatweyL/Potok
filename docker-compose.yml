@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  potok:
+    container_name: potok
+    build:
+      dockerfile: Dockerfile.dev
+      context: .
+    command: bash -c "poetry run alembic upgrade head && poetry run python3 service/main.py"
+    ports:
+      - "5005:5005"
+    volumes:
+      - .:/app:z

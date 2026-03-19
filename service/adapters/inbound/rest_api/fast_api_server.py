@@ -16,7 +16,6 @@ from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
 from .annotations import HTTPMethod, EveryType
 from .router import router as api_router
-from .html_router import router as html_router
 from .settings import FastAPIServerSettings
 
 DEFAULT_ORIGINS = ["*"]
@@ -54,7 +53,6 @@ class FastAPIServer(Startable):
             allow_headers=self._allow_headers,
         )
         self._app.include_router(api_router)
-        self._app.include_router(html_router)
         self._app.mount("/static", StaticFiles(directory=get_project_root().joinpath('static')), name="static")
         handle_422_exceptions(self._app)
 
