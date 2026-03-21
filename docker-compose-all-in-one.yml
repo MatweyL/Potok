@@ -1,0 +1,54 @@
+version: '3.9'
+
+services:
+  # Сервис приложения potok
+  potok:
+    container_name: potok
+    build:
+      dockerfile: Dockerfile.dev
+      context: .
+    command: bash -c "poetry run alembic upgrade head && poetry run python3 service/main.py"
+    ports:
+      - "5005:5005"
+    volumes:
+      - .:/app:z
+    depends_on:
+      - rabbitmq
+      - postgres
+    environment:
+      # Переопределяем переменные окружения для подключения к контейнерам
+      - fastapi_server__port=5005
+      - rmq_consumer_connection__uri=amqp://guest:guest@rabbitmq:5672/
+      - rmq_producer_connection__uri=amqp://guest:guest@rabbitmq:5672/
+      - database_uri=postgresql+asyncpg://postgres:postgres@postgres:5432/potok
+
+  # Сервис RabbitMQ (брокер сообщений)
+  rabbitmq:
+    image: rabbitmq:3.11.10-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"    # Порт для подключения приложений (AMQP)
+      - "15672:15672"  # Порт для веб-интерфейса управления (Management UI)
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq  # Сохраняем данные очередей при перезапуске
+
+  # Сервис PostgreSQL (база данных)
+  postgres:
+    image: postgres:13.3
+    container_name: postgres
+    environment:
+      POSTGRES_DB: "potok"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    ports:
+      - "5432:5432"    # Порт для подключения к базе данных
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Сохраняем данные БД при перезапуске
+
+# Определяем именованные тома для сохранения данных
+volumes:
+  rabbitmq_data:
+  postgres_data:
