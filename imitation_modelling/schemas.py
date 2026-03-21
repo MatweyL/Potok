@@ -78,6 +78,9 @@ class TaskBatchProviderType(str, enum.Enum):
     CONSTANT_SIZE = "CONSTANT_SIZE"
     AIMD = "AIMD"
     MOVING_PID = "MOVING_PID"
+    MOVING_PID_V2 = "MOVING_PID_V2"
+    GRADIENT_ASCENT = "GRADIENT_ASCENT"
+    ADAPTIVE_MODEL = "ADAPTIVE_MODEL"
 
 
 class SystemParams(BaseModel):

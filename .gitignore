@@ -116,3 +116,4 @@ venv.bak/
 !requirements.txt
 *.zip
 *.pdf
+plots_single_system/

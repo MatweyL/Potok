@@ -176,7 +176,7 @@ def generate_config(index: int) -> SystemParams:
         broker_task_ttl=broker_task_ttl,
         handler_scaling_rules=scaling_rules,
         config_name=config_name,
-        max_run_seconds=180,  # фиксировано для честного сравнения алгоритмов
+        max_run_seconds=60,  # фиксировано для честного сравнения алгоритмов
     )
 
 

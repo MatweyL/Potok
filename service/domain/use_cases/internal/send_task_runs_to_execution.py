@@ -15,9 +15,11 @@ class SendTaskRunsToExecutionUCRs(UCResponse):
 
 
 class SendTaskRunsToExecutionUC(UseCase):
-    def __init__(self, task_runs_producer: DataProducerI, queue_creator: QueueCreator):
+    def __init__(self, task_runs_producer: DataProducerI, queue_creator: QueueCreator,
+                 message_ttl: int = 300):
         self._task_runs_producer = task_runs_producer
         self._queue_creator = queue_creator
+        self._message_ttl_ms = message_ttl * 1000
 
     async def apply(self, request: SendTaskRunsToExecutionUCRq) -> SendTaskRunsToExecutionUCRs:
         for task_run in request.task_runs:
@@ -25,5 +27,6 @@ class SendTaskRunsToExecutionUC(UseCase):
             if not is_queue_exists:
                 await self._queue_creator.create_queue(task_run.queue_name)
             command = Command(task_run=task_run)
-            await self._task_runs_producer.produce(command, task_run.queue_name)
+            await self._task_runs_producer.produce(command, task_run.queue_name,
+                                                   item_params={'x-message-ttl': self._message_ttl_ms})
         return SendTaskRunsToExecutionUCRs(request=request, success=True)
