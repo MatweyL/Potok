@@ -19,7 +19,7 @@ class SendTaskRunsToExecutionUC(UseCase):
                  message_ttl: int = 300):
         self._task_runs_producer = task_runs_producer
         self._queue_creator = queue_creator
-        self._message_ttl_ms = message_ttl * 1000
+        self._message_ttl = message_ttl
 
     async def apply(self, request: SendTaskRunsToExecutionUCRq) -> SendTaskRunsToExecutionUCRs:
         for task_run in request.task_runs:
@@ -28,5 +28,5 @@ class SendTaskRunsToExecutionUC(UseCase):
                 await self._queue_creator.create_queue(task_run.queue_name)
             command = Command(task_run=task_run)
             await self._task_runs_producer.produce(command, task_run.queue_name,
-                                                   item_params={'x-message-ttl': self._message_ttl_ms})
+                                                   item_params={'expiration': self._message_ttl})
         return SendTaskRunsToExecutionUCRs(request=request, success=True)

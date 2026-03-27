@@ -110,7 +110,8 @@ class AioPikaRMQProducer(DataProducerI, Startable):
     async def produce(self, item: bytes | dict | str | Type[BaseModel], to: str, headers: dict = None,
                       item_params: dict = None) -> bool:
         prepared_body = to_bytes(item)
-        message = Message(body=prepared_body, headers=headers)
+        expiration = item_params.get('expiration') if item_params else None
+        message = Message(body=prepared_body, headers=headers, expiration=expiration)
         routing_key = to if to else self._routing_key
         exception = None
         for retry in range(self._max_retries):
