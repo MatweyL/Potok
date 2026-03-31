@@ -182,7 +182,7 @@ async def main():
         PeriodicRunner(retrieve_and_send_task_runs_uc.apply, 30, run_name="Send task runs to execution",
                        method_args=[RetrieveAndSendTaskRunsUCRq()]),
         PeriodicRunner(transit_task_status_uc.apply, 30, run_name="Transit task status to SUCCEED or ERROR",
-                       method_args=[TransitTaskStatusUCRq()])
+                       method_args=[TransitTaskStatusUCRq()]),
         PeriodicRunner(task_status_log_cleaner.clean_logs, 86_400, 30, run_name="Clean task run status logs"),
 
     ]
