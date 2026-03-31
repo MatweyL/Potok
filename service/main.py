@@ -24,6 +24,7 @@ from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import 
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.di import set_use_case_facade
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
+from service.domain.services.log_cleaner import TaskRunStatusLogCleaner
 from service.domain.services.payload_provider import PayloadProvider
 from service.domain.services.task_progress_provider import ActualTimeIntervalExecutionBoundsProvider
 from service.domain.services.uniqueness_payload_checker import UniquenessPayloadChecker
@@ -98,7 +99,7 @@ async def main():
     payload_provider = PayloadProvider(payload_repo)
     uniqueness_payload_checker = UniquenessPayloadChecker(payload_repo)
     actual_execution_bounds_provider = ActualTimeIntervalExecutionBoundsProvider(time_interval_task_progress_repo)
-
+    task_status_log_cleaner = TaskRunStatusLogCleaner(task_run_status_log_repo)
     # USE CASE
     create_monitoring_algorithm_uc = CreateMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                                  periodic_monitoring_algorithm_repo,
@@ -181,7 +182,8 @@ async def main():
         PeriodicRunner(retrieve_and_send_task_runs_uc.apply, 30, run_name="Send task runs to execution",
                        method_args=[RetrieveAndSendTaskRunsUCRq()]),
         PeriodicRunner(transit_task_status_uc.apply, 30, run_name="Transit task status to SUCCEED or ERROR",
-                       method_args=[TransitTaskStatusUCRq()]),
+                       method_args=[TransitTaskStatusUCRq()])
+        PeriodicRunner(task_status_log_cleaner.clean_logs, 86_400, 30, run_name="Clean task run status logs"),
 
     ]
     for startable_obj in startable:

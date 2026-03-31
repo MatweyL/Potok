@@ -6,7 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from service.adapters.outbound.repo.sa.base import Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin, \
     SerialIntPKMixin, JSONWithDatetime
-from service.domain.schemas.enums import TaskStatus, TaskType, PriorityType, MonitoringAlgorithmType, TaskRunStatus
+from service.domain.schemas.enums import TaskStatus, TaskType, PriorityType, MonitoringAlgorithmType, TaskRunStatus, \
+    AppUserRole
 
 
 class Payload(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
@@ -83,4 +84,11 @@ class TaskRunTimeIntervalExecutionBounds(Base, TablenameMixin, LoadTimestampMixi
     task_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task.id"), )
     right_bound_at: Mapped[datetime] = mapped_column(DateTime,)
     left_bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
+
+class AppUser(Base, TablenameMixin,SerialBigIntPKMixin, LoadTimestampMixin):
+    roles: Mapped[List[AppUserRole]] = mapped_column(JSON, nullable=False)
+    username:  Mapped[str] = mapped_column(TEXT, nullable=False, unique=True)
+    password_hash:  Mapped[str] = mapped_column(TEXT, nullable=False,)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

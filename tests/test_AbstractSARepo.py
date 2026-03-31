@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict
 
 import pytest
@@ -616,3 +616,15 @@ class TestConversionMethods:
 
         assert model_pk == {"id": 123}
         assert isinstance(model_pk, dict)
+
+
+@pytest.mark.asyncio
+async def test_delete_by_condition(user_repo):
+    users = [UserDomain(name=f"Auto_{i}", email=f"auto_{i}@test.com", age=25,
+                        created_at=datetime.now() - timedelta(seconds=3600 * i))
+             for i in range(24)
+             ]
+    created_users = await user_repo.create_all(users)
+    assert len(created_users) == 24
+    deleted_count = await user_repo.delete_by_condition(FilterFieldsDNF.single('created_at', datetime.now() - timedelta(seconds=3600 * 12), ConditionOperation.LTE))
+    assert deleted_count == 12

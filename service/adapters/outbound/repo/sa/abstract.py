@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Type
 
 from pydantic import BaseModel
-from sqlalchemy import update, select, or_, ColumnElement, and_, asc, desc, func
+from sqlalchemy import update, select, or_, ColumnElement, and_, asc, desc, func, delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.sql.operators import gt, eq, ge, lt, le, ne
 
@@ -186,6 +186,18 @@ class AbstractSARepo(Repo, ABC):
         else:
             value = await transaction.session.scalar(query)
         return value
+
+    async def delete_by_condition(self, filter_fields_dnf: FilterFieldsDNF,
+                                  transaction: Optional[SATransaction] = None):
+        sqlalchemy_dnf = filter_fields_dnf_as_sqlalchemy_dnf(filter_fields_dnf, self._model_class)
+        query = delete(self._model_class).where(sqlalchemy_dnf)
+        if not transaction:
+            async with self._database.session as session:
+                result = await session.execute(query)
+                await session.commit()
+        else:
+            result = await transaction.session.execute(query)
+        return result.rowcount
 
 
 def filter_fields_dnf_as_sqlalchemy_dnf(filter_fields_dnf: FilterFieldsDNF, model_class: Type[Base]) -> ColumnElement:
