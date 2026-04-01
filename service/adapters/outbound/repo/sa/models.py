@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Dict, List
 
-from sqlalchemy import JSON, BIGINT, ForeignKey, VARCHAR, Enum, INT, DateTime, FLOAT, TEXT, UUID
+from sqlalchemy import JSON, BIGINT, ForeignKey, VARCHAR, Enum, INT, DateTime, FLOAT, TEXT, UUID, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from service.adapters.outbound.repo.sa.base import Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin, \
@@ -91,4 +91,11 @@ class AppUser(Base, TablenameMixin,SerialBigIntPKMixin, LoadTimestampMixin):
     username:  Mapped[str] = mapped_column(TEXT, nullable=False, unique=True)
     password_hash:  Mapped[str] = mapped_column(TEXT, nullable=False,)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
+
+class RefreshToken(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
+    user_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("app_user.id"), primary_key=True)
+    token: Mapped[str] = mapped_column(TEXT, nullable=False, )
+    expires_at:  Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at:  Mapped[datetime] = mapped_column(DateTime, nullable=False)

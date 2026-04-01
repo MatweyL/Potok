@@ -80,7 +80,7 @@ class AbstractTransitTaskRunStatusUC(UseCase, ABC):
             )
 
         # Обновляем статус всех задач
-        now = datetime.utcnow()
+        now = datetime.now()
         update_fields = UpdateFields.multiple(
             {
                 "status": self.to_status,

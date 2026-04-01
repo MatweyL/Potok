@@ -86,6 +86,13 @@ class Repo(ABC, Generic[TDomain, TModel, TPK]):
         pass
 
     @abstractmethod
-    async def delete_by_condition(self,  filter_fields_dnf: FilterFieldsDNF,
-                     transaction: Optional[Transaction] = None):
+    async def delete_by_condition(self,
+                                  filter_fields_dnf: FilterFieldsDNF,
+                                  transaction: Optional[Transaction] = None):
+        pass
+
+    @abstractmethod
+    async def delete(self,
+                     obj_pk: TPK,
+                     transaction: Optional[Transaction] = None) -> Optional[TDomain]:
         pass

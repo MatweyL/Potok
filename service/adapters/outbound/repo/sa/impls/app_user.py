@@ -12,14 +12,16 @@ class SAAppUserRepo(AbstractSARepo):
                               roles=obj.roles,
                               username=obj.username,
                               password_hash=obj.password_hash,
-                              created_at=obj.created_at)
+                              created_at=obj.created_at,
+                              is_active=obj.is_active, )
 
     def to_domain(self, obj: models.AppUser) -> AppUser:
         return AppUser(id=obj.id,
                        roles=[AppUserRole(role_raw) for role_raw in obj.roles],
                        username=obj.username,
                        password_hash=obj.password_hash,
-                       created_at=obj.created_at)
+                       created_at=obj.created_at,
+                       is_active=obj.is_active, )
 
     def pk_to_model_pk(self, pk: AppUserPK) -> Dict:
         return {'id': pk.id}

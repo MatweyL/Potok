@@ -199,6 +199,22 @@ class AbstractSARepo(Repo, ABC):
             result = await transaction.session.execute(query)
         return result.rowcount
 
+    async def delete(self,
+                     obj_pk: TPK,
+                     transaction: Optional[SATransaction] = None) -> Optional[TDomain]:
+        model_pk = self.pk_to_model_pk(obj_pk)
+        query = delete(self._model_class).filter_by(**model_pk).returning(self._model_class)
+        if not transaction:
+            async with self._database.session as session:
+                result = await session.scalars(query)
+                deleted_model = result.first()
+                await session.commit()
+        else:
+            result = await transaction.session.scalars(query)
+            deleted_model = result.first()
+        if deleted_model:
+            return self.to_domain(deleted_model)
+
 
 def filter_fields_dnf_as_sqlalchemy_dnf(filter_fields_dnf: FilterFieldsDNF, model_class: Type[Base]) -> ColumnElement:
     conjunctions = [conjunct_as_sqlalchemy_conjunct(conjunct, model_class) for conjunct in

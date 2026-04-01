@@ -4,6 +4,7 @@ import pytest_asyncio
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.base import Base
 from service.adapters.outbound.repo.sa.database import Database
+from service.adapters.outbound.repo.sa.impls.app_user import SAAppUserRepo
 from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAPeriodicMonitoringAlgorithmRepo, \
     SAMonitoringAlgorithmRepo, SASingleMonitoringAlgorithmRepo
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
@@ -16,9 +17,12 @@ from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatus
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
+from service.domain.services.hasher import Hasher
 from service.domain.services.payload_provider import PayloadProvider
 from service.domain.services.task_progress_provider import ActualTimeIntervalExecutionBoundsProvider
 from service.domain.services.uniqueness_payload_checker import UniquenessPayloadChecker
+from service.domain.use_cases.external.auth.create_first_admin import CreateFirstAdminUC
+from service.domain.use_cases.external.auth.create_user import CreateUserUC
 from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
     GetAllMonitoringAlgorithmsUC
@@ -116,9 +120,15 @@ def sa_time_interval_task_progress_repo(database):
 def execution_bounds_provider(sa_task_run_time_interval_execution_bounds_repo):
     return DefaultExecutionBoundsProvider(sa_task_run_time_interval_execution_bounds_repo)
 
+
 @pytest.fixture
 def sa_task_run_time_interval_execution_bounds_repo(database):
     return SATaskRunTimeIntervalExecutionBoundsRepo(database, models.TaskRunTimeIntervalExecutionBounds)
+
+
+@pytest.fixture
+def sa_app_user_repo(database):
+    return SAAppUserRepo(database, models.AppUser)
 
 
 @pytest.fixture
@@ -131,7 +141,7 @@ def create_task_runs_uc(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo,
                         sa_time_interval_task_progress_repo, sa_task_run_time_interval_execution_bounds_repo,
                         sa_transaction_factory,
                         task_to_execute_provider_registry, execution_bounds_provider, payload_provider,
-                        actual_execution_bounds_provider,):
+                        actual_execution_bounds_provider, ):
     return CreateTaskRunsUC(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo, sa_task_run_status_log_repo,
                             sa_task_run_time_interval_execution_bounds_repo,
                             sa_transaction_factory, task_to_execute_provider_registry, execution_bounds_provider,
@@ -191,3 +201,18 @@ def transit_task_status_uc(
         task_status_log_repo=sa_task_status_log_repo,
         transaction_factory=sa_transaction_factory,
     )
+
+
+@pytest.fixture
+def hasher():
+    return Hasher()
+
+
+@pytest.fixture
+def create_user_uc(sa_app_user_repo, hasher):
+    return CreateUserUC(sa_app_user_repo, hasher)
+
+
+@pytest.fixture
+def create_first_admin_uc(create_user_uc, sa_app_user_repo):
+    return CreateFirstAdminUC(create_user_uc, sa_app_user_repo)

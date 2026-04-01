@@ -6,14 +6,16 @@ from typing import Any
 
 from service.adapters.inbound.consumer.rmq import AioPikaRMQConsumer, AioPikaRMQConsumerConnection, RMQQueueConsumer
 from service.adapters.inbound.rest_api.fast_api_server import FastAPIServer
+from service.adapters.inbound.rest_api.html_auth_middleware import AuthMiddleware
 from service.adapters.outbound.producer.rmq import AioPikaRMQProducerConnection, AioPikaRMQProducer, \
     AioPikaRMQQueueBoundToExchangeCreator
 from service.adapters.outbound.repo.sa import models
-from service.adapters.outbound.repo.sa.base import Base
 from service.adapters.outbound.repo.sa.database import Database
+from service.adapters.outbound.repo.sa.impls.app_user import SAAppUserRepo
 from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAMonitoringAlgorithmRepo, \
     SAPeriodicMonitoringAlgorithmRepo, SASingleMonitoringAlgorithmRepo
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
+from service.adapters.outbound.repo.sa.impls.refresh_token import SARefreshTokenRepo
 from service.adapters.outbound.repo.sa.impls.task import SATaskRepo
 from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
@@ -24,10 +26,18 @@ from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import 
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.di import set_use_case_facade
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
+from service.domain.services.hasher import Hasher
 from service.domain.services.log_cleaner import TaskRunStatusLogCleaner
 from service.domain.services.payload_provider import PayloadProvider
 from service.domain.services.task_progress_provider import ActualTimeIntervalExecutionBoundsProvider
+from service.domain.services.token_service import TokenService
 from service.domain.services.uniqueness_payload_checker import UniquenessPayloadChecker
+from service.domain.use_cases.external.auth.create_first_admin import CreateFirstAdminUC, CreateFirstAdminUCRq
+from service.domain.use_cases.external.auth.create_user import CreateUserUC
+from service.domain.use_cases.external.auth.facade import AuthUseCaseFacade
+from service.domain.use_cases.external.auth.login import LoginUC
+from service.domain.use_cases.external.auth.logout import LogoutUC
+from service.domain.use_cases.external.auth.refresh_token import RefreshTokenUC
 from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.facade import UseCaseFacade
 from service.domain.use_cases.external.get_payload import GetPayloadUC
@@ -51,7 +61,7 @@ from service.domain.use_cases.internal.transit_task_run_status.impls import Tran
     TransitStatusFromQueuedToInterruptedUC, TransitStatusFromInterruptedToWaitingUC, \
     TransitStatusFromTempErrorToWaitingUC
 from service.domain.use_cases.internal.transit_task_status import TransitTaskStatusUC, TransitTaskStatusUCRq
-from service.ports.common.input_converter import FromStrOrBytesToPydantic, InputConverterI
+from service.ports.common.input_converter import InputConverterI
 from service.ports.common.logs import logger, set_log_level
 from service.ports.common.periodic_runner import PeriodicRunner
 from service.ports.outbound.producer import DirectDataProducer
@@ -83,8 +93,11 @@ async def main():
     task_run_status_log_repo = SATaskRunStatusLogRepo(database, models.TaskRunStatusLog)
 
     time_interval_task_progress_repo = SATimeIntervalTaskProgressRepo(database, models.TimeIntervalTaskProgress)
-    task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database, models.TaskRunTimeIntervalExecutionBounds)
+    task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database,
+                                                                                            models.TaskRunTimeIntervalExecutionBounds)
     payload_repo = SAPayloadRepo(database, models.Payload)
+    app_user_repo = SAAppUserRepo(database, models.AppUser)
+    refresh_token_repo = SARefreshTokenRepo(database, models.RefreshToken)
 
     rmq_producer_connection = AioPikaRMQProducerConnection.from_settings(settings.rmq_producer_connection)
     rmq_producer = AioPikaRMQProducer.from_settings(settings.rmq_producer_task_run, rmq_producer_connection)
@@ -100,6 +113,8 @@ async def main():
     uniqueness_payload_checker = UniquenessPayloadChecker(payload_repo)
     actual_execution_bounds_provider = ActualTimeIntervalExecutionBoundsProvider(time_interval_task_progress_repo)
     task_status_log_cleaner = TaskRunStatusLogCleaner(task_run_status_log_repo)
+    hasher = Hasher()
+    token_service = TokenService(settings.jwt_secret_key)
     # USE CASE
     create_monitoring_algorithm_uc = CreateMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                                  periodic_monitoring_algorithm_repo,
@@ -157,6 +172,14 @@ async def main():
         transaction_factory=transaction_factory,
     )
 
+    # USE CASE: Auth
+    create_user_uc = CreateUserUC(app_user_repo, hasher)
+    create_first_admin_uc = CreateFirstAdminUC(create_user_uc, app_user_repo)
+    login_uc = LoginUC(app_user_repo, refresh_token_repo, hasher, token_service)
+    logout_uc = LogoutUC(refresh_token_repo)
+    refresh_token_uc = RefreshTokenUC(app_user_repo, refresh_token_repo, token_service)
+    auth_use_case_facade = AuthUseCaseFacade(login_uc,logout_uc, refresh_token_uc)
+
     rmq_consumer_connection = AioPikaRMQConsumerConnection.from_settings(settings.rmq_consumer_connection)
     rmq_consumer = AioPikaRMQConsumer.from_settings(settings.rmq_consumer, rmq_consumer_connection)
     rmq_task_run_execution_status_consumer = RMQQueueConsumer(rmq_consumer,
@@ -165,9 +188,17 @@ async def main():
                                                               CommandResponseToReceiveTaskRunExecutionStatusUCRq())
 
     fastapi_server = FastAPIServer.from_settings(settings.fastapi_server)
+    fastapi_server.app.state.auth_facade = auth_use_case_facade
+    fastapi_server.app.state.token_service = token_service
+    fastapi_server.app.add_middleware(AuthMiddleware)
 
-    startable = [rmq_producer_connection, rmq_producer, rmq_consumer_connection, rmq_consumer,
-                 rmq_task_run_execution_status_consumer, fastapi_server, ]
+    startable = [
+        # rmq_producer_connection,
+        # rmq_producer,
+        # rmq_consumer_connection,
+        # rmq_consumer,
+        # rmq_task_run_execution_status_consumer,
+        fastapi_server, ]
     periodic_runners = [
         PeriodicRunner(create_task_runs_uc.apply, 30, run_name="Create task runs from tasks",
                        method_args=[CreateTaskRunsUCRq()]),
@@ -191,6 +222,11 @@ async def main():
     for periodic_runner in periodic_runners:
         periodic_runner.create_periodic_task()
     try:
+        create_first_admin_uc_rs = await create_first_admin_uc.apply(
+            CreateFirstAdminUCRq(username=settings.admin_username,
+                                 password=settings.admin_password))
+        logger.info(
+            f"First admin created: {create_first_admin_uc_rs.success}; detail: {create_first_admin_uc_rs.error}")
         await asyncio.Future()
     except BaseException as e:
         logger.critical(f"Stop service due to error: {e.__class__.__name__}: {e}")

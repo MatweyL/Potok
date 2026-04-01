@@ -21,6 +21,10 @@ class CreateUserUCRs(UCResponse):
 
 
 class CreateUserUC(UseCase):
+    """
+    Юз-кейс создания пользователя, вызывается администратором системы.
+    Изначально в системе всегда существует один администратор
+    """
     def __init__(self, app_user_repo: Repo[AppUser, AppUser, AppUserPK],
                  hasher: Hasher):
         self._app_user_repo = app_user_repo

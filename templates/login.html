@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Поток — Вход</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --error: #f87171;
+      --border-radius: 16px;
+      --shadow: 0 10px 40px -10px rgba(0,0,0,0.3);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, var(--bg-primary), #1e1b4b);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 380px;
+      animation: fadeInUp 0.5s ease;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .logo h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .logo p {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+    }
+
+    .field {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.4rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    input {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    input::placeholder {
+      color: #475569;
+    }
+
+    .error {
+      font-size: 0.8rem;
+      color: var(--error);
+      margin-top: 1rem;
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 1.25rem;
+      padding: 0.85rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.35);
+    }
+
+    button:hover { opacity: 0.9; }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h1>Поток</h1>
+      <p>Система управления задачами</p>
+    </div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label for="username">Логин</label>
+        <input id="username" name="username" type="text" placeholder="username" autocomplete="username" required/>
+      </div>
+      <div class="field">
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required/>
+      </div>
+
+      <div class="error" id="errorMsg"></div>
+
+      <button type="submit" id="submitBtn">Войти</button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const errorMsg = document.getElementById('errorMsg');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.textContent = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Вход...';
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: form.username.value.trim(),
+            password: form.password.value,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          // access token держим в памяти — не в localStorage
+          window.__accessToken = data.access_token;
+          window.location.href = '/projects';
+        } else {
+          errorMsg.textContent = data.error || 'Ошибка входа';
+        }
+      } catch {
+        errorMsg.textContent = 'Нет связи с сервером';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Войти';
+      }
+    });
+  </script>
+</body>
+</html>

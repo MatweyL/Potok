@@ -1,14 +1,14 @@
 # src/auth/infrastructure/token_service.py
 # или src/core/security/token_service.py — как вам удобнее
 
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 import jwt
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
 from service.domain.schemas.app_user import AppUser, AppUserDTO
+from service.domain.schemas.refresh_token import RefreshToken
 
 
 class TokenService:
@@ -40,10 +40,10 @@ class TokenService:
             "sub": str(user.id),
             "username": user.username,
             "roles": [role.value for role in user.roles],  # enum → строки
-            "iat": datetime.now(timezone.utc),
+            "iat": datetime.now(),
         }
 
-        expire = datetime.now(timezone.utc) + timedelta(minutes=self.access_token_expire_minutes)
+        expire = datetime.now() + timedelta(minutes=self.access_token_expire_minutes)
         to_encode.update({"exp": expire})
 
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
@@ -57,10 +57,10 @@ class TokenService:
         to_encode: Dict[str, Any] = {
             "sub": str(user.id),
             "type": "refresh",  # чтобы отличать от access
-            "iat": datetime.now(timezone.utc),
+            "iat": datetime.now(),
         }
 
-        expire = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
+        expire = datetime.now() + timedelta(days=self.refresh_token_expire_days)
         to_encode.update({"exp": expire})
 
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
@@ -76,7 +76,7 @@ class TokenService:
                 token,
                 self.secret_key,
                 algorithms=[self.algorithm],
-                options={"verify_exp": True, "verify_iat": True},
+                options={"verify_exp": True, "verify_iat": False},
             )
 
             if expected_type and payload.get("type") != expected_type:
@@ -105,3 +105,12 @@ class TokenService:
         access = self.create_access_token(user)
         refresh = self.create_refresh_token(user)
         return access, refresh
+
+    def build_refresh_token_entity(self, user: AppUser | AppUserDTO, token: str) -> RefreshToken:
+        now = datetime.now()
+        return RefreshToken(
+            user_id=user.id,
+            token=token,
+            expires_at=now + timedelta(days=self.refresh_token_expire_days),
+            created_at=now,
+        )

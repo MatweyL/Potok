@@ -23,3 +23,6 @@ class ServiceSettings(BaseSettings):
     rmq_producer_task_run: RMQProducerSettings
 
     database_uri: str
+    admin_username: str
+    admin_password: str
+    jwt_secret_key: str
