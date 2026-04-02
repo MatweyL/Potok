@@ -79,7 +79,10 @@ class FastAPIServer(Startable):
                    description=settings.description if settings.description else DEFAULT_DESCRIPTION,
                    origins=settings.origins if settings.origins else DEFAULT_ORIGINS,
                    allow_methods=settings.allow_methods if settings.allow_methods else DEFAULT_ALLOW_METHODS,
-                   allow_headers=settings.allow_headers if settings.allow_headers else DEFAULT_ALLOW_HEADERS, )
+                   allow_headers=settings.allow_headers if settings.allow_headers else DEFAULT_ALLOW_HEADERS,
+                   use_https=settings.use_https,
+                   ssl_keyfile=settings.ssl_keyfile,
+                   ssl_certfile=settings.ssl_certfile,)
 
     async def start(self):
         self._server_task = asyncio.create_task(self._run())
