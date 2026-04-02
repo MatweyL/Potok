@@ -43,7 +43,7 @@ class SingleMonitoringAlgorithm(Base, TablenameMixin, LoadTimestampMixin):
     timeout_noize: Mapped[float] = mapped_column(FLOAT)
 
 
-class TaskRun(Base, TablenameMixin,SerialBigIntPKMixin, LoadTimestampMixin):
+class TaskRun(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     task_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task.id"), )
     group_name: Mapped[str] = mapped_column(VARCHAR(64))
     priority: Mapped[PriorityType] = mapped_column(Enum(PriorityType))
@@ -75,21 +75,21 @@ class TimeIntervalTaskProgress(Base, TablenameMixin, LoadTimestampMixin):
     task_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task.id"), primary_key=True)
     right_bound_at: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
     left_bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    collected_data_amount: Mapped[int] = mapped_column(INT,)
-    saved_data_amount: Mapped[int] = mapped_column(INT,)
+    collected_data_amount: Mapped[int] = mapped_column(INT, )
+    saved_data_amount: Mapped[int] = mapped_column(INT, )
 
 
 class TaskRunTimeIntervalExecutionBounds(Base, TablenameMixin, LoadTimestampMixin):
     task_run_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_run.id"), primary_key=True)
     task_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task.id"), )
-    right_bound_at: Mapped[datetime] = mapped_column(DateTime,)
+    right_bound_at: Mapped[datetime] = mapped_column(DateTime, )
     left_bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
 
-class AppUser(Base, TablenameMixin,SerialBigIntPKMixin, LoadTimestampMixin):
+class AppUser(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     roles: Mapped[List[AppUserRole]] = mapped_column(JSON, nullable=False)
-    username:  Mapped[str] = mapped_column(TEXT, nullable=False, unique=True)
-    password_hash:  Mapped[str] = mapped_column(TEXT, nullable=False,)
+    username: Mapped[str] = mapped_column(TEXT, nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(TEXT, nullable=False, )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
@@ -97,5 +97,22 @@ class AppUser(Base, TablenameMixin,SerialBigIntPKMixin, LoadTimestampMixin):
 class RefreshToken(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     user_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("app_user.id"), primary_key=True)
     token: Mapped[str] = mapped_column(TEXT, nullable=False, )
-    expires_at:  Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    created_at:  Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class Project(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
+    title: Mapped[str] = mapped_column(TEXT, nullable=False, )
+    description: Mapped[str] = mapped_column(TEXT, nullable=False, )
+
+
+class TaskGroup(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
+    title: Mapped[str] = mapped_column(TEXT, nullable=False, )
+    description: Mapped[str] = mapped_column(TEXT, nullable=False, )
+    name: Mapped[str] = mapped_column(TEXT, nullable=False, )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class TaskGroupByProject(Base, TablenameMixin, LoadTimestampMixin):
+    group_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_group.id"), primary_key=True)
+    project_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("project.id"), primary_key=True)

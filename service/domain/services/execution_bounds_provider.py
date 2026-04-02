@@ -34,10 +34,12 @@ class DefaultExecutionBoundsProvider:
             ],
             default_left_date: datetime = None,
             default_first_interval_days: int = 31,
+            default_month_step_to_left_date: int = 4
     ):
         self._task_run_time_interval_execution_bounds_repo = task_run_time_interval_execution_bounds_repo
-        self._default_left_date = default_left_date or datetime(2010, 1, 1)
+        self._default_left_date = default_left_date or datetime(2020, 1, 1)
         self._default_first_interval_days = default_first_interval_days
+        self._default_month_step_to_left_date = default_month_step_to_left_date
 
         # Можно добавить другие репозитории по мере появления новых типов задач
         # self._pagination_progress_repo = pagination_progress_repo
@@ -99,10 +101,20 @@ class DefaultExecutionBoundsProvider:
                 # Здесь ты можешь задать стартовую точку из конфига задачи (execution_arguments?)
                 # Для примера — начинаем с None (т.е. с самого начала)
                 separate_monitoring_and_retro_datetime = now - timedelta(days=self._default_first_interval_days)
+                if separate_monitoring_and_retro_datetime <= self._default_left_date:
+                    separate_monitoring_and_retro_datetime = self._default_left_date
                 bounds = [TimeIntervalBounds(right_bound_at=now,
-                                             left_bound_at=separate_monitoring_and_retro_datetime),
-                          TimeIntervalBounds(right_bound_at=separate_monitoring_and_retro_datetime,
-                                             left_bound_at=self._default_left_date)]
+                                             left_bound_at=separate_monitoring_and_retro_datetime),]
+                left_date = separate_monitoring_and_retro_datetime
+                while left_date > self._default_left_date:
+                    right_bound_at = left_date
+                    left_date = right_bound_at - timedelta(days=30 * self._default_month_step_to_left_date)
+                    if left_date < self._default_left_date:
+                        left_date = self._default_left_date
+                    time_interval_bounds = TimeIntervalBounds(right_bound_at=right_bound_at,
+                                                              left_bound_at=left_date)
+                    bounds.append(time_interval_bounds)
+
                 result[task] = bounds
                 continue
 
