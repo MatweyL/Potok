@@ -26,3 +26,4 @@ class ServiceSettings(BaseSettings):
     admin_username: str
     admin_password: str
     jwt_secret_key: str
+    use_https: bool = False

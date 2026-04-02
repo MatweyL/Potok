@@ -13,3 +13,6 @@ class FastAPIServerSettings(BaseSettings):
     origins: Optional[List[str]] = None
     allow_methods: Optional[List[HTTPMethod]] = None
     allow_headers: Optional[List[str]] = None
+    use_https: bool = False
+    ssl_keyfile: str = None
+    ssl_certfile: str = None
