@@ -6,6 +6,8 @@ from service.domain.use_cases.external.get_task_progress import GetTaskProgressU
     GetTaskProgressUC
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRs, GetTaskRunsUCRq, GetTaskRunsUC
 from service.domain.use_cases.external.get_tasks import GetTasksUC, GetTasksUCRq, GetTasksUCRs
+from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC, GetTasksDetailedUCRs, \
+    GetTasksDetailedUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq, \
     CreateMonitoringAlgorithmUCRs, GetAllMonitoringAlgorithmsUCRq, GetAllMonitoringAlgorithmsUCRs, \
     CreateMonitoringAlgorithmUC, GetAllMonitoringAlgorithmsUC
@@ -24,6 +26,7 @@ class UseCaseFacade:
                  get_payloads_uc: GetPayloadsUC,
                  get_payload_uc: GetPayloadUC,
                  update_payload_uc: UpdatePayloadUC,
+                 get_tasks_detailed_uc: GetTasksDetailedUC,
                  ):
         self._create_tasks_uc = create_tasks_uc
         self._create_monitoring_algorithm_uc = create_monitoring_algorithm_uc
@@ -35,6 +38,7 @@ class UseCaseFacade:
         self._get_payloads_uc = get_payloads_uc
         self._get_payload_uc = get_payload_uc
         self._update_payload_uc = update_payload_uc
+        self._get_tasks_detailed_uc = get_tasks_detailed_uc
 
     async def create_tasks(self, request: CreateTasksUCRq) -> CreateTasksUCRs:
         return await self._create_tasks_uc.apply(request)
@@ -66,3 +70,6 @@ class UseCaseFacade:
 
     async def get_all_monitoring_algorithms(self, ) -> GetAllMonitoringAlgorithmsUCRs:
         return await self._get_all_monitoring_algorithms_uc.apply(GetAllMonitoringAlgorithmsUCRq())
+
+    async def get_tasks_detailed(self, request: GetTasksDetailedUCRq) -> GetTasksDetailedUCRs:
+        return await self._get_tasks_detailed_uc.apply(request)

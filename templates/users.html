@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}Поток — Пользователи{% endblock %}
+
+{% block extra_css %}
+<style>
+  .role-badge {
+    font-size: 0.72rem; font-weight: 500;
+    padding: 0.2rem 0.5rem; border-radius: 20px;
+  }
+  .role-ADMIN    { background: #e0e7ff; color: #4338ca; }
+  .role-OPERATOR { background: #f1f5f9; color: #475569; }
+
+  .status-active   { color: #15803d; }
+  .status-inactive { color: #b91c1c; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid px-4 py-4">
+
+  {% if not is_admin %}
+  <div class="alert alert-danger">У вас нет доступа к этой странице.</div>
+  {% else %}
+
+  <h1 class="fs-4 fw-bold mb-4">Пользователи</h1>
+
+  <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
+
+  <!-- Создать пользователя -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold">Новый пользователь</div>
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-sm-4">
+          <label class="form-label">Логин <span class="text-danger">*</span></label>
+          <input type="text" id="newUsername" class="form-control" placeholder="username"/>
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label">Пароль <span class="text-danger">*</span></label>
+          <input type="password" id="newPassword" class="form-control" placeholder="••••••••"/>
+        </div>
+        <div class="col-sm-3">
+          <label class="form-label">Роль</label>
+          <select id="newRole" class="form-select">
+            <option value="OPERATOR" selected>Operator</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
+        <div class="col-sm-2">
+          <button class="btn btn-primary w-100" id="createUserBtn">Создать</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Таблица пользователей -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <table id="usersTable" class="table table-hover align-middle" style="width:100%">
+        <thead class="table-light">
+          <tr>
+            <th>ID</th>
+            <th>Логин</th>
+            <th>Роли</th>
+            <th>Статус</th>
+            <th>Создан</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr data-id="{{ user.id }}" data-active="{{ user.is_active | lower }}">
+            <td class="text-muted font-monospace">#{{ user.id }}</td>
+            <td class="fw-medium">{{ user.username }}</td>
+            <td>
+              {% for role in user.roles %}
+              <span class="role-badge role-{{ role }}">{{ role | title }}</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% if user.is_active %}
+                <span class="status-active">● Активен</span>
+              {% else %}
+                <span class="status-inactive">● Отключён</span>
+              {% endif %}
+            </td>
+            <td>{{ user.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+            <td>
+              <div class="d-flex gap-2">
+                <button
+                  class="btn btn-sm btn-outline-secondary btn-reset-password"
+                  data-id="{{ user.id }}"
+                  data-username="{{ user.username }}"
+                >
+                  Сменить пароль
+                </button>
+                {% if user.is_active %}
+                <button
+                  class="btn btn-sm btn-outline-danger btn-deactivate"
+                  data-id="{{ user.id }}"
+                  data-username="{{ user.username }}"
+                >
+                  Отключить
+                </button>
+                {% else %}
+                <button class="btn btn-sm btn-outline-secondary" disabled>Отключён</button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+
+<!-- Модалка смены пароля -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fs-6">Смена пароля — <span id="modalUsername"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modalUserId"/>
+        <label class="form-label">Новый пароль <span class="text-danger">*</span></label>
+        <input type="password" id="modalPassword" class="form-control" placeholder="••••••••"/>
+        <div id="modalError" class="form-text text-danger d-none mt-1"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+        <button type="button" class="btn btn-primary btn-sm" id="confirmResetBtn">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function () {
+
+  $('#usersTable').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.3/i18n/ru.json' },
+    pageLength: 25,
+    order: [[0, 'desc']],
+    columnDefs: [{ orderable: false, targets: [5] }],
+  });
+
+  // ── Создать пользователя ──────────────────────────
+  $('#createUserBtn').on('click', async function () {
+    const username = $('#newUsername').val().trim();
+    const password = $('#newPassword').val();
+    const role     = $('#newRole').val();
+
+    if (!username) return showAlert('Укажите логин', 'danger');
+    if (!password) return showAlert('Укажите пароль', 'danger');
+
+    $(this).prop('disabled', true).text('...');
+
+    try {
+      const res = await fetch('/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, roles: [role] }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showAlert(`Пользователь «${username}» создан`, 'success');
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        showAlert(data.error || 'Ошибка', 'danger');
+      }
+    } catch {
+      showAlert('Сетевая ошибка', 'danger');
+    } finally {
+      $(this).prop('disabled', false).text('Создать');
+    }
+  });
+
+  // ── Смена пароля — открыть модалку ───────────────
+  const resetModal = new bootstrap.Modal('#resetPasswordModal');
+
+  $('#usersTable tbody').on('click', '.btn-reset-password', function () {
+    $('#modalUserId').val($(this).data('id'));
+    $('#modalUsername').text($(this).data('username'));
+    $('#modalPassword').val('');
+    $('#modalError').addClass('d-none');
+    resetModal.show();
+    setTimeout(() => $('#modalPassword').focus(), 300);
+  });
+
+  // ── Смена пароля — подтвердить ────────────────────
+  $('#confirmResetBtn').on('click', async function () {
+    const userId   = $('#modalUserId').val();
+    const password = $('#modalPassword').val();
+    if (!password) {
+      $('#modalError').text('Введите пароль').removeClass('d-none');
+      return;
+    }
+    $('#modalError').addClass('d-none');
+    $(this).prop('disabled', true).text('...');
+
+    try {
+      const res = await fetch(`/users/${userId}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_user_id: parseInt(userId), new_password: password }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        resetModal.hide();
+        showAlert('Пароль изменён', 'success');
+      } else {
+        $('#modalError').text(data.error || 'Ошибка').removeClass('d-none');
+      }
+    } catch {
+      $('#modalError').text('Сетевая ошибка').removeClass('d-none');
+    } finally {
+      $(this).prop('disabled', false).text('Сохранить');
+    }
+  });
+
+  // ── Отключить пользователя ────────────────────────
+  $('#usersTable tbody').on('click', '.btn-deactivate', async function () {
+    const userId   = $(this).data('id');
+    const username = $(this).data('username');
+
+    if (!confirm(`Отключить пользователя «${username}»?`)) return;
+
+    const btn = $(this);
+    btn.prop('disabled', true).text('...');
+
+    try {
+      const res = await fetch(`/users/${userId}/deactivate`, { method: 'POST' });
+      const data = await res.json();
+
+      if (data.success) {
+        showAlert(`«${username}» отключён`, 'success');
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        showAlert(data.error || 'Ошибка', 'danger');
+        btn.prop('disabled', false).text('Отключить');
+      }
+    } catch {
+      showAlert('Сетевая ошибка', 'danger');
+      btn.prop('disabled', false).text('Отключить');
+    }
+  });
+
+});
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alertBox');
+  el.className = `alert alert-${type} mb-3`;
+  el.textContent = msg;
+  if (type === 'success') setTimeout(() => el.classList.add('d-none'), 2500);
+}
+</script>
+{% endblock %}

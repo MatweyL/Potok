@@ -133,7 +133,7 @@ async def test_get_all_returns_empty_list_initially(get_all_monitoring_algorithm
     response = await get_all_monitoring_algorithms_uc.apply(request)
 
     assert response.success is True
-    assert isinstance(response.algorithms, list)
+    assert isinstance(response.monitoring_algorithms, list)
     # May be empty or contain algorithms from other tests
 
 
@@ -161,10 +161,10 @@ async def test_get_all_returns_created_algorithms(
     response = await get_all_monitoring_algorithms_uc.apply(request)
 
     assert response.success is True
-    assert len(response.algorithms) >= 2
+    assert len(response.monitoring_algorithms) >= 2
 
     # Check that created algorithms are in the list
-    algorithm_types = [alg.type for alg in response.algorithms]
+    algorithm_types = [alg.type for alg in response.monitoring_algorithms]
     assert MonitoringAlgorithmType.PERIODIC in algorithm_types
     assert MonitoringAlgorithmType.SINGLE in algorithm_types
 
@@ -191,7 +191,7 @@ async def test_get_all_filters_by_type(
     # Note: get_all_monitoring_algorithms_uc uses only periodic repo in fixture
     # so it should only return PERIODIC algorithms
     periodic_algorithms = [
-        alg for alg in response.algorithms if alg.type == MonitoringAlgorithmType.PERIODIC
+        alg for alg in response.monitoring_algorithms if alg.type == MonitoringAlgorithmType.PERIODIC
     ]
     assert len(periodic_algorithms) >= 3
 

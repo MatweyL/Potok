@@ -46,8 +46,9 @@ from service.domain.use_cases.external.get_task import GetTaskUC
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUC
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUC
 from service.domain.use_cases.external.get_tasks import GetTasksUC
+from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
-    GetAllMonitoringAlgorithmsUC
+    GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC
 from service.domain.use_cases.external.update_payload import UpdatePayloadUC
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC, CreateTaskRunsUCRq
 from service.domain.use_cases.internal.receive_task_run_execution_status import ReceiveTaskRunExecutionStatusUC, \
@@ -130,10 +131,13 @@ async def main():
     get_payload_uc = GetPayloadUC(payload_repo)
     get_payloads_uc = GetPayloadsUC(payload_repo)
     update_payload_uc = UpdatePayloadUC(payload_repo)
-
+    get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
+                                                           periodic_monitoring_algorithm_repo,
+                                                           single_monitoring_algorithm_repo, transaction_factory)
+    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_payload_uc, get_monitoring_algorithm_uc)
     use_case_facade = UseCaseFacade(create_tasks_uc, create_monitoring_algorithm_uc, get_all_monitoring_algorithms_uc,
                                     get_tasks_uc, get_task_uc, get_task_runs_uc, get_task_progress_uc, get_payloads_uc,
-                                    get_payload_uc, update_payload_uc)
+                                    get_payload_uc, update_payload_uc, get_tasks_detailed_uc)
     set_use_case_facade(use_case_facade)
 
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,
@@ -178,7 +182,7 @@ async def main():
     login_uc = LoginUC(app_user_repo, refresh_token_repo, hasher, token_service)
     logout_uc = LogoutUC(refresh_token_repo)
     refresh_token_uc = RefreshTokenUC(app_user_repo, refresh_token_repo, token_service)
-    auth_use_case_facade = AuthUseCaseFacade(login_uc,logout_uc, refresh_token_uc)
+    auth_use_case_facade = AuthUseCaseFacade(login_uc, logout_uc, refresh_token_uc)
 
     rmq_consumer_connection = AioPikaRMQConsumerConnection.from_settings(settings.rmq_consumer_connection)
     rmq_consumer = AioPikaRMQConsumer.from_settings(settings.rmq_consumer, rmq_consumer_connection)
@@ -189,6 +193,7 @@ async def main():
 
     fastapi_server = FastAPIServer.from_settings(settings.fastapi_server)
     fastapi_server.app.state.auth_facade = auth_use_case_facade
+    fastapi_server.app.state.use_case_facade = use_case_facade
     fastapi_server.app.state.token_service = token_service
     fastapi_server.app.add_middleware(AuthMiddleware)
 

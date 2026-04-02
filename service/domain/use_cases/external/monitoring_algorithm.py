@@ -84,7 +84,7 @@ class GetAllMonitoringAlgorithmsUCRq(UCRequest):
 
 class GetAllMonitoringAlgorithmsUCRs(UCResponse):
     request: GetAllMonitoringAlgorithmsUCRq
-    algorithms: List[MonitoringAlgorithm] = []
+    monitoring_algorithms: List[MonitoringAlgorithmUnion] = []
 
 
 class GetAllMonitoringAlgorithmsUC(UseCase):
@@ -110,5 +110,54 @@ class GetAllMonitoringAlgorithmsUC(UseCase):
         return GetAllMonitoringAlgorithmsUCRs(
             success=True,
             request=request,
-            algorithms=algorithms_total,
+            monitoring_algorithms=algorithms_total,
         )
+
+
+class GetMonitoringAlgorithmUCRq(UCRequest):
+    monitoring_algorithm_id: int
+
+
+class GetMonitoringAlgorithmUCRs(UCResponse):
+    request: GetMonitoringAlgorithmUCRq
+    monitoring_algorithm: Optional[MonitoringAlgorithmUnion] = None
+
+
+class GetMonitoringAlgorithmUC(UseCase):
+    """
+    Возвращает все алгоритмы мониторинга из БД.
+    """
+
+
+    def __init__(
+            self,
+            monitoring_algorithm_repo: Repo[
+                MonitoringAlgorithm, MonitoringAlgorithm, MonitoringAlgorithmPK
+            ],
+            periodic_monitoring_algorithm_repo: Repo[
+                PeriodicMonitoringAlgorithm, PeriodicMonitoringAlgorithm, MonitoringAlgorithmPK
+            ],
+            single_monitoring_algorithm_repo: Repo[
+                SingleMonitoringAlgorithm, SingleMonitoringAlgorithm, MonitoringAlgorithmPK
+            ],
+            transaction_factory: TransactionFactory,
+    ):
+        self._monitoring_algorithm_repo = monitoring_algorithm_repo
+        self._periodic_monitoring_algorithm_repo = periodic_monitoring_algorithm_repo
+        self._single_monitoring_algorithm_repo = single_monitoring_algorithm_repo
+        self._transaction_factory = transaction_factory
+
+
+    async def apply(
+            self, request: GetMonitoringAlgorithmUCRq
+    ) -> GetMonitoringAlgorithmUCRs:
+        monitoring_algorithm_pk = MonitoringAlgorithmPK(id=request.monitoring_algorithm_id)
+        base_algorithm = await self._monitoring_algorithm_repo.get(monitoring_algorithm_pk)
+        if base_algorithm.type == MonitoringAlgorithmType.PERIODIC:
+            monitoring_algorithm = await self._periodic_monitoring_algorithm_repo.get(monitoring_algorithm_pk)
+        elif  base_algorithm.type == MonitoringAlgorithmType.SINGLE:
+            monitoring_algorithm = await self._single_monitoring_algorithm_repo.get(monitoring_algorithm_pk)
+        else:
+            raise RuntimeError(f"Unknown algorithm: {monitoring_algorithm_pk}")
+        return GetMonitoringAlgorithmUCRs(success=True,request=request,
+                                          monitoring_algorithm=monitoring_algorithm)

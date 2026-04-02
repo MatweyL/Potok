@@ -11,6 +11,8 @@ class UCRequest(BaseModel):
 def exception_as_text(e: BaseException) -> Optional[str]:
     if not e:
         return
+    if isinstance(e, str):
+        return e
     return f"{e.__class__.__name__}: {e}"
 
 

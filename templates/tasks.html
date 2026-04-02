@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Поток — Задачи{% endblock %}
+{% block extra_css %}
+
+  <style>
+    .task-row { cursor: pointer; }
+
+    .s-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.75rem; font-weight: 500;
+      padding: 0.2rem 0.6rem; border-radius: 20px;
+    }
+    .s-badge::before { content:''; width:6px; height:6px; border-radius:50%; }
+    .s-NEW       { background:#e0e7ff; color:#4338ca; }
+    .s-NEW::before { background:#6366f1; }
+    .s-EXECUTION { background:#fef3c7; color:#b45309; }
+    .s-EXECUTION::before { background:#f59e0b; animation:blink 1.2s infinite; }
+    .s-SUCCEED   { background:#dcfce7; color:#15803d; }
+    .s-SUCCEED::before { background:#22c55e; }
+    .s-FINISHED  { background:#f1f5f9; color:#64748b; }
+    .s-FINISHED::before { background:#94a3b8; }
+    .s-CANCELLED { background:#fee2e2; color:#b91c1c; }
+    .s-CANCELLED::before { background:#f87171; }
+    .s-ERROR     { background:#fee2e2; color:#991b1b; }
+    .s-ERROR::before { background:#ef4444; }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  </style>
+{% endblock %}
+{% block body %}
+
+<div class="container-fluid px-4 py-4">
+  <h1 class="fs-4 fw-bold mb-4">Задачи</h1>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <table id="tasksTable" class="table table-hover align-middle" style="width:100%">
+        <thead class="table-light">
+          <tr>
+            <th>ID</th>
+            <th>Группа</th>
+            <th>Статус</th>
+            <th>Приоритет</th>
+            <th>Тип</th>
+            <th>Алгоритм</th>
+            <th>Payload</th>
+            <th>Обновлён</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in tasks %}
+          {% set task = item.task %}
+          {% set algo = item.monitoring_algorithm %}
+          {% set payload = item.payload %}
+          <tr class="task-row" data-href="/tasks/{{ task.id }}">
+
+            <td class="text-muted font-monospace">#{{ task.id }}</td>
+
+            <td>{{ task.group_name }}</td>
+
+            <td><span class="s-badge s-{{ task.status }}">{{ task.status | title }}</span></td>
+
+            <td>{{ task.priority | title }}</td>
+
+            <td><code>{{ task.type }}</code></td>
+
+            <!-- Алгоритм мониторинга -->
+            <td>
+              {% if algo %}
+                <div><code class="text-muted small">#{{ algo.id }}</code> {{ algo.type | title }}</div>
+                {% if algo.timeout is defined %}
+                  <div class="text-muted small">
+                    {{ algo.timeout }}с
+                    {% if algo.timeout_noize %} ±{{ algo.timeout_noize }}с{% endif %}
+                  </div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Payload data -->
+            <td>
+              {% if payload and payload.data %}
+                <code class="small">{{ payload.data | tojson }}</code>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+
+            <td data-order="{{ task.status_updated_at | string | truncate(19, True, '') | replace('T', ' ') }}">
+              {{ task.status_updated_at.strftime('%d.%m.%Y %H:%M') }}
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+
+<script>
+$(document).ready(function () {
+  $('#tasksTable').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.3/i18n/ru.json' },
+    pageLength: 25,
+    order: [[0, 'desc']],
+  });
+
+  $('#tasksTable tbody').on('click', 'tr', function () {
+    const href = $(this).data('href');
+    if (href) window.location.href = href;
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+});
+</script>
+{% endblock %}

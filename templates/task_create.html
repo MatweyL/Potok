@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Поток — Задачи{% endblock %}
+{% block extra_css %}{% endblock %}
+{% block body %}
+
+<div class="container py-4" style="max-width: 760px">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/tasks">Задачи</a></li>
+      <li class="breadcrumb-item active">Новая задача</li>
+    </ol>
+  </nav>
+
+  <h1 class="fs-4 fw-bold mb-4">Новая задача</h1>
+
+  <div id="alertBox" class="alert d-none mb-4" role="alert"></div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+
+      <!-- Конфигурация -->
+      <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Конфигурация</h6>
+
+      <div class="row g-3 mb-4">
+
+        <div class="col-12">
+          <label class="form-label">Группа <span class="text-danger">*</span></label>
+          <input type="text" id="groupName" class="form-control" placeholder="например, monitoring"/>
+        </div>
+
+        <div class="col-sm-6">
+          <label class="form-label">Алгоритм мониторинга <span class="text-danger">*</span></label>
+          <select id="algorithmId" class="form-select">
+            <option value="">Загрузка...</option>
+          </select>
+          <div id="algoDetails" class="form-text"></div>
+        </div>
+
+        <div class="col-sm-6">
+          <label class="form-label">Приоритет</label>
+          <select id="priority" class="form-select">
+            <option value="LOWEST">Lowest</option>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM" selected>Medium</option>
+            <option value="HIGH">High</option>
+            <option value="HIGHEST">Highest</option>
+          </select>
+        </div>
+
+        <div class="col-sm-6">
+          <label class="form-label">Тип задачи</label>
+          <select id="taskType" class="form-select">
+            <option value="UNDEFINED" selected>Undefined</option>
+            <option value="TIME_INTERVAL">Time interval</option>
+            <option value="PAGINATION">Pagination</option>
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">
+            Аргументы выполнения
+            <span class="text-muted small fw-normal">(JSON-объект, необязательно)</span>
+          </label>
+          <textarea id="executionArguments" class="form-control font-monospace" rows="2"
+            placeholder='{"key": "value"}'></textarea>
+          <div id="execArgsError" class="form-text text-danger d-none">Невалидный JSON</div>
+        </div>
+
+      </div>
+
+      <!-- Payload -->
+      <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Полезная нагрузка</h6>
+
+      <div class="mb-1">
+        <label class="form-label">
+          JSON-массив payload-ов <span class="text-danger">*</span>
+        </label>
+        <textarea id="payloads" class="form-control font-monospace" rows="8"
+          placeholder='[&#10;  {"username": "alice"},&#10;  {"username": "bob"}&#10;]'></textarea>
+        <div id="payloadsError" class="form-text text-danger d-none"></div>
+        <div id="payloadsInfo" class="form-text"></div>
+      </div>
+
+      <!-- Кнопки -->
+      <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+        <a href="/tasks" class="btn btn-outline-secondary me-2">Отмена</a>
+        <button type="button" class="btn btn-primary" id="submitBtn">Создать</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+// ── Алгоритмы ─────────────────────────────────────────
+let algorithms = [];
+
+async function loadAlgorithms() {
+  try {
+    const res = await fetch('/monitoring-algorithms');
+    const data = await res.json();
+    algorithms = data.monitoring_algorithms || [];
+
+    const sel = document.getElementById('algorithmId');
+    sel.innerHTML = '';
+
+    if (!algorithms.length) {
+      sel.innerHTML = '<option value="">Нет доступных алгоритмов</option>';
+      return;
+    }
+
+    algorithms.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = `#${a.id} — ${a.type}`;
+      sel.appendChild(opt);
+    });
+
+    updateAlgoDetails();
+  } catch {
+    document.getElementById('algorithmId').innerHTML =
+      '<option value="">Ошибка загрузки</option>';
+  }
+}
+
+function updateAlgoDetails() {
+  const id = parseInt(document.getElementById('algorithmId').value);
+  const algo = algorithms.find(a => a.id === id);
+  const el = document.getElementById('algoDetails');
+  if (!algo) { el.textContent = ''; return; }
+
+  if (algo.type === 'PERIODIC') {
+    el.textContent = `Период: ${algo.timeout}с` +
+      (algo.timeout_noize ? ` ± ${algo.timeout_noize}с` : '');
+  } else if (algo.type === 'SINGLE') {
+    el.textContent = `Запусков: ${(algo.timeouts?.length ?? 0) + 1}`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+document.getElementById('algorithmId').addEventListener('change', updateAlgoDetails);
+
+// ── Подсчёт payload-ов на лету ────────────────────────
+document.getElementById('payloads').addEventListener('input', () => {
+  const errEl = document.getElementById('payloadsError');
+  const infoEl = document.getElementById('payloadsInfo');
+  const raw = document.getElementById('payloads').value.trim();
+
+  if (!raw) { errEl.classList.add('d-none'); infoEl.textContent = ''; return; }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error();
+    errEl.classList.add('d-none');
+    infoEl.textContent = `${parsed.length} payload${parsed.length === 1 ? '' : '-ов'}`;
+  } catch {
+    errEl.textContent = 'Должен быть JSON-массив';
+    errEl.classList.remove('d-none');
+    infoEl.textContent = '';
+  }
+});
+
+// ── Отправка ──────────────────────────────────────────
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const groupName = document.getElementById('groupName').value.trim();
+  if (!groupName) return showAlert('Укажите группу', 'danger');
+
+  const algorithmId = parseInt(document.getElementById('algorithmId').value);
+  if (!algorithmId) return showAlert('Выберите алгоритм мониторинга', 'danger');
+
+  // execution_arguments
+  const execRaw = document.getElementById('executionArguments').value.trim();
+  let executionArguments = null;
+  if (execRaw) {
+    try { executionArguments = JSON.parse(execRaw); }
+    catch {
+      document.getElementById('execArgsError').classList.remove('d-none');
+      return showAlert('Невалидный JSON в аргументах выполнения', 'danger');
+    }
+  }
+  document.getElementById('execArgsError').classList.add('d-none');
+
+  // payloads
+  const payloadsRaw = document.getElementById('payloads').value.trim();
+  if (!payloadsRaw) return showAlert('Введите payload-ы', 'danger');
+
+  let payloads;
+  try {
+    payloads = JSON.parse(payloadsRaw);
+    if (!Array.isArray(payloads) || !payloads.length) throw new Error();
+  } catch {
+    document.getElementById('payloadsError').textContent = 'Должен быть непустой JSON-массив';
+    document.getElementById('payloadsError').classList.remove('d-none');
+    return;
+  }
+  document.getElementById('payloadsError').classList.add('d-none');
+
+  const body = {
+    payloads: payloads.map(data => ({ data })),
+    task_configuration: {
+      group_name: groupName,
+      monitoring_algorithm_id: algorithmId,
+      priority: document.getElementById('priority').value,
+      type: document.getElementById('taskType').value,
+      execution_arguments: executionArguments,
+    }
+  };
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Создание...';
+
+  try {
+    const res = await fetch('/tasks/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showAlert(`Создано задач: ${data.tasks?.length ?? '?'}`, 'success');
+      setTimeout(() => window.location.href = '/tasks', 1200);
+    } else {
+      showAlert(data.error || 'Ошибка при создании', 'danger');
+    }
+  } catch {
+    showAlert('Сетевая ошибка', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Создать';
+  }
+});
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alertBox');
+  el.className = `alert alert-${type} mb-4`;
+  el.textContent = msg;
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+  await fetch('/auth/logout', { method: 'POST' });
+  window.location.href = '/login';
+});
+
+loadAlgorithms();
+</script>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Поток — Задачи{% endblock %}
+{% block extra_css %}
+<style>
+    .editable-cell { cursor: pointer; }
+    .editable-cell:hover { background: #f8f9fa; }
+
+    .cell-view { white-space: pre-wrap; font-family: monospace; font-size: 0.82rem; }
+    .cell-edit { display: none; }
+    .cell-edit textarea {
+      width: 100%;
+      font-family: monospace;
+      font-size: 0.82rem;
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .cell-actions { display: none; gap: 0.3rem; margin-top: 0.3rem; }
+
+    tr.editing .cell-view   { display: none; }
+    tr.editing .cell-edit   { display: block; }
+    tr.editing .cell-actions { display: flex; }
+    tr.editing .edit-hint   { display: none; }
+  </style>
+{% endblock %}
+{% block body %}
+
+<div class="container-fluid px-4 py-4">
+  <h1 class="fs-4 fw-bold mb-4">Payload-ы</h1>
+
+  <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <table id="payloadsTable" class="table table-hover align-middle" style="width:100%">
+        <thead class="table-light">
+          <tr>
+            <th style="width:80px">ID</th>
+            <th>Data</th>
+            <th style="width:280px">Checksum</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payload in payloads %}
+          <tr data-id="{{ payload.id }}">
+
+            <td class="text-muted font-monospace">#{{ payload.id }}</td>
+
+            <!-- Редактируемая ячейка Data -->
+            <td class="editable-cell" title="Нажмите для редактирования">
+              <div class="cell-view">{{ payload.data | tojson(indent=2) if payload.data else '—' }}</div>
+              <div class="cell-edit">
+                <textarea class="form-control">{{ payload.data | tojson(indent=2) if payload.data else '' }}</textarea>
+                <div class="cell-actions">
+                  <button class="btn btn-sm btn-primary btn-save">Сохранить</button>
+                  <button class="btn btn-sm btn-outline-secondary btn-cancel">Отмена</button>
+                  <span class="text-danger small save-error ms-2 d-none"></span>
+                </div>
+              </div>
+              <div class="edit-hint text-muted small mt-1">✎ нажмите чтобы изменить</div>
+            </td>
+
+            <td class="font-monospace text-muted small">{{ payload.checksum }}</td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+
+<script>
+$(document).ready(function () {
+
+  $('#payloadsTable').DataTable({
+    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.3/i18n/ru.json' },
+    pageLength: 25,
+    order: [[0, 'desc']],
+    columnDefs: [
+      { orderable: false, targets: [1] }  // Data не сортируем
+    ],
+  });
+
+  // ── Клик по ячейке — войти в режим редактирования ──
+  $('#payloadsTable tbody').on('click', 'td.editable-cell', function () {
+    const tr = $(this).closest('tr');
+    if (tr.hasClass('editing')) return;  // уже редактируется
+
+    // Снимаем редактирование с других строк
+    cancelAll();
+
+    tr.addClass('editing');
+    $(this).find('textarea').focus();
+  });
+
+  // ── Отмена ──
+  $('#payloadsTable tbody').on('click', '.btn-cancel', function (e) {
+    e.stopPropagation();
+    const tr = $(this).closest('tr');
+    cancelRow(tr);
+  });
+
+  // ── Сохранение ──
+  $('#payloadsTable tbody').on('click', '.btn-save', async function (e) {
+    e.stopPropagation();
+    const tr = $(this).closest('tr');
+    const payloadId = tr.data('id');
+    const textarea = tr.find('textarea');
+    const errEl = tr.find('.save-error');
+    const raw = textarea.val().trim();
+
+    // Валидация JSON
+    let parsedData = null;
+    if (raw) {
+      try { parsedData = JSON.parse(raw); }
+      catch {
+        errEl.text('Невалидный JSON').removeClass('d-none');
+        return;
+      }
+    }
+    errEl.addClass('d-none');
+
+    const btn = $(this);
+    btn.prop('disabled', true).text('...');
+
+    try {
+      const res = await fetch(`/payloads/${payloadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload_id: payloadId, payload_data: parsedData }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // Обновляем отображение без перезагрузки
+        const newData = data.payload.data;
+        const formatted = newData ? JSON.stringify(newData, null, 2) : '—';
+        tr.find('.cell-view').text(formatted);
+        textarea.val(newData ? JSON.stringify(newData, null, 2) : '');
+        tr.find('td:last').text(data.payload.checksum);
+        cancelRow(tr);
+        showAlert('Сохранено', 'success');
+      } else {
+        errEl.text(data.error || 'Ошибка').removeClass('d-none');
+      }
+    } catch {
+      errEl.text('Сетевая ошибка').removeClass('d-none');
+    } finally {
+      btn.prop('disabled', false).text('Сохранить');
+    }
+  });
+
+  // ── Escape — отмена ──
+  $(document).on('keydown', function (e) {
+    if (e.key === 'Escape') cancelAll();
+  });
+
+  function cancelRow(tr) {
+    tr.removeClass('editing');
+    tr.find('.save-error').addClass('d-none');
+  }
+
+  function cancelAll() {
+    $('#payloadsTable tbody tr.editing').each(function () {
+      cancelRow($(this));
+    });
+  }
+
+  // ── Logout ──
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+
+});
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alertBox');
+  el.className = `alert alert-${type} mb-3`;
+  el.textContent = msg;
+  setTimeout(() => el.classList.add('d-none'), 2000);
+}
+</script>
+{% endblock %}

@@ -8,6 +8,7 @@ from service.domain.use_cases.external.get_task import GetTaskUCRq
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
 from service.domain.use_cases.external.get_tasks import GetTasksUCRq
+from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
 from service.ports.outbound.repo.fields import PaginationQuery
@@ -35,6 +36,19 @@ async def get_tasks(offset_page: int = None,
                                                                                          order_by=order_by,
                                                                                          asc_sort=asc_sort,
                                                                                          )))
+
+
+@router.get("/tasks/detailed")
+async def get_tasks_detailed(offset_page: int = None,
+                             limit_per_page: int = None,
+                             order_by: str = None,
+                             asc_sort: bool = None):
+    return await get_use_case_facade().get_tasks_detailed(
+        GetTasksDetailedUCRq(pagination=PaginationQuery(offset_page=offset_page,
+                                                        limit_per_page=limit_per_page,
+                                                        order_by=order_by,
+                                                        asc_sort=asc_sort,
+                                                        )))
 
 
 @router.get("/tasks/{task_id}")

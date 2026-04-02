@@ -1,0 +1,480 @@
+/* ==============================================
+   styles.css — Поток. BEM-методология.
+   Структура:
+     - Токены (CSS-переменные)
+     - Сброс
+     - Базовые стили
+     - Блоки: page, nav, login-card, projects, section-card, empty-state
+     - Утилиты
+     - Анимации
+     - Медиа
+   ============================================== */
+
+/* ── Токены ──────────────────────────────────── */
+:root {
+  --bg-primary:    #0f172a;
+  --bg-secondary:  #1e293b;
+  --bg-card:       #334155;
+  --bg-card-hover: #475569;
+
+  --text-primary:   #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted:     #475569;
+
+  --accent:       #6366f1;
+  --accent-hover: #818cf8;
+  --accent-glow:  rgba(99, 102, 241, 0.35);
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error:   #f87171;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --shadow:     0 10px 40px -10px rgba(0, 0, 0, 0.3);
+  --transition: all 0.2s ease;
+
+  --font-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Fira Code', 'Cascadia Code', monospace;
+}
+
+
+/* ── Сброс ───────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+
+/* ── Базовые стили ───────────────────────────── */
+body {
+  font-family: var(--font-base);
+  background: linear-gradient(135deg, var(--bg-primary), #1e1b4b);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: page
+   Враппер-центратор контента
+   ══════════════════════════════════════════════ */
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.page--centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  max-width: unset;
+  padding: 1rem;
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: brand
+   Логотип и подзаголовок приложения
+   ══════════════════════════════════════════════ */
+.brand {
+  text-align: center;
+  padding: 3rem 1rem;
+  animation: fadeInDown 0.6s ease;
+}
+
+.brand__title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 0.5rem;
+}
+
+.brand__subtitle {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.brand__icon {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.5rem;
+  box-shadow: 0 8px 25px var(--accent-glow);
+  margin-bottom: 1rem;
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: nav
+   Верхняя навигационная панель
+   ══════════════════════════════════════════════ */
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav__logo {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: login-card
+   Карточка формы входа
+   ══════════════════════════════════════════════ */
+.login-card {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 380px;
+  animation: fadeInUp 0.5s ease;
+}
+
+.login-card__header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-card__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.login-card__subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.login-card__error {
+  font-size: 0.8rem;
+  color: var(--error);
+  margin-top: 1rem;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: field
+   Поле формы (label + input)
+   ══════════════════════════════════════════════ */
+.field {
+  margin-bottom: 1rem;
+}
+
+.field__label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.field__input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field__input:focus {
+  border-color: var(--accent);
+}
+
+.field__input::placeholder {
+  color: var(--text-muted);
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: btn
+   Кнопки (модификаторы меняют вид)
+   ══════════════════════════════════════════════ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-base);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Модификатор: основная акцентная кнопка */
+.btn--primary {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.85rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+
+.btn--primary:hover:not(:disabled) { opacity: 0.9; }
+.btn--primary:active:not(:disabled) { transform: scale(0.98); }
+
+/* Модификатор: призрачная кнопка (logout и т.п.) */
+.btn--ghost {
+  padding: 0.45rem 1rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--text-primary);
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: info-section
+   Секции с фичами на index.html
+   ══════════════════════════════════════════════ */
+.info-section {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  animation: fadeInUp 0.6s ease backwards;
+}
+
+.info-section:nth-of-type(1) { animation-delay: 0.1s; }
+.info-section:nth-of-type(2) { animation-delay: 0.2s; }
+
+.info-section__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid rgba(99, 102, 241, 0.3);
+}
+
+.info-section__list {
+  list-style: none;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.info-section__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+  border-left: 3px solid transparent;
+}
+
+.info-section__item:hover {
+  transform: translateX(4px);
+  border-left-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.info-section__item::before {
+  content: "✓";
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Модификатор: секция "в планах" */
+.info-section--future .info-section__item::before {
+  content: "◦";
+  background: linear-gradient(135deg, var(--warning), #fbbf24);
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: badge
+   Бейджи статусов
+   ══════════════════════════════════════════════ */
+.badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.badge--success {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.badge--warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: empty-state
+   Заглушка при отсутствии данных
+   ══════════════════════════════════════════════ */
+.empty-state {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+  animation: fadeInUp 0.5s ease;
+}
+
+.empty-state__icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  opacity: 0.4;
+}
+
+.empty-state__text {
+  font-size: 0.95rem;
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: page-header
+   Заголовок страницы (h1 внутри main)
+   ══════════════════════════════════════════════ */
+.page-header {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: 1.75rem;
+  animation: fadeInDown 0.4s ease;
+}
+
+
+/* ══════════════════════════════════════════════
+   БЛОК: site-footer
+   Подвал страницы
+   ══════════════════════════════════════════════ */
+.site-footer {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  animation: fadeIn 1s ease 0.4s backwards;
+}
+
+.site-footer__pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  animation: pulse 2s infinite;
+}
+
+
+/* ══════════════════════════════════════════════
+   УТИЛИТЫ
+   ══════════════════════════════════════════════ */
+.u-code {
+  background: rgba(99, 102, 241, 0.2);
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: #c7d2fe;
+}
+
+.u-strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+
+/* ── Анимации ────────────────────────────────── */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(0.9); }
+}
+
+
+/* ── Медиа ───────────────────────────────────── */
+@media (max-width: 640px) {
+  .brand__title   { font-size: 2rem; }
+  .brand__subtitle { font-size: 1.1rem; }
+  .info-section   { padding: 1.5rem; }
+  .info-section__title { font-size: 1.3rem; }
+  .info-section__item  { padding: 0.75rem; }
+}
