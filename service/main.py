@@ -198,11 +198,11 @@ async def main():
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [
-        # rmq_producer_connection,
-        # rmq_producer,
-        # rmq_consumer_connection,
-        # rmq_consumer,
-        # rmq_task_run_execution_status_consumer,
+        rmq_producer_connection,
+        rmq_producer,
+        rmq_consumer_connection,
+        rmq_consumer,
+        rmq_task_run_execution_status_consumer,
         fastapi_server, ]
     periodic_runners = [
         PeriodicRunner(create_task_runs_uc.apply, 30, run_name="Create task runs from tasks",
