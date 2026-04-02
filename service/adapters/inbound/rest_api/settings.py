@@ -14,5 +14,5 @@ class FastAPIServerSettings(BaseSettings):
     allow_methods: Optional[List[HTTPMethod]] = None
     allow_headers: Optional[List[str]] = None
     use_https: bool = False
-    ssl_keyfile: str = None
-    ssl_certfile: str = None
+    ssl_keyfile: Optional[str] = None
+    ssl_certfile: Optional[str] = None

@@ -5,6 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
+from service.domain.use_cases.external.auth.get_me import GetMeUCRq
 from service.domain.use_cases.external.auth.refresh_token import RefreshTokenUCRq
 from service.ports.common.logs import logger
 
@@ -25,9 +26,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # access валиден — пускаем
         if token:
             try:
-                request.app.state.token_service.decode_token(token)
+                payload = request.app.state.token_service.decode_token(token)
                 logger.info(f"token is valid")
-
+                user_id = int(payload.get("sub"))
+                get_me_uc_rs = await request.app.state.auth_facade.get_me(GetMeUCRq(user_id=user_id))
+                request.state.user = get_me_uc_rs.app_user_dto
                 return await call_next(request)
             except ValueError as e:
                 logger.info(f"token not valid: {e}")
@@ -43,6 +46,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
             logger.info(f"refresh response: {rs.success=}, {rs.error=}")
             if rs.success:
+                request.state.user = rs.user
                 response = await call_next(request)
                 response.set_cookie(
                     key="access_token", value=rs.access_token,

@@ -32,12 +32,18 @@ from service.domain.services.payload_provider import PayloadProvider
 from service.domain.services.task_progress_provider import ActualTimeIntervalExecutionBoundsProvider
 from service.domain.services.token_service import TokenService
 from service.domain.services.uniqueness_payload_checker import UniquenessPayloadChecker
+from service.domain.use_cases.external.admin.activate_user import ActivateUserUC
+from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUC
+from service.domain.use_cases.external.admin.facade import AdminUseCaseFacade
+from service.domain.use_cases.external.admin.get_all_users import GetAllUsersUC
 from service.domain.use_cases.external.auth.create_first_admin import CreateFirstAdminUC, CreateFirstAdminUCRq
 from service.domain.use_cases.external.auth.create_user import CreateUserUC
 from service.domain.use_cases.external.auth.facade import AuthUseCaseFacade
+from service.domain.use_cases.external.auth.get_me import GetMeUC
 from service.domain.use_cases.external.auth.login import LoginUC
 from service.domain.use_cases.external.auth.logout import LogoutUC
 from service.domain.use_cases.external.auth.refresh_token import RefreshTokenUC
+from service.domain.use_cases.external.auth.reset_password import ResetPasswordUC
 from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.facade import UseCaseFacade
 from service.domain.use_cases.external.get_payload import GetPayloadUC
@@ -182,7 +188,16 @@ async def main():
     login_uc = LoginUC(app_user_repo, refresh_token_repo, hasher, token_service)
     logout_uc = LogoutUC(refresh_token_repo)
     refresh_token_uc = RefreshTokenUC(app_user_repo, refresh_token_repo, token_service)
-    auth_use_case_facade = AuthUseCaseFacade(login_uc, logout_uc, refresh_token_uc)
+    get_me_uc = GetMeUC(app_user_repo)
+    reset_password_uc = ResetPasswordUC(app_user_repo, hasher)
+    auth_use_case_facade = AuthUseCaseFacade(login_uc, logout_uc, refresh_token_uc, get_me_uc,create_user_uc,
+                                             reset_password_uc)
+
+    # USE CASE: Admin
+    deactivate_user_uc = DeactivateUserUC(app_user_repo)
+    get_all_users_uc = GetAllUsersUC(app_user_repo)
+    activate_user_uc = ActivateUserUC(app_user_repo)
+    admin_use_case_facade = AdminUseCaseFacade(deactivate_user_uc, get_all_users_uc, activate_user_uc)
 
     rmq_consumer_connection = AioPikaRMQConsumerConnection.from_settings(settings.rmq_consumer_connection)
     rmq_consumer = AioPikaRMQConsumer.from_settings(settings.rmq_consumer, rmq_consumer_connection)
@@ -195,15 +210,17 @@ async def main():
     fastapi_server.app.state.auth_facade = auth_use_case_facade
     fastapi_server.app.state.use_case_facade = use_case_facade
     fastapi_server.app.state.token_service = token_service
+    fastapi_server.app.state.admin_use_case_facade = admin_use_case_facade
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [
-        rmq_producer_connection,
-        rmq_producer,
-        rmq_consumer_connection,
-        rmq_consumer,
-        rmq_task_run_execution_status_consumer,
-        fastapi_server, ]
+        # rmq_producer_connection,
+        # rmq_producer,
+        # rmq_consumer_connection,
+        # rmq_consumer,
+        # rmq_task_run_execution_status_consumer,
+        fastapi_server,
+    ]
     periodic_runners = [
         PeriodicRunner(create_task_runs_uc.apply, 30, run_name="Create task runs from tasks",
                        method_args=[CreateTaskRunsUCRq()]),

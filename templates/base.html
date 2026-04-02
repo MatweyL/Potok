@@ -17,7 +17,11 @@
   <a class="navbar-brand fw-bold" href="/tasks">Поток</a>
   <div class="d-flex align-items-center gap-3">
     <a href="/tasks" class="nav-link text-secondary small">Задачи</a>
-    <a href="/payloads" class="nav-link text-secondary small">Payload-ы</a>
+    <a href="/payloads" class="nav-link text-secondary small">Данные для сбора</a>
+    <a href="/tasks/create" class="nav-link text-secondary small">Создать задачи</a>
+    {% if request.state.user and request.state.user.roles and 'ADMIN' in request.state.user.roles %}
+    <a href="/users" class="nav-link text-secondary small">Пользователи системы</a>
+    {% endif %}
     <button class="btn btn-outline-secondary btn-sm" id="logoutBtn">Выйти</button>
   </div>
 </nav>

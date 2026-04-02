@@ -14,10 +14,12 @@ class GetMeUCRq(UCRequest):
 
 class GetMeUCRs(UCResponse):
     request: GetMeUCRq
-    app_user_dto: Optional[AppUserDTO] = None
+    app_user_dto: Optional[AppUser] = None
 
 
 class GetMeUC(UseCase):
+    # TODO: Добавить TTL кеш. Юзеры будут меняться скорее редко, чем часто
+    #  Если актуальность данных будет 30-60 сек, это кратно сократит количество запросов к хранилищу
     def __init__(self, app_user_repo: Repo[AppUser, AppUser, AppUserPK]):
         self._app_user_repo = app_user_repo
 
@@ -35,6 +37,6 @@ class GetMeUC(UseCase):
 
         return GetMeUCRs(
             success=True,
-            app_user_dto=AppUserDTO.from_app_user(user),
+            app_user_dto=user,
             request=request,
         )

@@ -1,10 +1,12 @@
 from fastapi import APIRouter
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response, RedirectResponse
 from starlette.templating import Jinja2Templates
 
 from service.domain.schemas.enums import AppUserRole
+from service.domain.use_cases.external.admin.activate_user import ActivateUserUCRq
 from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUCRq
 from service.domain.use_cases.external.auth.create_user import CreateUserUCRq
 from service.domain.use_cases.external.auth.login import LoginUCRq
@@ -16,7 +18,6 @@ from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq
 from service.domain.use_cases.external.get_task import GetTaskUCRq
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
-from service.domain.use_cases.external.get_tasks import GetTasksUCRq
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
 from service.ports.common.path_utils import get_project_root
@@ -81,14 +82,17 @@ async def tasks_page(request: Request):
         context={"tasks": rs.tasks}
     )
 
+
 @router.get("/monitoring-algorithms")
 async def get_algorithms(request: Request):
     rs = await request.app.state.use_case_facade.get_all_monitoring_algorithms()
     return rs
 
+
 @router.get("/tasks/create", response_class=HTMLResponse)
 def task_create_page(request: Request):
     return templates.TemplateResponse(request=request, name="task_create.html")
+
 
 @router.post("/tasks/create")
 async def create_tasks(request: Request, rq: CreateTasksUCRq):
@@ -123,6 +127,7 @@ async def task_detail_page(request: Request, task_id: int):
         }
     )
 
+
 @router.get("/payloads", response_class=HTMLResponse)
 async def payloads_page(request: Request):
     rs = await request.app.state.use_case_facade.get_payloads(
@@ -132,6 +137,7 @@ async def payloads_page(request: Request):
         request=request, name="payloads.html",
         context={"payloads": rs.payloads}
     )
+
 
 @router.patch("/payloads/{payload_id}")
 async def update_payload(request: Request, payload_id: int, rq: UpdatePayloadUCRq):
@@ -147,7 +153,7 @@ async def users_page(request: Request):
 
     users = []
     if is_admin:
-        rs = await request.app.state.use_case_facade.get_all_users()
+        rs = await request.app.state.admin_use_case_facade.get_all_users()
         users = rs.users
 
     return templates.TemplateResponse(
@@ -155,18 +161,38 @@ async def users_page(request: Request):
         context={"users": users, "is_admin": is_admin}
     )
 
+
 @router.post("/users")
 async def create_user(request: Request, rq: CreateUserUCRq):
-    return await request.app.state.use_case_facade.create_user(rq)
+    return await request.app.state.auth_facade.create_user(rq)
+
+
+class ResetPasswordUCRqDTO(BaseModel):
+    target_user_id: int
+    new_password: str
+
 
 @router.post("/users/{user_id}/reset-password")
-async def reset_password(request: Request, user_id: int, rq: ResetPasswordUCRq):
+async def reset_password(request: Request, user_id: int, rq: ResetPasswordUCRqDTO):
     current_user = request.state.user
-    rq.requestor_roles = current_user.roles
-    return await request.app.state.use_case_facade.reset_password(rq)
+    requestor_roles = current_user.roles
+    target_rq = ResetPasswordUCRq(requestor_roles=requestor_roles,
+                                  target_user_id=rq.target_user_id,
+                                  new_password=rq.new_password)
+    return await request.app.state.auth_facade.reset_password(target_rq)
+
 
 @router.post("/users/{user_id}/deactivate")
 async def deactivate_user(request: Request, user_id: int):
-    return await request.app.state.use_case_facade.deactivate_user(
-        DeactivateUserUCRq(target_user_id=user_id)
+    current_user = request.state.user
+    return await request.app.state.admin_use_case_facade.deactivate_user(
+        DeactivateUserUCRq(target_user_id=user_id,
+                           current_user_id=current_user.id)
+    )
+@router.post("/users/{user_id}/activate")
+async def activate_user(request: Request, user_id: int):
+    current_user = request.state.user
+    return await request.app.state.admin_use_case_facade.activate_user(
+        ActivateUserUCRq(target_user_id=user_id,
+                           current_user_id=current_user.id)
     )
