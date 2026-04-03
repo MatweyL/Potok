@@ -2,6 +2,8 @@
 
 from typing import Optional
 
+from cachetools import TTLCache
+
 from service.domain.schemas.app_user import AppUser, AppUserPK, AppUserDTO
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.repo.abstract import Repo
@@ -18,19 +20,27 @@ class GetMeUCRs(UCResponse):
 
 
 class GetMeUC(UseCase):
-    # TODO: Добавить TTL кеш. Юзеры будут меняться скорее редко, чем часто
-    #  Если актуальность данных будет 30-60 сек, это кратно сократит количество запросов к хранилищу
-    def __init__(self, app_user_repo: Repo[AppUser, AppUser, AppUserPK]):
+
+    def __init__(self, app_user_repo: Repo[AppUser, AppUser, AppUserPK],
+                 max_cached_users: int = 10,
+                 cached_user_ttl: int = 60,
+                 ):
         self._app_user_repo = app_user_repo
+        self._max_cached_users = max_cached_users
+        self._cached_user_ttl = cached_user_ttl
+        self._user_by_id = TTLCache(maxsize=max_cached_users, ttl=cached_user_ttl)
 
     async def apply(self, request: GetMeUCRq) -> GetMeUCRs:
-        users = await self._app_user_repo.filter(
-            FilterFieldsDNF.single("id", request.user_id)
-        )
-        if not users:
-            return GetMeUCRs(success=False, error="User not found", request=request)
+        user = self._user_by_id.get(request.user_id)
+        if not user:
+            users = await self._app_user_repo.filter(
+                FilterFieldsDNF.single("id", request.user_id)
+            )
+            if not users:
+                return GetMeUCRs(success=False, error="User not found", request=request)
 
-        user = users[0]
+            user = users[0]
+            self._user_by_id[user.id] = user
 
         if not user.is_active:
             return GetMeUCRs(success=False, error="Account is deactivated", request=request)

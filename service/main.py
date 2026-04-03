@@ -73,7 +73,7 @@ from service.ports.common.logs import logger, set_log_level
 from service.ports.common.periodic_runner import PeriodicRunner
 from service.ports.outbound.producer import DirectDataProducer
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
-from service.settings import ServiceSettings
+from service.settings import ServiceSettings, ServiceType
 
 
 class CommandResponseToReceiveTaskRunExecutionStatusUCRq(InputConverterI):
@@ -214,12 +214,11 @@ async def main():
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [
-        # rmq_producer_connection,
-        # rmq_producer,
-        # rmq_consumer_connection,
-        # rmq_consumer,
-        # rmq_task_run_execution_status_consumer,
-        fastapi_server,
+        rmq_producer_connection,
+        rmq_producer,
+        rmq_consumer_connection,
+        rmq_consumer,
+        rmq_task_run_execution_status_consumer,
     ]
     periodic_runners = [
         PeriodicRunner(create_task_runs_uc.apply, 30, run_name="Create task runs from tasks",
@@ -237,26 +236,35 @@ async def main():
         PeriodicRunner(transit_task_status_uc.apply, 30, run_name="Transit task status to SUCCEED or ERROR",
                        method_args=[TransitTaskStatusUCRq()]),
         PeriodicRunner(task_status_log_cleaner.clean_logs, 86_400, 30, run_name="Clean task run status logs"),
+        PeriodicRunner(receive_task_run_execution_status_uc.upload_command_responses, 30,
+                       run_name="Upload received task run statuses"),
 
     ]
-    for startable_obj in startable:
-        await startable_obj.start()
-    for periodic_runner in periodic_runners:
-        periodic_runner.create_periodic_task()
+    logger.info(f"service configured as {settings.service_type}")
+    if settings.service_type in (ServiceType.WORKER, ServiceType.MONOLITH):
+        for startable_obj in startable:
+            await startable_obj.start()
+        for periodic_runner in periodic_runners:
+            periodic_runner.create_periodic_task()
     try:
-        create_first_admin_uc_rs = await create_first_admin_uc.apply(
-            CreateFirstAdminUCRq(username=settings.admin_username,
-                                 password=settings.admin_password))
-        logger.info(
-            f"First admin created: {create_first_admin_uc_rs.success}; detail: {create_first_admin_uc_rs.error}")
+        if settings.service_type in (ServiceType.API, ServiceType.MONOLITH):
+            create_first_admin_uc_rs = await create_first_admin_uc.apply(
+                CreateFirstAdminUCRq(username=settings.admin_username,
+                                     password=settings.admin_password))
+            logger.info(
+                f"First admin created: {create_first_admin_uc_rs.success}; detail: {create_first_admin_uc_rs.error}")
+            await fastapi_server.start()
         await asyncio.Future()
     except BaseException as e:
         logger.critical(f"Stop service due to error: {e.__class__.__name__}: {e}")
     finally:
-        for periodic_runner in periodic_runners:
-            periodic_runner.cancel()
-        for startable_obj in startable:
-            await startable_obj.stop()
+        if settings.service_type in (ServiceType.WORKER, ServiceType.MONOLITH):
+            for periodic_runner in periodic_runners:
+                periodic_runner.cancel()
+            for startable_obj in startable:
+                await startable_obj.stop()
+        if settings.service_type in (ServiceType.API, ServiceType.MONOLITH):
+            await fastapi_server.stop()
 
 
 if __name__ == '__main__':

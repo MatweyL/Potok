@@ -1,3 +1,4 @@
+import enum
 from pathlib import Path
 
 from pydantic import Field
@@ -6,6 +7,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from service.adapters.inbound.consumer.settings import RMQConsumerSettings, RMQConsumerConnectionSettings
 from service.adapters.inbound.rest_api.settings import FastAPIServerSettings
 from service.adapters.outbound.producer.settings import RMQProducerSettings, RMQProducerConnectionSettings
+
+
+class ServiceType(str, enum.Enum):
+    MONOLITH = "MONOLITH"
+    API = "API"
+    WORKER = "WORKER"
 
 
 class ServiceSettings(BaseSettings):
@@ -27,3 +34,4 @@ class ServiceSettings(BaseSettings):
     admin_password: str
     jwt_secret_key: str
     use_https: bool = False
+    service_type: ServiceType = ServiceType.MONOLITH

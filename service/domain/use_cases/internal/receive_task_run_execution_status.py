@@ -1,3 +1,5 @@
+from typing import List
+
 from service.domain.schemas.command import CommandResponse
 from service.domain.schemas.task_progress import TimeIntervalTaskProgress, TimeIntervalTaskProgressPK
 
@@ -28,23 +30,41 @@ class ReceiveTaskRunExecutionStatusUC(UseCase):
         self._time_interval_task_progress_repo = time_interval_task_progress_repo
         self._transaction_factory = transaction_factory
 
+        # FIXME: быстрое решение для предотвращения вставки малого количества статусов в БД (забирают все соединения)
+        self._accumulated_command_responses: List[CommandResponse] = []
+
+    async def upload_command_responses(self):
+        accumulated_command_responses= self._accumulated_command_responses
+        self._accumulated_command_responses = []
+
+        update_fields_by_task_run_pk = {}
+        task_run_status_logs = []
+        task_progresses = []
+        for command_response in accumulated_command_responses:
+            update_fields_by_task_run_pk[TaskRunPK(id=command_response.command.task_run.id)] = UpdateFields.multiple({
+                "status": command_response.status,
+                "status_updated_at": command_response.created_at,
+            })
+            task_run_status_log = TaskRunStatusLog(task_run_id=command_response.command.task_run.id,
+                                                   status_updated_at=command_response.created_at,
+                                                   status=command_response.status,
+                                                   description=command_response.description, )
+            task_run_status_logs.append(task_run_status_log)
+            if command_response.result:
+                task_progress = TimeIntervalTaskProgress(task_id=command_response.command.task_run.task_id,
+                                                         right_bound_at=command_response.result.right_bound_at,
+                                                         left_bound_at=command_response.result.left_bound_at,
+                                                         collected_data_amount=command_response.result.collected_data_amount,
+                                                         saved_data_amount=command_response.result.saved_data_amount,
+                                                         )
+                task_progresses.append(task_progress)
+
+        async with self._transaction_factory.create() as transaction:
+            await self._task_run_repo.update_all(update_fields_by_task_run_pk, transaction)
+            await self._task_run_status_log_repo.create_all(task_run_status_logs, transaction)
+            await self._time_interval_task_progress_repo.create_all(task_progresses, transaction)
+
     async def apply(self, request: ReceiveTaskRunExecutionStatusUCRq) -> ReceiveTaskRunExecutionStatusUCRs:
         command_response = request.command_response
-        await self._task_run_repo.update(TaskRunPK(id=command_response.command.task_run.id),UpdateFields.multiple({
-            "status": command_response.status,
-            "status_updated_at": command_response.created_at,
-        }))
-        task_run_status_log = TaskRunStatusLog(task_run_id=command_response.command.task_run.id,
-                                               status_updated_at=command_response.created_at,
-                                               status=command_response.status,
-                                               description=command_response.description,)
-        await self._task_run_status_log_repo.create(task_run_status_log)
-        if command_response.result:
-            task_progress = TimeIntervalTaskProgress(task_id=command_response.command.task_run.task_id,
-                                                     right_bound_at=command_response.result.right_bound_at,
-                                                     left_bound_at=command_response.result.left_bound_at,
-                                                     collected_data_amount=command_response.result.collected_data_amount,
-                                                     saved_data_amount=command_response.result.saved_data_amount,
-                                                     )
-            await self._time_interval_task_progress_repo.create(task_progress)
+        self._accumulated_command_responses.append(command_response)
         return ReceiveTaskRunExecutionStatusUCRs(success=True, request=request)

@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  potok-api:
+    container_name: potok-api
+    build:
+      dockerfile: devops/Dockerfile.dev
+      context: .
+    command: bash -c "poetry run alembic upgrade head && poetry run python3 service/main.py"
+    environment:
+      - service_type=API
+    ports:
+      - "5005:5005"
+    volumes:
+      - .:/app:z
+  potok-worker:
+    container_name: potok-worker
+    build:
+      dockerfile: devops/Dockerfile.dev
+      context: .
+    command: bash -c "poetry run python3 service/main.py"
+    environment:
+      - service_type=WORKER
+    volumes:
+      - .:/app:z
+    depends_on:
+      - potok-api

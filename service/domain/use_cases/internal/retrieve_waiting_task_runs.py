@@ -32,7 +32,7 @@ class RetrieveWaitingTaskRunsUC(UseCase):
         async with self._transaction_factory.create() as transaction:
             task_runs = await self._task_run_repo.paginated(
                 PaginationQuery(filter_fields_dnf=FilterFieldsDNF.single('status', TaskRunStatus.WAITING),
-                                limit_per_page=2000),
+                                limit_per_page=500),
                 transaction,
             )
             status_updated_at = datetime.now()
