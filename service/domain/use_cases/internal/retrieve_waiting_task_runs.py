@@ -31,7 +31,8 @@ class RetrieveWaitingTaskRunsUC(UseCase):
     async def apply(self, request: RetrieveWaitingTaskRunsUCRq) -> RetrieveWaitingTaskRunsUCRs:
         async with self._transaction_factory.create() as transaction:
             task_runs = await self._task_run_repo.paginated(
-                PaginationQuery(filter_fields_dnf=FilterFieldsDNF.single('status', TaskRunStatus.WAITING)),
+                PaginationQuery(filter_fields_dnf=FilterFieldsDNF.single('status', TaskRunStatus.WAITING),
+                                limit_per_page=2000),
                 transaction,
             )
             status_updated_at = datetime.now()
