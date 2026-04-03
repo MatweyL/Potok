@@ -34,7 +34,7 @@ class DefaultExecutionBoundsProvider:
             ],
             default_left_date: datetime = None,
             default_first_interval_days: int = 31,
-            default_month_step_to_left_date: int = 4
+            default_month_step_to_left_date: int = 12
     ):
         self._task_run_time_interval_execution_bounds_repo = task_run_time_interval_execution_bounds_repo
         self._default_left_date = default_left_date or datetime(2020, 1, 1)

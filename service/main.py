@@ -93,7 +93,7 @@ async def main():
     periodic_monitoring_algorithm_repo = SAPeriodicMonitoringAlgorithmRepo(database, models.PeriodicMonitoringAlgorithm)
     single_monitoring_algorithm_repo = SASingleMonitoringAlgorithmRepo(database, models.SingleMonitoringAlgorithm)
     task_repo = SATaskRepo(database, models.Task)
-    task_run_repo = SATaskRunRepo(database, models.TaskRun)
+    task_run_repo = SATaskRunRepo(database, models.TaskRun, chunk_size=2000)
     monitoring_algorithms = [periodic_monitoring_algorithm_repo, single_monitoring_algorithm_repo]
     task_to_execute_provider_registry = TaskToExecuteProviderRegistry(monitoring_algorithms)
     task_status_log_repo = SATaskStatusLogRepo(database, models.TaskStatusLog)
