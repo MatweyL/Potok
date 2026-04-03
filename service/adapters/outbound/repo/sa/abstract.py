@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Type
 
+from more_itertools import batched
 from pydantic import BaseModel
 from sqlalchemy import update, select, or_, ColumnElement, and_, asc, desc, func, delete
 from sqlalchemy.dialects.postgresql import insert
@@ -16,9 +17,10 @@ from service.ports.outbound.repo.fields import FilterFieldsDNF, PaginationQuery,
 
 class AbstractSARepo(Repo, ABC):
 
-    def __init__(self, database: Database, model_class: Type[Base]):
+    def __init__(self, database: Database, model_class: Type[Base], chunk_size: int = 5000):
         self._database = database
         self._model_class = model_class
+        self._chunk_size = chunk_size
 
     @abstractmethod
     def to_model(self, obj: BaseModel) -> Base:
@@ -59,19 +61,31 @@ class AbstractSARepo(Repo, ABC):
                          transaction: Optional[SATransaction] = None) -> List[TDomain]:
         if not objs:
             return []
-        obj_models = (self.to_model(obj) for obj in objs)
-        query = (insert(self._model_class)
-                 .values([obj_model.to_dict() for obj_model in obj_models])
-                 .on_conflict_do_nothing()
-                 .returning(self._model_class))
+
+        created_domains = []
         if not transaction:
             async with self._database.session as session:
-                result = await session.scalars(query)
-                created_models = result.all()
+                for obj_chunk in batched(objs, self._chunk_size):
+                    values = [self.to_model(obj).to_dict() for obj in obj_chunk]
+                    query = (insert(self._model_class)
+                             .values(values)
+                             .on_conflict_do_nothing()
+                             .returning(self._model_class))
+                    result = await session.scalars(query)
+                    created_models = result.all()
+                    created_domains.extend([self.to_domain(created_model) for created_model in created_models])
                 await session.commit()
         else:
-            result = await transaction.session.scalars(query)
-            created_models = result.all()
+            for obj_chunk in batched(objs, self._chunk_size):
+                values = [self.to_model(obj).to_dict() for obj in obj_chunk]
+                query = (insert(self._model_class)
+                         .values(values)
+                         .on_conflict_do_nothing()
+                         .returning(self._model_class))
+                result = await transaction.session.scalars(query)
+                created_models = result.all()
+                created_domains.extend([self.to_domain(created_model) for created_model in created_models])
+
         return [self.to_domain(created_model) for created_model in created_models]
 
     async def update(self,
