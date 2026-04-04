@@ -17,7 +17,7 @@ class TaskPK(BaseModel):
 
 
 class TaskConfiguration(BaseModel):
-    group_name: str
+    group_id: int
     priority: PriorityType = PriorityType.MEDIUM
     type: TaskType = TaskType.UNDEFINED
     monitoring_algorithm_id: int

@@ -9,10 +9,10 @@ from service.domain.schemas.enums import (
 from service.domain.schemas.monitoring_algorithm import PeriodicMonitoringAlgorithm
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task, TaskPK
+from service.domain.schemas.task_group import TaskGroup
 from service.domain.schemas.task_run import TaskRun
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
 from service.domain.use_cases.internal.transit_task_status import (
-    TransitTaskStatusUC,
     TransitTaskStatusUCRq,
 )
 
@@ -20,7 +20,6 @@ from service.domain.use_cases.internal.transit_task_status import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
 
 
 @pytest_asyncio.fixture
@@ -38,23 +37,25 @@ def monitoring_algorithm_id(_monitoring_algorithm_id):
     return _monitoring_algorithm_id
 
 
-async def _create_task(
-        sa_task_repo,
-        sa_payload_repo,
-        monitoring_algorithm_id: int,
-        status: TaskStatus = TaskStatus.EXECUTION,
-        group_name: str = "test_group",
-) -> Task:
+@pytest.mark.asyncio
+async def _create_task(sa_task_group_repo,
+                       sa_task_repo,
+                       sa_payload_repo,
+                       monitoring_algorithm_id: int,
+                       status: TaskStatus = TaskStatus.EXECUTION,
+                       group_name: str = "test_group",
+                       ) -> Task:
     payload = await sa_payload_repo.create(
         Payload(data={"key": group_name})
     )
+    task_group = await sa_task_group_repo.create(TaskGroup(name=group_name, title='', description='', ))
     task = Task(
         type=TaskType.TIME_INTERVAL,
         status=status,
         status_updated_at=datetime.utcnow(),
         payload_id=payload.id,
         monitoring_algorithm_id=monitoring_algorithm_id,
-        group_name=group_name,
+        group_id=task_group.id,
     )
     return await sa_task_repo.create(task)
 
@@ -102,8 +103,9 @@ async def test_task_transitions_to_succeed_when_all_runs_succeed(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
 
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.SUCCEED)
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.SUCCEED)
@@ -131,8 +133,9 @@ async def test_task_transitions_to_error_when_all_runs_error(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
 
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.ERROR)
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.ERROR)
@@ -160,8 +163,9 @@ async def test_task_transitions_to_succeed_when_one_of_three_runs_succeeds(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
 
     t = datetime(2024, 1, 1, 0, 0, 0)
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.ERROR,
@@ -191,9 +195,9 @@ async def test_task_not_transitioned_when_has_running_task_run(
         sa_task_repo,
         sa_task_run_repo,
         sa_payload_repo,
-        monitoring_algorithm_id,
+        monitoring_algorithm_id, sa_task_group_repo
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
 
     # Mix of finished and still-running
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.SUCCEED)
@@ -220,8 +224,9 @@ async def test_task_not_transitioned_when_has_queued_task_run(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
 
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.SUCCEED)
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.QUEUED)  # Pending
@@ -246,8 +251,9 @@ async def test_task_not_transitioned_when_no_task_runs(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
     # No task runs created
 
     response = await transit_task_status_uc.apply(TransitTaskStatusUCRq())
@@ -271,8 +277,9 @@ async def test_only_last_3_runs_are_analyzed(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
 
     t = datetime(2024, 1, 1, 0, 0, 0)
     # Old SUCCEED run — should be outside the window of last 3
@@ -308,17 +315,18 @@ async def test_non_execution_tasks_not_affected(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+sa_task_group_repo,
 ):
     # Tasks in other statuses
-    new_task = await _create_task(
+    new_task = await _create_task(sa_task_group_repo,
         sa_task_repo, sa_payload_repo, monitoring_algorithm_id,
         status=TaskStatus.NEW, group_name="new_task"
     )
-    succeed_task = await _create_task(
+    succeed_task = await _create_task(sa_task_group_repo,
         sa_task_repo, sa_payload_repo, monitoring_algorithm_id,
         status=TaskStatus.SUCCEED, group_name="succeed_task"
     )
-    error_task = await _create_task(
+    error_task = await _create_task(sa_task_group_repo,
         sa_task_repo, sa_payload_repo, monitoring_algorithm_id,
         status=TaskStatus.ERROR, group_name="error_task"
     )
@@ -349,12 +357,12 @@ async def test_multiple_tasks_transition_independently(
         sa_task_repo,
         sa_task_run_repo,
         sa_payload_repo,
-        monitoring_algorithm_id,
+        monitoring_algorithm_id, sa_task_group_repo,
 ):
-    succeed_task = await _create_task(
+    succeed_task = await _create_task(sa_task_group_repo,
         sa_task_repo, sa_payload_repo, monitoring_algorithm_id, group_name="will_succeed"
     )
-    error_task = await _create_task(
+    error_task = await _create_task(sa_task_group_repo,
         sa_task_repo, sa_payload_repo, monitoring_algorithm_id, group_name="will_error"
     )
 
@@ -386,8 +394,9 @@ async def test_status_log_created_for_transitioned_task(
         sa_task_status_log_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.SUCCEED)
 
     await transit_task_status_uc.apply(TransitTaskStatusUCRq())
@@ -418,13 +427,14 @@ async def test_task_with_interrupted_runs_stays_in_execution(
         sa_task_run_repo,
         sa_payload_repo,
         monitoring_algorithm_id,
+        sa_task_group_repo,
 ):
     """
     INTERRUPTED попадает под NOT_IN (SUCCEED, ERROR) → задача считается незавершённой.
     Другой компонент переведёт INTERRUPTED → WAITING для повторного запуска.
     TransitTaskStatusUC не трогает такие задачи.
     """
-    task = await _create_task(sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
+    task = await _create_task(sa_task_group_repo, sa_task_repo, sa_payload_repo, monitoring_algorithm_id)
 
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.INTERRUPTED)
     await _create_task_run(sa_task_run_repo, task.id, TaskRunStatus.INTERRUPTED)

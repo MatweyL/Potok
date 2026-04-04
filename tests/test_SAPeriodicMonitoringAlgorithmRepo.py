@@ -8,21 +8,24 @@ from service.domain.schemas.enums import PriorityType, TaskType, TaskStatus, Mon
 from service.domain.schemas.monitoring_algorithm import MonitoringAlgorithm, PeriodicMonitoringAlgorithm
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task
+from service.domain.schemas.task_group import TaskGroup
 
 
 @pytest.fixture()
 def create_task(sa_monitoring_algorithm_repo,
                 sa_periodic_monitoring_algorithm_repo,
                 sa_payload_repo,
-                sa_task_repo):
+                sa_task_repo,
+                sa_task_group_repo,):
     async def _create_task(task_id: int, status: TaskStatus, status_updated_at: datetime, timeout: float = 10):
         monitoring_algorithm = MonitoringAlgorithm(id=task_id + 1_000, type=MonitoringAlgorithmType.PERIODIC)
         periodic_monitoring_algorithm = PeriodicMonitoringAlgorithm(id=monitoring_algorithm.id,
                                                                     timeout=timeout)
         payload = Payload(id=task_id + 1_000, data={"username": "test_username"})
+        task_group = await sa_task_group_repo.create(TaskGroup(name="api_monitoring", title="", description=""))
         task = Task(
             id=task_id,
-            group_name="api_monitoring",
+            group_id=task_group.id,
             priority=PriorityType.HIGH,
             type=TaskType.TIME_INTERVAL,
             monitoring_algorithm_id=monitoring_algorithm.id,

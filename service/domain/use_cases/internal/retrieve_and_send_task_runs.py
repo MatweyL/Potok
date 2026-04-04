@@ -3,6 +3,7 @@ from service.domain.use_cases.internal.retrieve_waiting_task_runs import Retriev
     RetrieveWaitingTaskRunsUCRq
 from service.domain.use_cases.internal.send_task_runs_to_execution import SendTaskRunsToExecutionUC, \
     SendTaskRunsToExecutionUCRq
+from service.ports.common.logs import logger
 
 
 class RetrieveAndSendTaskRunsUCRq(UCRequest):
@@ -23,4 +24,5 @@ class RetrieveAndSendTaskRunsUC(UseCase):
     async def apply(self, request: RetrieveAndSendTaskRunsUCRq) -> RetrieveAndSendTaskRunsUCRs:
         retrieve_response = await self._retrieve_waiting_task_runs.apply(RetrieveWaitingTaskRunsUCRq())
         send_response = await self._send_task_runs_to_execution.apply(SendTaskRunsToExecutionUCRq(task_runs=retrieve_response.task_runs))
+        logger.info(f"sent {len(retrieve_response.task_runs)} task(s)")
         return RetrieveAndSendTaskRunsUCRs(request=request, success=True)

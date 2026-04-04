@@ -16,7 +16,7 @@ class Payload(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
 
 
 class Task(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
-    group_name: Mapped[str] = mapped_column(VARCHAR(64))
+    group_id: Mapped[int] = mapped_column(INT, ForeignKey("task_group.id"))
     priority: Mapped[PriorityType] = mapped_column(Enum(PriorityType))
     type: Mapped[TaskType] = mapped_column(Enum(TaskType))
     monitoring_algorithm_id: Mapped[int] = mapped_column(INT, ForeignKey("monitoring_algorithm.id"))
@@ -101,16 +101,17 @@ class RefreshToken(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
-class Project(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
+class Project(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
     title: Mapped[str] = mapped_column(TEXT, nullable=False, )
     description: Mapped[str] = mapped_column(TEXT, nullable=False, )
 
 
-class TaskGroup(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
+class TaskGroup(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
     title: Mapped[str] = mapped_column(TEXT, nullable=False, )
     description: Mapped[str] = mapped_column(TEXT, nullable=False, )
     name: Mapped[str] = mapped_column(TEXT, nullable=False, )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    queue_per_priority: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
 
 class TaskGroupByProject(Base, TablenameMixin, LoadTimestampMixin):

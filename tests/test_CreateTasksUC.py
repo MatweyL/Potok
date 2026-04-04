@@ -1,12 +1,11 @@
-from datetime import datetime
-
 import pytest
 import pytest_asyncio
 
-from service.domain.schemas.enums import TaskType, TaskStatus, PriorityType, MonitoringAlgorithmType
+from service.domain.schemas.enums import TaskType, TaskStatus, PriorityType
 from service.domain.schemas.monitoring_algorithm import PeriodicMonitoringAlgorithm
 from service.domain.schemas.payload import PayloadBody
 from service.domain.schemas.task import TaskConfiguration
+from service.domain.schemas.task_group import TaskGroup
 from service.domain.use_cases.external.create_tasks import CreateTasksUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
 
@@ -25,13 +24,20 @@ async def monitoring_algorithm(create_monitoring_algorithm_uc):
     return response.created_algorithm
 
 
+@pytest_asyncio.fixture
+async def default_group(sa_task_group_repo):
+    task_group = TaskGroup(name="test_group", title='', description='')
+    task_group = await sa_task_group_repo.create(task_group)
+    return task_group
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_creates_tasks_with_new_payloads(create_tasks_uc, monitoring_algorithm):
+async def test_creates_tasks_with_new_payloads(create_tasks_uc, monitoring_algorithm, default_group):
     """Create tasks with new unique payloads."""
     payloads = [
         PayloadBody(data={"user_id": 1, "action": "login"}),
@@ -40,7 +46,7 @@ async def test_creates_tasks_with_new_payloads(create_tasks_uc, monitoring_algor
     ]
 
     task_config = TaskConfiguration(
-        group_name="test_group",
+        group_id=default_group.id,
         priority=PriorityType.HIGH,
         type=TaskType.TIME_INTERVAL,
         monitoring_algorithm_id=monitoring_algorithm.id,
@@ -57,7 +63,7 @@ async def test_creates_tasks_with_new_payloads(create_tasks_uc, monitoring_algor
     # Verify task properties
     for task in response.tasks:
         assert task.id is not None
-        assert task.group_name == "test_group"
+        assert task.group_id == default_group.id
         assert task.priority == PriorityType.HIGH
         assert task.type == TaskType.TIME_INTERVAL
         assert task.monitoring_algorithm_id == monitoring_algorithm.id
@@ -67,16 +73,17 @@ async def test_creates_tasks_with_new_payloads(create_tasks_uc, monitoring_algor
 
 
 @pytest.mark.asyncio
-async def test_creates_tasks_with_duplicate_payloads(create_tasks_uc, monitoring_algorithm):
+async def test_creates_tasks_with_duplicate_payloads(create_tasks_uc, monitoring_algorithm, sa_task_group_repo):
     """When payloads are duplicates, should create tasks for existing payloads."""
     # First, create tasks with some payloads
     payloads_first = [
         PayloadBody(data={"user_id": 10, "action": "login"}),
         PayloadBody(data={"user_id": 11, "action": "logout"}),
     ]
+    first_task_group = await sa_task_group_repo.create(TaskGroup(name="first_group", title="", description=""))
 
     task_config = TaskConfiguration(
-        group_name="first_group",
+        group_id=first_task_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -92,8 +99,10 @@ async def test_creates_tasks_with_duplicate_payloads(create_tasks_uc, monitoring
         PayloadBody(data={"user_id": 11, "action": "logout"}),  # Duplicate
     ]
 
+    second_task_group = await sa_task_group_repo.create(TaskGroup(name="second_group", title="", description=""))
+
     task_config2 = TaskConfiguration(
-        group_name="second_group",
+        group_id=second_task_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -110,7 +119,7 @@ async def test_creates_tasks_with_duplicate_payloads(create_tasks_uc, monitoring
 
 @pytest.mark.asyncio
 async def test_creates_tasks_with_mixed_new_and_existing_payloads(
-    create_tasks_uc, monitoring_algorithm
+        create_tasks_uc, monitoring_algorithm, default_group,
 ):
     """Mix of new and existing payloads should create appropriate tasks."""
     # Create first batch
@@ -119,7 +128,7 @@ async def test_creates_tasks_with_mixed_new_and_existing_payloads(
     ]
 
     task_config = TaskConfiguration(
-        group_name="batch1",
+        group_id=default_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -146,12 +155,13 @@ async def test_creates_tasks_with_mixed_new_and_existing_payloads(
 
 
 @pytest.mark.asyncio
-async def test_creates_single_task(create_tasks_uc, monitoring_algorithm):
+async def test_creates_single_task(create_tasks_uc, monitoring_algorithm, sa_task_group_repo):
     """Create a single task."""
     payloads = [PayloadBody(data={"single": "task"})]
 
+    task_group = await sa_task_group_repo.create(TaskGroup(name="single_task_group", title="", description=""))
     task_config = TaskConfiguration(
-        group_name="single_task_group",
+        group_id=task_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -160,16 +170,17 @@ async def test_creates_single_task(create_tasks_uc, monitoring_algorithm):
 
     assert response.success is True
     assert len(response.tasks) == 1
-    assert response.tasks[0].group_name == "single_task_group"
+    assert response.tasks[0].group_id == task_group.id
 
 
 @pytest.mark.asyncio
-async def test_task_configuration_with_defaults(create_tasks_uc, monitoring_algorithm):
+async def test_task_configuration_with_defaults(create_tasks_uc, monitoring_algorithm, sa_task_group_repo):
     """Task configuration with default values."""
     payloads = [PayloadBody(data={"test": "data"})]
 
+    task_group = await sa_task_group_repo.create(TaskGroup(name="default_config", title="", description=""))
     task_config = TaskConfiguration(
-        group_name="default_config",
+        group_id=task_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
         # priority and type use defaults
     )
@@ -183,12 +194,12 @@ async def test_task_configuration_with_defaults(create_tasks_uc, monitoring_algo
 
 
 @pytest.mark.asyncio
-async def test_task_configuration_with_custom_priority(create_tasks_uc, monitoring_algorithm):
+async def test_task_configuration_with_custom_priority(create_tasks_uc, monitoring_algorithm, default_group):
     """Create tasks with custom priority."""
     payloads = [PayloadBody(data={"priority": "test"})]
 
     task_config = TaskConfiguration(
-        group_name="priority_test",
+        group_id=default_group.id,
         priority=PriorityType.LOW,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
@@ -202,7 +213,7 @@ async def test_task_configuration_with_custom_priority(create_tasks_uc, monitori
 
 @pytest.mark.asyncio
 async def test_task_configuration_with_execution_arguments(
-    create_tasks_uc, monitoring_algorithm
+        create_tasks_uc, monitoring_algorithm, default_group
 ):
     """Create tasks with execution arguments."""
     payloads = [PayloadBody(data={"exec": "args"})]
@@ -214,7 +225,7 @@ async def test_task_configuration_with_execution_arguments(
     }
 
     task_config = TaskConfiguration(
-        group_name="exec_args_test",
+        group_id=default_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
         execution_arguments=exec_args,
     )
@@ -228,13 +239,13 @@ async def test_task_configuration_with_execution_arguments(
 
 @pytest.mark.asyncio
 async def test_task_configuration_without_execution_arguments(
-    create_tasks_uc, monitoring_algorithm
+        create_tasks_uc, monitoring_algorithm, default_group,
 ):
     """Create tasks without execution arguments."""
     payloads = [PayloadBody(data={"no": "exec_args"})]
 
     task_config = TaskConfiguration(
-        group_name="no_exec_args",
+        group_id=default_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
         execution_arguments=None,
     )
@@ -247,14 +258,14 @@ async def test_task_configuration_without_execution_arguments(
 
 
 @pytest.mark.asyncio
-async def test_payload_checksum_auto_generated(create_tasks_uc, monitoring_algorithm):
+async def test_payload_checksum_auto_generated(create_tasks_uc, monitoring_algorithm, default_group,):
     """Payload checksum is automatically generated if not provided."""
     payloads = [
         PayloadBody(data={"auto": "checksum"}),  # No checksum provided
     ]
 
     task_config = TaskConfiguration(
-        group_name="checksum_test",
+        group_id=default_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -274,14 +285,16 @@ async def test_payload_checksum_auto_generated(create_tasks_uc, monitoring_algor
 
 
 @pytest.mark.asyncio
-async def test_all_tasks_have_same_configuration(create_tasks_uc, monitoring_algorithm):
+async def test_all_tasks_have_same_configuration(create_tasks_uc, monitoring_algorithm, sa_task_group_repo):
     """All tasks created from same request share the same configuration."""
     payloads = [
         PayloadBody(data={"id": i}) for i in range(5)
     ]
 
+    task_group = await sa_task_group_repo.create(TaskGroup(name="shared_config", title="", description=""))
+
     task_config = TaskConfiguration(
-        group_name="shared_config",
+        group_id=task_group.id,
         priority=PriorityType.HIGH,
         type=TaskType.TIME_INTERVAL,
         monitoring_algorithm_id=monitoring_algorithm.id,
@@ -296,7 +309,7 @@ async def test_all_tasks_have_same_configuration(create_tasks_uc, monitoring_alg
 
     # All should have identical config
     for task in response.tasks:
-        assert task.group_name == "shared_config"
+        assert task.group_id == task_group.id
         assert task.priority == PriorityType.HIGH
         assert task.type == TaskType.TIME_INTERVAL
         assert task.monitoring_algorithm_id == monitoring_algorithm.id
@@ -304,12 +317,14 @@ async def test_all_tasks_have_same_configuration(create_tasks_uc, monitoring_alg
 
 
 @pytest.mark.asyncio
-async def test_response_contains_request(create_tasks_uc, monitoring_algorithm):
+async def test_response_contains_request(create_tasks_uc, monitoring_algorithm, sa_task_group_repo):
     """Response contains the original request."""
     payloads = [PayloadBody(data={"test": "request"})]
 
+    task_group = await sa_task_group_repo.create(TaskGroup(name="request_test", title="", description=""))
+
     task_config = TaskConfiguration(
-        group_name="request_test",
+        group_id=task_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -321,13 +336,14 @@ async def test_response_contains_request(create_tasks_uc, monitoring_algorithm):
 
 @pytest.mark.asyncio
 async def test_created_tasks_persist_in_database(
-    create_tasks_uc, monitoring_algorithm, sa_task_repo
+        create_tasks_uc, monitoring_algorithm, sa_task_repo, sa_task_group_repo
 ):
     """Verify tasks are actually persisted in database."""
     payloads = [PayloadBody(data={"persist": "test"})]
+    task_group = await sa_task_group_repo.create(TaskGroup(name="persistence_test", title="", description=""))
 
     task_config = TaskConfiguration(
-        group_name="persistence_test",
+        group_id=task_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -343,16 +359,16 @@ async def test_created_tasks_persist_in_database(
 
     assert retrieved_task is not None
     assert retrieved_task.id == task_id
-    assert retrieved_task.group_name == "persistence_test"
+    assert retrieved_task.group_id == task_group.id
 
 
 @pytest.mark.asyncio
-async def test_large_batch_of_tasks(create_tasks_uc, monitoring_algorithm):
+async def test_large_batch_of_tasks(create_tasks_uc, monitoring_algorithm, default_group, ):
     """Create a large batch of tasks (100+)."""
     payloads = [PayloadBody(data={"batch_id": i}) for i in range(150)]
 
     task_config = TaskConfiguration(
-        group_name="large_batch",
+        group_id=default_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -364,12 +380,12 @@ async def test_large_batch_of_tasks(create_tasks_uc, monitoring_algorithm):
 
 
 @pytest.mark.asyncio
-async def test_empty_payload_data(create_tasks_uc, monitoring_algorithm):
+async def test_empty_payload_data(create_tasks_uc, monitoring_algorithm, default_group, ):
     """Create tasks with empty payload data."""
     payloads = [PayloadBody(data={})]  # Empty dict
 
     task_config = TaskConfiguration(
-        group_name="empty_payload",
+        group_id=default_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 
@@ -381,12 +397,12 @@ async def test_empty_payload_data(create_tasks_uc, monitoring_algorithm):
 
 
 @pytest.mark.asyncio
-async def test_null_payload_data(create_tasks_uc, monitoring_algorithm):
+async def test_null_payload_data(create_tasks_uc, monitoring_algorithm, default_group):
     """Create tasks with None payload data."""
     payloads = [PayloadBody(data=None)]
 
     task_config = TaskConfiguration(
-        group_name="null_payload",
+        group_id=default_group.id,
         monitoring_algorithm_id=monitoring_algorithm.id,
     )
 

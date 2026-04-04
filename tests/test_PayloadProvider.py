@@ -37,7 +37,7 @@ def sample_tasks():
     return [
         Task(
             id=101,
-            group_name="api_monitoring",
+            group_id=1,
             priority=PriorityType.HIGH,
             type=TaskType.TIME_INTERVAL,
             monitoring_algorithm_id=1,
@@ -47,7 +47,7 @@ def sample_tasks():
         ),
         Task(
             id=102,
-            group_name="stats_monitoring",
+            group_id=2,
             priority=PriorityType.MEDIUM,
             type=TaskType.TIME_INTERVAL,
             monitoring_algorithm_id=1,
@@ -57,7 +57,7 @@ def sample_tasks():
         ),
         Task(
             id=103,
-            group_name="file_processing",
+            group_id=3,
             priority=PriorityType.LOW,
             type=TaskType.TIME_INTERVAL,
             monitoring_algorithm_id=2,
@@ -143,7 +143,7 @@ async def test_provide_integration_scenario(payload_provider, sa_payload_repo):
         tasks.append(
             Task(
                 id=i,
-                group_name="api_monitoring",
+                group_id=1,
                 priority=PriorityType.HIGH,
                 type=TaskType.TIME_INTERVAL,
                 monitoring_algorithm_id=1,
@@ -156,7 +156,7 @@ async def test_provide_integration_scenario(payload_provider, sa_payload_repo):
         tasks.append(
             Task(
                 id=i,
-                group_name="api_monitoring",
+                group_id=2,
                 priority=PriorityType.MEDIUM,
                 type=TaskType.TIME_INTERVAL,
                 monitoring_algorithm_id=1,
@@ -169,7 +169,7 @@ async def test_provide_integration_scenario(payload_provider, sa_payload_repo):
         tasks.append(
             Task(
                 id=i,
-                group_name="api_monitoring",
+                group_id=3,
                 priority=PriorityType.LOW,
                 type=TaskType.TIME_INTERVAL,
                 monitoring_algorithm_id=1,

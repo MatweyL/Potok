@@ -99,7 +99,7 @@ let algorithms = [];
 
 async function loadAlgorithms() {
   try {
-    const res = await fetch('/monitoring-algorithms');
+    const res = await fetch('/monitoring-algorithms/json');
     const data = await res.json();
     algorithms = data.monitoring_algorithms || [];
 

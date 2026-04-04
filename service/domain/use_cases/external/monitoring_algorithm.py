@@ -128,7 +128,6 @@ class GetMonitoringAlgorithmUC(UseCase):
     Возвращает все алгоритмы мониторинга из БД.
     """
 
-
     def __init__(
             self,
             monitoring_algorithm_repo: Repo[

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from service.domain.schemas.enums import TaskStatus, TaskRunStatus, TaskType
 from service.domain.schemas.task import TaskPK, Task, TaskStatusLog, TaskStatusLogPK
+from service.domain.schemas.task_group import TaskGroup, TaskGroupPK
 from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK, \
     TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK
 from service.domain.services.execution_bounds_provider import ExecutionBoundsProvider
@@ -37,7 +38,8 @@ class CreateTaskRunsUC(UseCase):
                  tasks_to_execute_provider_registry: TaskToExecuteProviderRegistry,
                  execution_bounds_provider: ExecutionBoundsProvider,
                  payload_provider: PayloadProvider,
-                 actual_execution_bounds_provider: ActualExecutionBoundsProvider):
+                 actual_execution_bounds_provider: ActualExecutionBoundsProvider,
+                 task_group_repo: Repo[TaskGroup, TaskGroup, TaskGroupPK],):
         self._task_repo = task_repo
         self._task_run_repo = task_run_repo
         self._task_status_log_repo = task_status_log_repo
@@ -48,6 +50,7 @@ class CreateTaskRunsUC(UseCase):
         self._execution_bounds_provider = execution_bounds_provider
         self._payload_provider = payload_provider
         self._actual_execution_bounds_provider = actual_execution_bounds_provider
+        self._task_group_repo = task_group_repo
 
     async def apply(self, request: CreateTaskRunsUCRq) -> CreateTaskRunsUCRs:
         async with self._transaction_factory.create() as transaction:
@@ -60,6 +63,9 @@ class CreateTaskRunsUC(UseCase):
                 "status_updated_at": status_updated_at})
                 for task_to_create_run in tasks_to_create_runs}, transaction=transaction)
 
+            # Получаем список групп, конвертируем в словарь
+            task_groups = await self._task_group_repo.get_all()
+            task_group_by_id = {task_group.id: task_group for task_group in task_groups}
             # Для каждой задачи получаем полезную нагрузку
             payload_by_task_pk = await self._payload_provider.provide(tasks_to_create_runs)
             # Для каждой задачи получаем границы выполнения
@@ -78,9 +84,10 @@ class CreateTaskRunsUC(UseCase):
                 payload = payload_by_task_pk[task_to_create_run]
                 execution_bounds_list = execution_bounds_by_task_pk[task_to_create_run]
                 execution_bounds_cutter = execution_bounds_cutter_by_task_id.get(task_to_create_run.id)
+                task_group = task_group_by_id[task_to_create_run.group_id]
                 if not execution_bounds_list:
                     task_runs_to_create.append(TaskRun(task_id=task_to_create_run.id,
-                                                       group_name=task_to_create_run.group_name,
+                                                       group_name=task_group.name,
                                                        priority=task_to_create_run.priority,
                                                        type=task_to_create_run.type,
                                                        payload=payload,
@@ -95,7 +102,7 @@ class CreateTaskRunsUC(UseCase):
                         else:
                             correct_execution_bounds = execution_bounds_cutter.cut(execution_bounds)
                         task_runs_to_create.append(TaskRun(task_id=task_to_create_run.id,
-                                                           group_name=task_to_create_run.group_name,
+                                                           group_name=task_group.name,
                                                            priority=task_to_create_run.priority,
                                                            type=task_to_create_run.type,
                                                            payload=payload,

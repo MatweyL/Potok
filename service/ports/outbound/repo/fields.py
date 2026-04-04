@@ -73,6 +73,10 @@ class FilterFieldsDNF(BaseModel):
     def single_conjunct(cls, filter_fields: List[FilterField]):
         return cls(conjunctions=[FilterFieldsConjunct(group=filter_fields)])
 
+    @classmethod
+    def empty(cls):
+        return cls(conjunctions=[])
+
 
 class PaginationQuery(BaseModel):
     offset_page: Optional[int] = None

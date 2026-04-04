@@ -11,14 +11,16 @@ class SATaskGroupRepo(AbstractSARepo):
                                 name=obj.name,
                                 title=obj.title,
                                 description=obj.description,
-                                is_active=obj.is_active, )
+                                is_active=obj.is_active,
+                                queue_per_priority=obj.queue_per_priority, )
 
     def to_domain(self, obj: models.TaskGroup) -> TaskGroup:
         return TaskGroup(id=obj.id,
                          name=obj.name,
                          title=obj.title,
                          description=obj.description,
-                         is_active=obj.is_active, )
+                         is_active=obj.is_active,
+                         queue_per_priority=obj.queue_per_priority,)
 
     def pk_to_model_pk(self, pk: TaskGroupPK) -> Dict:
         return {"id": pk.id}

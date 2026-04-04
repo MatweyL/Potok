@@ -85,8 +85,11 @@ class FastAPIServer(Startable):
                    ssl_certfile=settings.ssl_certfile,)
 
     async def start(self):
-        self._server_task = asyncio.create_task(self._run())
-        logger.info(f'FastAPI started; local Swagger: http://localhost:{self._port}/docs')
+        if self._server_task:
+            logger.warning("FastAPI already started!")
+        else:
+            self._server_task = asyncio.create_task(self._run())
+            logger.info(f'FastAPI started; local Swagger: http://localhost:{self._port}/docs')
 
     async def _run(self):
         config_dict = dict(app=self._app,

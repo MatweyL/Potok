@@ -7,6 +7,7 @@ from service.domain.schemas.enums import TaskStatus, TaskType, MonitoringAlgorit
 from service.domain.schemas.monitoring_algorithm import SingleMonitoringAlgorithm, MonitoringAlgorithm
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task
+from service.domain.schemas.task_group import TaskGroup
 
 
 # ---------------------------------------------------------------------------
@@ -14,7 +15,7 @@ from service.domain.schemas.task import Task
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def _make_task(sa_task_repo, sa_payload_repo):
+def _make_task(sa_task_repo, sa_payload_repo, sa_task_group_repo,):
 
     async def _inner(
         task_id: int,
@@ -23,6 +24,7 @@ def _make_task(sa_task_repo, sa_payload_repo):
         status_updated_at: datetime,
     ) -> Task:
         payload = await sa_payload_repo.create(Payload(data={'username': 'test'}))
+        task_group = await sa_task_group_repo.create(TaskGroup(name="test", title="", description=""))
         task = Task(
             id=task_id,
             type=TaskType.TIME_INTERVAL,
@@ -30,7 +32,7 @@ def _make_task(sa_task_repo, sa_payload_repo):
             status_updated_at=status_updated_at,
             payload_id=payload.id,
             monitoring_algorithm_id=1,
-            group_name="test",
+            group_id=task_group.id,
             loaded_at=loaded_at,
     )
         return await sa_task_repo.create(task)
@@ -40,8 +42,10 @@ def _make_task(sa_task_repo, sa_payload_repo):
 @pytest.fixture
 def _make_algorithm(sa_monitoring_algorithm_repo, sa_single_monitoring_algorithm_repo):
     async def _inner(timeouts: List[float], timeout_noize: float = 0.0) -> SingleMonitoringAlgorithm:
-        monitoring_algorithm = await sa_monitoring_algorithm_repo.create(MonitoringAlgorithm(id=1,
-                                                                                             type=MonitoringAlgorithmType.SINGLE))
+        monitoring_algorithm = await sa_monitoring_algorithm_repo.create(
+            MonitoringAlgorithm(id=1,
+                                                                                             type=MonitoringAlgorithmType.SINGLE)
+        )
         single_monitoring_algorithm = SingleMonitoringAlgorithm(
             id=monitoring_algorithm.id,
             timeouts=timeouts,

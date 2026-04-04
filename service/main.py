@@ -15,9 +15,13 @@ from service.adapters.outbound.repo.sa.impls.app_user import SAAppUserRepo
 from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAMonitoringAlgorithmRepo, \
     SAPeriodicMonitoringAlgorithmRepo, SASingleMonitoringAlgorithmRepo
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
+from service.adapters.outbound.repo.sa.impls.project import SAProjectRepo
 from service.adapters.outbound.repo.sa.impls.refresh_token import SARefreshTokenRepo
 from service.adapters.outbound.repo.sa.impls.task import SATaskRepo
-from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo
+from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
+from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
+from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider, \
+    SATaskRunMetricsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
     SATaskRunTimeIntervalExecutionBoundsRepo
@@ -25,6 +29,8 @@ from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatus
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.di import set_use_case_facade
+from service.domain.services.balancing_algorithm.aimd import AIMDBalancingAlgorithm
+from service.domain.services.balancing_algorithm.constant import ConstantBalancingAlgorithm
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
 from service.domain.services.hasher import Hasher
 from service.domain.services.log_cleaner import TaskRunStatusLogCleaner
@@ -102,9 +108,15 @@ async def main():
     time_interval_task_progress_repo = SATimeIntervalTaskProgressRepo(database, models.TimeIntervalTaskProgress)
     task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database,
                                                                                             models.TaskRunTimeIntervalExecutionBounds)
+    waiting_task_run_provider = SAWaitingTaskRunProvider(database, task_run_repo)
     payload_repo = SAPayloadRepo(database, models.Payload)
     app_user_repo = SAAppUserRepo(database, models.AppUser)
     refresh_token_repo = SARefreshTokenRepo(database, models.RefreshToken)
+
+    task_group_repo = SATaskGroupRepo(database, models.TaskGroup)
+    project_repo = SAProjectRepo(database, models.TaskGroup)
+    task_group_by_project_repo = SATaskGroupByProjectRepo(database, models.TaskGroupByProject)
+    task_run_metrics_provider = SATaskRunMetricsProvider(database)
 
     rmq_producer_connection = AioPikaRMQProducerConnection.from_settings(settings.rmq_producer_connection)
     rmq_producer = AioPikaRMQProducer.from_settings(settings.rmq_producer_task_run, rmq_producer_connection)
@@ -113,7 +125,7 @@ async def main():
 
     execution_bounds_provider = DefaultExecutionBoundsProvider(
         task_run_time_interval_execution_bounds_repo=task_run_time_interval_execution_bounds_repo,
-        default_left_date=datetime(2010, 1, 1),
+        default_left_date=datetime(2020, 1, 1),
         default_first_interval_days=31,
     )
     payload_provider = PayloadProvider(payload_repo)
@@ -122,6 +134,11 @@ async def main():
     task_status_log_cleaner = TaskRunStatusLogCleaner(task_run_status_log_repo)
     hasher = Hasher()
     token_service = TokenService(settings.jwt_secret_key)
+    constant_balancing_algorithm = ConstantBalancingAlgorithm(500, task_group_repo,)
+    aimd_balancing_algorithm = AIMDBalancingAlgorithm(task_group_repo,
+                                                      task_run_metrics_provider, 10, 500,
+                                                      50, 0.5,
+                                                      600)
     # USE CASE
     create_monitoring_algorithm_uc = CreateMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                                  periodic_monitoring_algorithm_repo,
@@ -140,7 +157,7 @@ async def main():
     get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                            periodic_monitoring_algorithm_repo,
                                                            single_monitoring_algorithm_repo, transaction_factory)
-    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_payload_uc, get_monitoring_algorithm_uc)
+    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_payload_uc, get_monitoring_algorithm_uc, task_repo)
     use_case_facade = UseCaseFacade(create_tasks_uc, create_monitoring_algorithm_uc, get_all_monitoring_algorithms_uc,
                                     get_tasks_uc, get_task_uc, get_task_runs_uc, get_task_progress_uc, get_payloads_uc,
                                     get_payload_uc, update_payload_uc, get_tasks_detailed_uc)
@@ -150,14 +167,17 @@ async def main():
                                            task_run_time_interval_execution_bounds_repo,
                                            transaction_factory, task_to_execute_provider_registry,
                                            execution_bounds_provider,
-                                           payload_provider, actual_execution_bounds_provider)
+                                           payload_provider, actual_execution_bounds_provider,
+                                           task_group_repo)
     receive_task_run_execution_status_uc = ReceiveTaskRunExecutionStatusUC(task_run_repo,
                                                                            task_run_status_log_repo,
                                                                            time_interval_task_progress_repo,
                                                                            transaction_factory)
     retrieve_waiting_task_runs_uc = RetrieveWaitingTaskRunsUC(task_run_repo,
                                                               task_run_status_log_repo,
-                                                              transaction_factory)
+                                                              transaction_factory,
+                                                              waiting_task_run_provider,
+                                                              aimd_balancing_algorithm,)
     send_task_runs_to_execution_uc = SendTaskRunsToExecutionUC(task_runs_producer, queue_creator)
     retrieve_and_send_task_runs_uc = RetrieveAndSendTaskRunsUC(retrieve_waiting_task_runs_uc,
                                                                send_task_runs_to_execution_uc)
@@ -219,6 +239,7 @@ async def main():
         rmq_consumer_connection,
         rmq_consumer,
         rmq_task_run_execution_status_consumer,
+
     ]
     periodic_runners = [
         PeriodicRunner(create_task_runs_uc.apply, 30, run_name="Create task runs from tasks",

@@ -24,7 +24,7 @@ class ReceiveTaskRunExecutionStatusUC(UseCase):
                  task_run_status_log_repo: Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
                  time_interval_task_progress_repo: Repo[TimeIntervalTaskProgress, TimeIntervalTaskProgress, TimeIntervalTaskProgressPK],
                  transaction_factory: TransactionFactory,
-                 ):
+                 instant_upload: bool = True,):
         self._task_run_repo = task_run_repo
         self._task_run_status_log_repo = task_run_status_log_repo
         self._time_interval_task_progress_repo = time_interval_task_progress_repo
@@ -32,6 +32,7 @@ class ReceiveTaskRunExecutionStatusUC(UseCase):
 
         # FIXME: быстрое решение для предотвращения вставки малого количества статусов в БД (забирают все соединения)
         self._accumulated_command_responses: List[CommandResponse] = []
+        self._instant_upload = instant_upload
 
     async def upload_command_responses(self):
         accumulated_command_responses= self._accumulated_command_responses
@@ -67,4 +68,6 @@ class ReceiveTaskRunExecutionStatusUC(UseCase):
     async def apply(self, request: ReceiveTaskRunExecutionStatusUCRq) -> ReceiveTaskRunExecutionStatusUCRs:
         command_response = request.command_response
         self._accumulated_command_responses.append(command_response)
+        if self._instant_upload:
+            await self.upload_command_responses()
         return ReceiveTaskRunExecutionStatusUCRs(success=True, request=request)

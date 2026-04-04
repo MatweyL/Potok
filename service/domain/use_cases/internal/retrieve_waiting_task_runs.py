@@ -3,9 +3,11 @@ from typing import List
 
 from service.domain.schemas.enums import TaskRunStatus
 from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK
+from service.domain.services.balancing_algorithm.abstract import BalancingAlgorithm
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import FilterFieldsDNF, UpdateFields, PaginationQuery
+from service.ports.outbound.repo.task_run import WaitingTaskRunProvider
 from service.ports.outbound.repo.transaction import TransactionFactory
 
 
@@ -23,18 +25,19 @@ class RetrieveWaitingTaskRunsUC(UseCase):
                  task_run_repo: Repo[TaskRun, TaskRun, TaskRunPK],
                  task_run_status_log_repo: Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
                  transaction_factory: TransactionFactory,
+                 waiting_task_run_provider: WaitingTaskRunProvider,
+                 balancing_algorithm: BalancingAlgorithm,
                  ):
         self._task_run_repo = task_run_repo
         self._task_run_status_log_repo = task_run_status_log_repo
         self._transaction_factory = transaction_factory
-
+        self._waiting_task_run_provider = waiting_task_run_provider
+        self._balancing_algorithm = balancing_algorithm
+        
     async def apply(self, request: RetrieveWaitingTaskRunsUCRq) -> RetrieveWaitingTaskRunsUCRs:
         async with self._transaction_factory.create() as transaction:
-            task_runs = await self._task_run_repo.paginated(
-                PaginationQuery(filter_fields_dnf=FilterFieldsDNF.single('status', TaskRunStatus.WAITING),
-                                limit_per_page=500),
-                transaction,
-            )
+            batch_size_by_group_name = await self._balancing_algorithm.calculate_batch_size_by_group()
+            task_runs = await self._waiting_task_run_provider.provide(batch_size_by_group_name)
             status_updated_at = datetime.now()
             await self._task_run_repo.update_all({task_run: UpdateFields.multiple({
                 'status': TaskRunStatus.QUEUED,

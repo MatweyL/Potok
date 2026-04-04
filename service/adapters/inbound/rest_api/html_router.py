@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
@@ -6,6 +8,7 @@ from starlette.responses import HTMLResponse, Response, RedirectResponse
 from starlette.templating import Jinja2Templates
 
 from service.domain.schemas.enums import AppUserRole
+from service.domain.schemas.task_detailed import TaskDetailed
 from service.domain.use_cases.external.admin.activate_user import ActivateUserUCRq
 from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUCRq
 from service.domain.use_cases.external.auth.create_user import CreateUserUCRq
@@ -19,9 +22,11 @@ from service.domain.use_cases.external.get_task import GetTaskUCRq
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
+from service.domain.use_cases.external.monitoring_algorithm import GetAllMonitoringAlgorithmsUCRq, \
+    CreateMonitoringAlgorithmUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
 from service.ports.common.path_utils import get_project_root
-from service.ports.outbound.repo.fields import PaginationQuery
+from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF, ConditionOperation
 
 router = APIRouter()
 
@@ -82,9 +87,103 @@ async def tasks_page(request: Request):
         context={"tasks": rs.tasks}
     )
 
+# DataTables присылает: draw, start, length, order[0][column], order[0][dir], search[value]
+COLUMN_MAP = {
+    '0': 'id',
+    '1': 'group_name',
+    '2': 'status',
+    '3': 'priority',
+    '4': 'type',
+    '5': 'status_updated_at',
+}
 
-@router.get("/monitoring-algorithms")
-async def get_algorithms(request: Request):
+@router.get("/tasks/json")
+async def tasks_json(
+    request: Request,
+    draw: int = 1,
+    start: int = 0,
+    length: int = 25,
+    # DataTables передаёт order и search через QueryString
+):
+    params = dict(request.query_params)
+
+    order_col  = params.get('order[0][column]', '0')
+    order_dir  = params.get('order[0][dir]', 'desc')
+    search_val = params.get('search[value]', '').strip()
+
+    order_by = COLUMN_MAP.get(order_col, 'id')
+    asc_sort = order_dir == 'asc'
+    offset_page = start // length
+
+    # Фильтрация по поиску — ищем по group_name
+    filter_dnf = FilterFieldsDNF.empty()
+    if search_val:
+        filter_dnf = FilterFieldsDNF.single('group_name', search_val, ConditionOperation.IN)
+
+    pagination = PaginationQuery(
+        offset_page=offset_page,
+        limit_per_page=length,
+        order_by=order_by,
+        asc_sort=asc_sort,
+        filter_fields_dnf=filter_dnf,
+    )
+
+    rs = await request.app.state.use_case_facade.get_tasks_detailed(
+        GetTasksDetailedUCRq(pagination=pagination)
+    )
+
+    # DataTables ожидает recordsTotal и recordsFiltered
+    # нужен total count — добавь в GetTasksDetailedUCRs поле total: int
+    return {
+        "draw": draw,
+        "recordsTotal": rs.total,
+        "recordsFiltered": rs.total,
+        "data": [format_task_row(item) for item in rs.tasks],
+    }
+
+
+def format_task_row(item: TaskDetailed) -> dict:
+    task = item.task
+    algo = item.monitoring_algorithm
+    payload = item.payload
+
+    algo_html = '—'
+    if algo:
+        algo_html = f'<code class="text-muted small">#{algo.id}</code> {algo.type.title()}'
+        if hasattr(algo, 'timeout'):
+            noise = f' ± {algo.timeout_noize}с' if algo.timeout_noize else ''
+            algo_html += f'<div class="text-muted small">{algo.timeout}с{noise}</div>'
+
+    payload_html = '—'
+    if payload and payload.data:
+        payload_html = f'<code class="small">{json.dumps(payload.data, ensure_ascii=False)}</code>'
+
+    status_classes = {
+        'NEW': 'e0e7ff" style="color:#4338ca',
+        'EXECUTION': 'fef3c7" style="color:#b45309',
+        'SUCCEED': 'dcfce7" style="color:#15803d',
+        'FINISHED': 'f1f5f9" style="color:#64748b',
+        'CANCELLED': 'fee2e2" style="color:#b91c1c',
+        'ERROR': 'fee2e2" style="color:#991b1b',
+    }
+    bg = status_classes.get(task.status.value, 'f1f5f9" style="color:#64748b')
+    status_html = f'<span style="background:#{bg};font-size:.75rem;font-weight:500;padding:.2rem .6rem;border-radius:20px">{task.status.value.title()}</span>'
+
+    return {
+        "DT_RowAttr": {"data-href": f"/tasks/{task.id}", "style": "cursor:pointer"},
+        "id":         f'<span class="text-muted font-monospace">#{task.id}</span>',
+        "group_name": task.group_name,
+        "status":     status_html,
+        "priority":   task.priority.value.title(),
+        "type":       f'<code>{task.type.value}</code>',
+        "algorithm":  algo_html,
+        "payload":    payload_html,
+        "updated_at": task.status_updated_at.strftime('%d.%m.%Y %H:%M'),
+    }
+
+
+@router.get("/monitoring-algorithms/json")
+async def get_algorithms_json(request: Request):
     rs = await request.app.state.use_case_facade.get_all_monitoring_algorithms()
     return rs
 
@@ -196,3 +295,16 @@ async def activate_user(request: Request, user_id: int):
         ActivateUserUCRq(target_user_id=user_id,
                            current_user_id=current_user.id)
     )
+
+
+@router.get("/monitoring-algorithms", response_class=HTMLResponse)
+async def monitoring_algorithms_page(request: Request):
+    rs = await request.app.state.use_case_facade.get_all_monitoring_algorithms()
+    return templates.TemplateResponse(
+        request=request, name="monitoring_algorithms.html",
+        context={"algorithms": rs.monitoring_algorithms}
+    )
+
+@router.post("/monitoring-algorithms")
+async def create_monitoring_algorithm(request: Request, rq: CreateMonitoringAlgorithmUCRq):
+    return await request.app.state.use_case_facade.create_monitoring_algorithm(rq)

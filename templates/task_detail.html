@@ -191,7 +191,7 @@
 
             <!-- Timeline -->
             <div class="timeline-wrap">
-              {% for p in task_progress %}
+              {% for p in task_progress|sort(attribute="right_bound_at") %}
                 {% if p.collected_data_amount > 0 or p.saved_data_amount > 0 %}
                   <div
                     class="timeline-segment timeline-segment--done"
@@ -258,9 +258,9 @@
                 <td>
                   {% if run.execution_bounds %}
                     <span class="small">
-                      {{ run.execution_bounds.left_bound_at.strftime('%d.%m %H:%M') if run.execution_bounds.left_bound_at else '?' }}
+                      {{ run.execution_bounds.left_bound_at.strftime('%Y-%m-%d %H:%M') if run.execution_bounds.left_bound_at else '?' }}
                       →
-                      {{ run.execution_bounds.right_bound_at.strftime('%d.%m %H:%M') }}
+                      {{ run.execution_bounds.right_bound_at.strftime('%Y-%m-%d %H:%M') }}
                     </span>
                   {% else %}
                     <span class="text-muted">—</span>
@@ -302,7 +302,7 @@ $(document).ready(function () {
   $('#runsTable').DataTable({
     language: { url: 'https://cdn.datatables.net/plug-ins/2.0.3/i18n/ru.json' },
     pageLength: 25,
-    order: [[0, 'desc']],
+    order: [[4, 'desc']],
   });
 
   // Logout

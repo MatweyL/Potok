@@ -1,3 +1,4 @@
+import pprint
 from datetime import datetime, timedelta
 from typing import Dict
 
@@ -8,6 +9,7 @@ from service.domain.schemas.execution_bounds import TimeIntervalBounds
 from service.domain.schemas.monitoring_algorithm import MonitoringAlgorithm, PeriodicMonitoringAlgorithm
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task
+from service.domain.schemas.task_group import TaskGroup, TaskGroupPK
 from service.domain.schemas.task_progress import TimeIntervalTaskProgress
 from service.domain.schemas.task_run import TaskRunTimeIntervalExecutionBounds, TaskRun
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUCRq
@@ -39,17 +41,19 @@ def create_periodic_monitoring_algorithm(sa_monitoring_algorithm_repo,
 
 
 @pytest.fixture
-def create_task_v2(sa_task_repo, ):
+def create_task_v2(sa_task_repo, sa_task_group_repo):
     async def _inner(payload: Payload, monitoring_algorithm: MonitoringAlgorithm,
                      status_update_elapsed_seconds: int = 100,
                      status: TaskStatus = TaskStatus.NEW):
+        group_name = "test"
+        task_group = await sa_task_group_repo.create(TaskGroup(name=group_name, title='', description=''))
         t = Task(
             type=TaskType.TIME_INTERVAL,
             status=status,
             status_updated_at=datetime.now() - timedelta(seconds=status_update_elapsed_seconds),
             payload_id=payload.id,
             monitoring_algorithm_id=monitoring_algorithm.id,
-            group_name="test",
+            group_id=task_group.id,
         )
         t_created = await sa_task_repo.create(t)
         return t_created
@@ -60,7 +64,8 @@ def create_task_v2(sa_task_repo, ):
 @pytest.fixture
 def create_time_interval_task_progress(sa_time_interval_task_progress_repo,
                                        sa_task_run_time_interval_execution_bounds_repo,
-                                       sa_task_run_repo):
+                                       sa_task_run_repo,
+                                       sa_task_group_repo):
     async def _inner(task: Task, right_bound_at: datetime = None, left_bound_at: datetime = None, ):
         right_bound_at = right_bound_at or datetime.now() - timedelta(days=1)
         left_bound_at = left_bound_at if left_bound_at else datetime.min
@@ -68,7 +73,8 @@ def create_time_interval_task_progress(sa_time_interval_task_progress_repo,
                                      collected_data_amount=10, saved_data_amount=10)
         execution_bounds = TimeIntervalBounds(right_bound_at=t.right_bound_at,
                                               left_bound_at=t.left_bound_at)
-        task_run = TaskRun(task_id=task.id, group_name=task.group_name, priority=task.priority, type=task.type,
+        task_group = await sa_task_group_repo.get(TaskGroupPK(id=task.group_id))
+        task_run = TaskRun(task_id=task.id, group_name=task_group.name, priority=task.priority, type=task.type,
                            payload=None, execution_bounds=execution_bounds, status=TaskRunStatus.SUCCEED,
                            status_updated_at=datetime.now())
         task_run = await sa_task_run_repo.create(task_run)
@@ -88,9 +94,10 @@ async def test_apply_one_task_two_runs(create_task_runs_uc, sa_task_run_repo, cr
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
     task = await create_task_v2(payload, monitoring_algorithm)
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
-    assert response.task_runs_created == 2
+    assert response.task_runs_created == 8
     task_runs = await sa_task_run_repo.get_all()
     assert len(task_runs) == response.task_runs_created
+
     for task_run in task_runs:
         assert task_run.task_id == task.id
 

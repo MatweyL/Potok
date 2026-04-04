@@ -8,7 +8,7 @@ class TaskMapper:
     @staticmethod
     def to_model(obj: Task) -> models.Task:
         return models.Task(id=obj.id,
-                           group_name=obj.group_name,
+                           group_id=obj.group_id,
                            priority=obj.priority,
                            type=obj.type,
                            monitoring_algorithm_id=obj.monitoring_algorithm_id,
@@ -21,7 +21,7 @@ class TaskMapper:
     @staticmethod
     def to_domain(obj: models.Task) -> Task:
         return Task(id=obj.id,
-                    group_name=obj.group_name,
+                    group_id=obj.group_id,
                     priority=obj.priority,
                     type=obj.type,
                     monitoring_algorithm_id=obj.monitoring_algorithm_id,

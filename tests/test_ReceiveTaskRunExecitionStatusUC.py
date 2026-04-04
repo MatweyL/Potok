@@ -1,28 +1,49 @@
 from datetime import datetime
 from typing import Optional
-from unittest.mock import AsyncMock
 
 import pytest
+import pytest_asyncio
 
 from service.domain.schemas.command import Command, CommandResponse
-from service.domain.schemas.enums import CommandType, TaskRunStatus, TaskType, TaskStatus
+from service.domain.schemas.enums import CommandType, TaskRunStatus, TaskType, TaskStatus, PriorityType, \
+    MonitoringAlgorithmType
 from service.domain.schemas.execution_results import TimeIntervalExecutionResults
+from service.domain.schemas.monitoring_algorithm import MonitoringAlgorithm
+from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task
-from service.domain.schemas.task_progress import TimeIntervalTaskProgress
-from service.domain.schemas.task_run import TaskRun, TaskRunPK, TaskRunStatusLog
+from service.domain.schemas.task_group import TaskGroup
+from service.domain.schemas.task_run import TaskRun, TaskRunPK
 from service.domain.use_cases.internal.receive_task_run_execution_status import (
     ReceiveTaskRunExecutionStatusUC,
     ReceiveTaskRunExecutionStatusUCRq,
 )
-from service.ports.outbound.repo.fields import UpdateFields
 
 
 # ---------------------------------------------------------------------------
 # Fixtures & Helpers
 # ---------------------------------------------------------------------------
 
+@pytest_asyncio.fixture
+async def default_task_group(sa_task_group_repo):
+    task_group = await sa_task_group_repo.create(TaskGroup(id=1, name='test', title='', description=''))
+    return task_group
+@pytest_asyncio.fixture
+async def default_monitoring_algorithm(sa_monitoring_algorithm_repo):
+    monitoring_algorithm = await sa_monitoring_algorithm_repo.create(MonitoringAlgorithm(id=1, type=MonitoringAlgorithmType.PERIODIC))
+    return monitoring_algorithm
+@pytest_asyncio.fixture
+async def default_payload(sa_payload_repo):
+    payload = await sa_payload_repo.create(Payload(id=1, data={}))
+    return payload
 
-def _make_task(task_id: int = 1) -> Task:
+@pytest_asyncio.fixture
+async def default_task(sa_task_repo):
+    task = _make_task()
+    task = await sa_task_repo.create(task)
+    return task
+
+
+def _make_task(task_id: int = 1, group_id: int = 1) -> Task:
     """Create a minimal Task stub."""
     return Task(
         id=task_id,
@@ -31,14 +52,15 @@ def _make_task(task_id: int = 1) -> Task:
         status_updated_at=datetime(2024, 1, 1),
         payload_id=1,
         monitoring_algorithm_id=1,
-        group_name="test_group",
+        group_id=group_id,
+        priority=PriorityType.MEDIUM,
     )
 
 
 def _make_task_run(
-    task_run_id: int = 10,
-    task_id: int = 1,
-    status: TaskRunStatus = TaskRunStatus.WAITING,
+        task_run_id: int = 10,
+        task_id: int = 1,
+        status: TaskRunStatus = TaskRunStatus.WAITING,
 ) -> TaskRun:
     """Create a minimal TaskRun stub."""
     return TaskRun(
@@ -57,11 +79,11 @@ def _make_command(task_run: TaskRun, command_type: CommandType = CommandType.EXE
 
 
 def _make_command_response(
-    command: Command,
-    status: TaskRunStatus,
-    description: Optional[str] = None,
-    result: Optional[TimeIntervalExecutionResults] = None,
-    created_at: Optional[datetime] = None,
+        command: Command,
+        status: TaskRunStatus,
+        description: Optional[str] = None,
+        result: Optional[TimeIntervalExecutionResults] = None,
+        created_at: Optional[datetime] = None,
 ) -> CommandResponse:
     """Create a CommandResponse."""
     return CommandResponse(
@@ -74,43 +96,17 @@ def _make_command_response(
 
 
 @pytest.fixture
-def mock_task_run_repo() -> AsyncMock:
-    repo = AsyncMock()
-    repo.update = AsyncMock(return_value=None)
-    return repo
-
-
-@pytest.fixture
-def mock_task_run_status_log_repo() -> AsyncMock:
-    repo = AsyncMock()
-    repo.create = AsyncMock(return_value=None)
-    return repo
-
-
-@pytest.fixture
-def mock_time_interval_task_progress_repo() -> AsyncMock:
-    repo = AsyncMock()
-    repo.create = AsyncMock(return_value=None)
-    return repo
-
-
-@pytest.fixture
-def mock_transaction_factory() -> AsyncMock:
-    return AsyncMock()
-
-
-@pytest.fixture
-def use_case(
-    mock_task_run_repo,
-    mock_task_run_status_log_repo,
-    mock_time_interval_task_progress_repo,
-    mock_transaction_factory,
+def receive_task_run_execution_status_uc(
+        sa_task_run_repo,
+        sa_task_run_status_log_repo,
+        sa_time_interval_task_progress_repo,
+        sa_transaction_factory,
 ) -> ReceiveTaskRunExecutionStatusUC:
     return ReceiveTaskRunExecutionStatusUC(
-        task_run_repo=mock_task_run_repo,
-        task_run_status_log_repo=mock_task_run_status_log_repo,
-        time_interval_task_progress_repo=mock_time_interval_task_progress_repo,
-        transaction_factory=mock_transaction_factory,
+        task_run_repo=sa_task_run_repo,
+        task_run_status_log_repo=sa_task_run_status_log_repo,
+        time_interval_task_progress_repo=sa_time_interval_task_progress_repo,
+        transaction_factory=sa_transaction_factory,
     )
 
 
@@ -121,13 +117,20 @@ def use_case(
 
 @pytest.mark.asyncio
 async def test_updates_task_run_status_without_result(
-    use_case,
-    mock_task_run_repo,
-    mock_task_run_status_log_repo,
-    mock_time_interval_task_progress_repo,
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_task_run_status_log_repo,
+        sa_time_interval_task_progress_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
-    task_run = _make_task_run(task_run_id=10, task_id=1)
-    command = _make_command(task_run)
+    # Создаём task_run в БД
+    task_run = _make_task_run(task_run_id=10,)
+    created_task_run = await sa_task_run_repo.create(task_run)
+
+    command = _make_command(created_task_run)
     created_at = datetime(2024, 6, 15, 12, 0, 0)
 
     command_response = _make_command_response(
@@ -139,30 +142,29 @@ async def test_updates_task_run_status_without_result(
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    response = await use_case.apply(request)
+    response = await receive_task_run_execution_status_uc.apply(request)
 
-    # Verify task_run was updated
-    mock_task_run_repo.update.assert_awaited_once()
-    call_args = mock_task_run_repo.update.call_args
-    assert call_args[0][0] == TaskRunPK(id=10)
-    update_fields: UpdateFields = call_args[0][1]
-    assert update_fields.to_dict() == {
-        "status": TaskRunStatus.EXECUTION,
-        "status_updated_at": created_at,
-    }
+    # Проверяем что task_run обновился в БД
+    updated_task_run = await sa_task_run_repo.get(TaskRunPK(id=10))
+    assert updated_task_run.status == TaskRunStatus.EXECUTION
+    assert updated_task_run.status_updated_at == created_at
 
-    # Verify status log was created
-    mock_task_run_status_log_repo.create.assert_awaited_once()
-    status_log: TaskRunStatusLog = mock_task_run_status_log_repo.create.call_args[0][0]
-    assert status_log.task_run_id == 10
-    assert status_log.status == TaskRunStatus.EXECUTION
-    assert status_log.status_updated_at == created_at
-    assert status_log.description == "Task is now EXECUTION"
+    # Проверяем что создался status log
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    status_logs = await sa_task_run_status_log_repo.filter(
+        FilterFieldsDNF.single("task_run_id", 10)
+    )
+    assert len(status_logs) == 1
+    assert status_logs[0].status == TaskRunStatus.EXECUTION
+    assert status_logs[0].description == "Task is now EXECUTION"
 
-    # Verify progress was NOT created (no result)
-    mock_time_interval_task_progress_repo.create.assert_not_awaited()
+    # Проверяем что прогресс НЕ создался (нет result)
+    progress_records = await sa_time_interval_task_progress_repo.filter(
+        FilterFieldsDNF.single("task_id", 1)
+    )
+    assert len(progress_records) == 0
 
-    # Verify response
+    # Проверяем response
     assert response.success is True
     assert response.request == request
 
@@ -174,13 +176,19 @@ async def test_updates_task_run_status_without_result(
 
 @pytest.mark.asyncio
 async def test_creates_progress_when_result_present(
-    use_case,
-    mock_task_run_repo,
-    mock_task_run_status_log_repo,
-    mock_time_interval_task_progress_repo,
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_time_interval_task_progress_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
-    task_run = _make_task_run(task_run_id=20, task_id=5)
-    command = _make_command(task_run)
+    # Создаём task_run в БД
+    task_run = _make_task_run(task_run_id=20,)
+    created_task_run = await sa_task_run_repo.create(task_run)
+
+    command = _make_command(created_task_run)
     created_at = datetime(2024, 6, 15, 14, 30, 0)
 
     execution_result = TimeIntervalExecutionResults(
@@ -199,21 +207,20 @@ async def test_creates_progress_when_result_present(
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    response = await use_case.apply(request)
+    response = await receive_task_run_execution_status_uc.apply(request)
 
-    # Verify task_run was updated
-    mock_task_run_repo.update.assert_awaited_once()
-    update_pk, update_fields = mock_task_run_repo.update.call_args[0]
-    assert update_pk == TaskRunPK(id=20)
-    assert update_fields.to_dict()["status"] == TaskRunStatus.SUCCEED
+    # Проверяем обновление task_run
+    updated_task_run = await sa_task_run_repo.get(TaskRunPK(id=20))
+    assert updated_task_run.status == TaskRunStatus.SUCCEED
 
-    # Verify status log was created
-    mock_task_run_status_log_repo.create.assert_awaited_once()
-
-    # Verify progress WAS created
-    mock_time_interval_task_progress_repo.create.assert_awaited_once()
-    progress: TimeIntervalTaskProgress = mock_time_interval_task_progress_repo.create.call_args[0][0]
-    assert progress.task_id == 5
+    # Проверяем что создался прогресс
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    progress_records = await sa_time_interval_task_progress_repo.filter(
+        FilterFieldsDNF.single("task_id", 1)
+    )
+    assert len(progress_records) == 1
+    progress = progress_records[0]
+    assert progress.task_id == 1
     assert progress.right_bound_at == datetime(2024, 6, 15)
     assert progress.left_bound_at == datetime(2024, 5, 1)
     assert progress.collected_data_amount == 100
@@ -229,82 +236,101 @@ async def test_creates_progress_when_result_present(
 
 @pytest.mark.asyncio
 async def test_handles_ERROR_status(
-    use_case,
-    mock_task_run_repo,
-    mock_task_run_status_log_repo,
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_task_run_status_log_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
-    task_run = _make_task_run(task_run_id=30, task_id=7)
+    task_run = _make_task_run(task_run_id=30,)
+    await sa_task_run_repo.create(task_run)
+
     command = _make_command(task_run)
     created_at = datetime(2024, 6, 15, 15, 0, 0)
 
     command_response = _make_command_response(
         command=command,
         status=TaskRunStatus.ERROR,
-        description="Error: Connection timeout",
-        result=None,
+        description="Execution failed",
         created_at=created_at,
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    response = await use_case.apply(request)
+    await receive_task_run_execution_status_uc.apply(request)
 
-    # Verify status was updated to ERROR
-    update_fields: UpdateFields = mock_task_run_repo.update.call_args[0][1]
-    assert update_fields.to_dict()["status"] == TaskRunStatus.ERROR
+    # Проверяем статус
+    updated_task_run = await sa_task_run_repo.get(TaskRunPK(id=30))
+    assert updated_task_run.status == TaskRunStatus.ERROR
 
-    # Verify log contains error description
-    status_log: TaskRunStatusLog = mock_task_run_status_log_repo.create.call_args[0][0]
-    assert status_log.status == TaskRunStatus.ERROR
-    assert status_log.description == "Error: Connection timeout"
-
-    assert response.success is True
+    # Проверяем status log
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    status_logs = await sa_task_run_status_log_repo.filter(
+        FilterFieldsDNF.single("task_run_id", 30)
+    )
+    assert len(status_logs) == 1
+    assert status_logs[0].status == TaskRunStatus.ERROR
+    assert status_logs[0].description == "Execution failed"
 
 
 # ---------------------------------------------------------------------------
-# 4. Different statuses — CANCELLED
+# 4. Different statuses — INTERRUPTED
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_handles_cancelled_status(
-    use_case,
-    mock_task_run_repo,
-    mock_task_run_status_log_repo,
+async def test_handles_INTERRUPTED_status(
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
     task_run = _make_task_run(task_run_id=40)
+    await sa_task_run_repo.create(task_run)
+
     command = _make_command(task_run)
 
     command_response = _make_command_response(
         command=command,
-        status=TaskRunStatus.CANCELLED,
-        description="User requested cancellation",
+        status=TaskRunStatus.INTERRUPTED,
+        description="Task was interrupted",
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    await use_case.apply(request)
+    await receive_task_run_execution_status_uc.apply(request)
 
-    update_fields: UpdateFields = mock_task_run_repo.update.call_args[0][1]
-    assert update_fields.to_dict()["status"] == TaskRunStatus.CANCELLED
+    updated_task_run = await sa_task_run_repo.get(TaskRunPK(id=40))
+    assert updated_task_run.status == TaskRunStatus.INTERRUPTED
 
 
 # ---------------------------------------------------------------------------
-# 5. Progress with partial save (collected != saved)
+# 5. Result with large amounts
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_creates_progress_with_partial_save(
-    use_case,
-    mock_time_interval_task_progress_repo,
+async def test_handles_large_amounts_in_result(
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_time_interval_task_progress_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
-    task_run = _make_task_run(task_run_id=50, task_id=8)
+    task_run = _make_task_run(task_run_id=50, )
+    await sa_task_run_repo.create(task_run)
+
     command = _make_command(task_run)
 
     execution_result = TimeIntervalExecutionResults(
-        right_bound_at=datetime(2024, 6, 10),
+        right_bound_at=datetime(2024, 6, 15),
         left_bound_at=datetime(2024, 6, 1),
         collected_data_amount=200,
-        saved_data_amount=180,  # Partial save
+        saved_data_amount=180,
     )
 
     command_response = _make_command_response(
@@ -314,11 +340,15 @@ async def test_creates_progress_with_partial_save(
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    await use_case.apply(request)
+    await receive_task_run_execution_status_uc.apply(request)
 
-    progress: TimeIntervalTaskProgress = mock_time_interval_task_progress_repo.create.call_args[0][0]
-    assert progress.collected_data_amount == 200
-    assert progress.saved_data_amount == 180
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    progress_records = await sa_time_interval_task_progress_repo.filter(
+        FilterFieldsDNF.single("task_id", 1)
+    )
+    assert len(progress_records) == 1
+    assert progress_records[0].collected_data_amount == 200
+    assert progress_records[0].saved_data_amount == 180
 
 
 # ---------------------------------------------------------------------------
@@ -328,10 +358,17 @@ async def test_creates_progress_with_partial_save(
 
 @pytest.mark.asyncio
 async def test_handles_none_description(
-    use_case,
-    mock_task_run_status_log_repo,
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_task_run_status_log_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
     task_run = _make_task_run(task_run_id=60)
+    await sa_task_run_repo.create(task_run)
+
     command = _make_command(task_run)
 
     command_response = _make_command_response(
@@ -341,24 +378,34 @@ async def test_handles_none_description(
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    await use_case.apply(request)
+    await receive_task_run_execution_status_uc.apply(request)
 
-    status_log: TaskRunStatusLog = mock_task_run_status_log_repo.create.call_args[0][0]
-    assert status_log.description is None
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    status_logs = await sa_task_run_status_log_repo.filter(
+        FilterFieldsDNF.single("task_run_id", 60)
+    )
+    assert len(status_logs) == 1
+    assert status_logs[0].description is None
 
 
 # ---------------------------------------------------------------------------
-# 7. Multiple calls — repos called correctly each time
+# 7. Multiple calls — sequential status updates
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_multiple_status_updates(
-    use_case,
-    mock_task_run_repo,
-    mock_task_run_status_log_repo,
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_task_run_status_log_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
     task_run = _make_task_run(task_run_id=70)
+    await sa_task_run_repo.create(task_run)
+
     command = _make_command(task_run)
 
     # First update: EXECUTION
@@ -367,7 +414,9 @@ async def test_multiple_status_updates(
         status=TaskRunStatus.EXECUTION,
         created_at=datetime(2024, 6, 15, 10, 0, 0),
     )
-    await use_case.apply(ReceiveTaskRunExecutionStatusUCRq(command_response=cr1))
+    await receive_task_run_execution_status_uc.apply(
+        ReceiveTaskRunExecutionStatusUCRq(command_response=cr1)
+    )
 
     # Second update: SUCCEED
     cr2 = _make_command_response(
@@ -375,11 +424,20 @@ async def test_multiple_status_updates(
         status=TaskRunStatus.SUCCEED,
         created_at=datetime(2024, 6, 15, 10, 30, 0),
     )
-    await use_case.apply(ReceiveTaskRunExecutionStatusUCRq(command_response=cr2))
+    await receive_task_run_execution_status_uc.apply(
+        ReceiveTaskRunExecutionStatusUCRq(command_response=cr2)
+    )
 
-    # Repos should have been called twice
-    assert mock_task_run_repo.update.await_count == 2
-    assert mock_task_run_status_log_repo.create.await_count == 2
+    # Проверяем финальный статус
+    updated_task_run = await sa_task_run_repo.get(TaskRunPK(id=70))
+    assert updated_task_run.status == TaskRunStatus.SUCCEED
+
+    # Проверяем что создались 2 status log
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    status_logs = await sa_task_run_status_log_repo.filter(
+        FilterFieldsDNF.single("task_run_id", 70)
+    )
+    assert len(status_logs) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -389,10 +447,17 @@ async def test_multiple_status_updates(
 
 @pytest.mark.asyncio
 async def test_handles_zero_amounts_in_result(
-    use_case,
-    mock_time_interval_task_progress_repo,
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_time_interval_task_progress_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
-    task_run = _make_task_run(task_run_id=80, task_id=9)
+    task_run = _make_task_run(task_run_id=80, )
+    await sa_task_run_repo.create(task_run)
+
     command = _make_command(task_run)
 
     execution_result = TimeIntervalExecutionResults(
@@ -409,11 +474,15 @@ async def test_handles_zero_amounts_in_result(
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    await use_case.apply(request)
+    await receive_task_run_execution_status_uc.apply(request)
 
-    progress: TimeIntervalTaskProgress = mock_time_interval_task_progress_repo.create.call_args[0][0]
-    assert progress.collected_data_amount == 0
-    assert progress.saved_data_amount == 0
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    progress_records = await sa_time_interval_task_progress_repo.filter(
+        FilterFieldsDNF.single("task_id", 1)
+    )
+    assert len(progress_records) == 1
+    assert progress_records[0].collected_data_amount == 0
+    assert progress_records[0].saved_data_amount == 0
 
 
 # ---------------------------------------------------------------------------
@@ -423,11 +492,17 @@ async def test_handles_zero_amounts_in_result(
 
 @pytest.mark.asyncio
 async def test_status_updated_at_uses_command_response_created_at(
-    use_case,
-    mock_task_run_repo,
-    mock_task_run_status_log_repo,
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_task_run_status_log_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
     task_run = _make_task_run(task_run_id=90)
+    await sa_task_run_repo.create(task_run)
+
     command = _make_command(task_run)
     specific_time = datetime(2024, 7, 1, 8, 45, 30)
 
@@ -438,75 +513,39 @@ async def test_status_updated_at_uses_command_response_created_at(
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    await use_case.apply(request)
+    await receive_task_run_execution_status_uc.apply(request)
 
-    # Check task_run update
-    update_fields: UpdateFields = mock_task_run_repo.update.call_args[0][1]
-    assert update_fields.to_dict()["status_updated_at"] == specific_time
+    # Проверяем task_run
+    updated_task_run = await sa_task_run_repo.get(TaskRunPK(id=90))
+    assert updated_task_run.status_updated_at == specific_time
 
-    # Check status log
-    status_log: TaskRunStatusLog = mock_task_run_status_log_repo.create.call_args[0][0]
-    assert status_log.status_updated_at == specific_time
+    # Проверяем status log
+    from service.ports.outbound.repo.fields import FilterFieldsDNF
+    status_logs = await sa_task_run_status_log_repo.filter(
+        FilterFieldsDNF.single("task_run_id", 90)
+    )
+    assert status_logs[0].status_updated_at == specific_time
 
 
 # ---------------------------------------------------------------------------
-# 11. Verify TaskRunPK is constructed correctly
+# 10. Response always returns success=True
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_task_run_pk_constructed_correctly(
-    use_case,
-    mock_task_run_repo,
+async def test_response_always_success_true(
+        receive_task_run_execution_status_uc,
+        sa_task_run_repo,
+        sa_task_repo,
+        sa_task_group_repo,
+        default_task_group,
+        default_monitoring_algorithm,
+        default_payload,
+        default_task,
 ):
-    task_run = _make_task_run(task_run_id=12345)
-    command = _make_command(task_run)
+    task_run = _make_task_run(task_run_id=100,)
+    await sa_task_run_repo.create(task_run)
 
-    command_response = _make_command_response(
-        command=command,
-        status=TaskRunStatus.EXECUTION,
-    )
-
-    request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    await use_case.apply(request)
-
-    pk_arg = mock_task_run_repo.update.call_args[0][0]
-    assert isinstance(pk_arg, TaskRunPK)
-    assert pk_arg.id == 12345
-
-
-# ---------------------------------------------------------------------------
-# 12. Verify all three repos are injected correctly
-# ---------------------------------------------------------------------------
-
-
-def test_use_case_initialization():
-    mock_task_run = AsyncMock()
-    mock_status_log = AsyncMock()
-    mock_progress = AsyncMock()
-    mock_tf = AsyncMock()
-
-    uc = ReceiveTaskRunExecutionStatusUC(
-        task_run_repo=mock_task_run,
-        task_run_status_log_repo=mock_status_log,
-        time_interval_task_progress_repo=mock_progress,
-        transaction_factory=mock_tf,
-    )
-
-    assert uc._task_run_repo is mock_task_run
-    assert uc._task_run_status_log_repo is mock_status_log
-    assert uc._time_interval_task_progress_repo is mock_progress
-    assert uc._transaction_factory is mock_tf
-
-
-# ---------------------------------------------------------------------------
-# 13. Response always returns success=True (no error handling in UC)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_response_always_success_true(use_case):
-    task_run = _make_task_run()
     command = _make_command(task_run)
 
     command_response = _make_command_response(
@@ -515,39 +554,7 @@ async def test_response_always_success_true(use_case):
     )
 
     request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    response = await use_case.apply(request)
+    response = await receive_task_run_execution_status_uc.apply(request)
 
     assert response.success is True
     assert response.request is request
-
-
-# ---------------------------------------------------------------------------
-# 14. Verify UpdateFields.multiple is used correctly
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_update_fields_multiple_usage(
-    use_case,
-    mock_task_run_repo,
-):
-    task_run = _make_task_run(task_run_id=999)
-    command = _make_command(task_run)
-    created_at = datetime(2024, 8, 1, 12, 0, 0)
-
-    command_response = _make_command_response(
-        command=command,
-        status=TaskRunStatus.CANCELLED,
-        created_at=created_at,
-    )
-
-    request = ReceiveTaskRunExecutionStatusUCRq(command_response=command_response)
-    await use_case.apply(request)
-
-    update_fields: UpdateFields = mock_task_run_repo.update.call_args[0][1]
-    fields_dict = update_fields.to_dict()
-
-    # Verify it contains exactly the two fields
-    assert len(fields_dict) == 2
-    assert fields_dict["status"] == TaskRunStatus.CANCELLED
-    assert fields_dict["status_updated_at"] == created_at

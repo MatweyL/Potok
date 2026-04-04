@@ -8,8 +8,11 @@ from service.adapters.outbound.repo.sa.impls.app_user import SAAppUserRepo
 from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAPeriodicMonitoringAlgorithmRepo, \
     SAMonitoringAlgorithmRepo, SASingleMonitoringAlgorithmRepo
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
+from service.adapters.outbound.repo.sa.impls.project import SAProjectRepo
 from service.adapters.outbound.repo.sa.impls.task import SATaskRepo
-from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo
+from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
+from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
+from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
     SATaskRunTimeIntervalExecutionBoundsRepo
@@ -130,7 +133,22 @@ def sa_task_run_time_interval_execution_bounds_repo(database):
 def sa_app_user_repo(database):
     return SAAppUserRepo(database, models.AppUser)
 
+@pytest.fixture
+def sa_task_group_repo(database):
+    return SATaskGroupRepo(database, models.TaskGroup)
 
+@pytest.fixture
+def sa_project_repo(database):
+    return SAProjectRepo(database, models.Project)
+
+
+@pytest.fixture
+def sa_task_group_by_project_repo(database):
+    return SATaskGroupByProjectRepo(database, models.TaskGroupByProject)
+
+@pytest.fixture
+def sa_waiting_task_run_provider(database, sa_task_run_repo):
+    return SAWaitingTaskRunProvider(database, sa_task_run_repo)
 @pytest.fixture
 def actual_execution_bounds_provider(sa_time_interval_task_progress_repo):
     return ActualTimeIntervalExecutionBoundsProvider(sa_time_interval_task_progress_repo)
@@ -141,12 +159,14 @@ def create_task_runs_uc(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo,
                         sa_time_interval_task_progress_repo, sa_task_run_time_interval_execution_bounds_repo,
                         sa_transaction_factory,
                         task_to_execute_provider_registry, execution_bounds_provider, payload_provider,
-                        actual_execution_bounds_provider, ):
+                        actual_execution_bounds_provider,
+                        sa_task_group_repo, ):
     return CreateTaskRunsUC(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo, sa_task_run_status_log_repo,
                             sa_task_run_time_interval_execution_bounds_repo,
                             sa_transaction_factory, task_to_execute_provider_registry, execution_bounds_provider,
                             payload_provider,
-                            actual_execution_bounds_provider)
+                            actual_execution_bounds_provider,
+                            sa_task_group_repo, )
 
 
 @pytest.fixture
