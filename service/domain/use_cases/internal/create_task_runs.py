@@ -9,6 +9,7 @@ from service.domain.services.execution_bounds_provider import ExecutionBoundsPro
 from service.domain.services.payload_provider import PayloadProvider
 from service.domain.services.task_progress_provider import ActualExecutionBoundsProvider
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
+from service.ports.common.logs import logger
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import UpdateFields
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
@@ -101,6 +102,8 @@ class CreateTaskRunsUC(UseCase):
                             correct_execution_bounds = execution_bounds
                         else:
                             correct_execution_bounds = execution_bounds_cutter.cut(execution_bounds)
+                        if correct_execution_bounds.left_bound_at == correct_execution_bounds.right_bound_at:  # FIXME: предотавратить появление такой ситуации, удалить код
+                            continue
                         task_runs_to_create.append(TaskRun(task_id=task_to_create_run.id,
                                                            group_name=task_group.name,
                                                            priority=task_to_create_run.priority,

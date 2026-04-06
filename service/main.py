@@ -128,7 +128,7 @@ async def main():
 
     execution_bounds_provider = DefaultExecutionBoundsProvider(
         task_run_time_interval_execution_bounds_repo=task_run_time_interval_execution_bounds_repo,
-        default_left_date=datetime(2020, 1, 1),
+        default_left_date=datetime(2026, 1, 1),
         default_first_interval_days=31,
     )
     payload_provider = PayloadProvider(payload_repo)
