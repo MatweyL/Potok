@@ -175,7 +175,9 @@ async def main():
     receive_task_run_execution_status_uc = ReceiveTaskRunExecutionStatusUC(task_run_repo,
                                                                            task_run_status_log_repo,
                                                                            time_interval_task_progress_repo,
-                                                                           transaction_factory)
+                                                                           task_run_time_interval_progress_repo,
+                                                                           transaction_factory,
+                                                                           instant_upload=False)
     retrieve_waiting_task_runs_uc = RetrieveWaitingTaskRunsUC(task_run_repo,
                                                               task_run_status_log_repo,
                                                               transaction_factory,
