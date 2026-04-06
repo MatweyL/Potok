@@ -46,7 +46,7 @@ class TaskRunStatusLogPK(BaseModel):
         return isinstance(other, TaskRunStatusLogPK) and self.task_run_id == other.task_run_id
 
     def __hash__(self):
-        return hash(self.id)
+        return hash(self.task_run_id)
 
 
 class TaskRunStatusLog(TaskRunStatusLogPK):
@@ -61,3 +61,21 @@ class TaskRunTimeIntervalExecutionBoundsPK(BaseModel):
 class TaskRunTimeIntervalExecutionBounds(TaskRunTimeIntervalExecutionBoundsPK):
     task_id: int
     execution_bounds: TimeIntervalBounds
+
+
+class TaskRunTimeIntervalProgressPK(BaseModel):
+    task_run_id: int
+    right_bound_at: datetime
+
+    def __eq__(self, other):
+        return isinstance(other, TaskRunTimeIntervalProgressPK) and self.task_run_id == other.task_run_id and self.right_bound_at == other.right_bound_at
+
+    def __hash__(self):
+        return hash((self.task_run_id, self.right_bound_at))
+
+
+class TaskRunTimeIntervalProgress(TaskRunTimeIntervalProgressPK):
+    left_bound_at: Optional[datetime] = None
+    collected_data_amount: int
+    saved_data_amount: int
+

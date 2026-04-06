@@ -117,3 +117,11 @@ class TaskGroup(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
 class TaskGroupByProject(Base, TablenameMixin, LoadTimestampMixin):
     group_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_group.id"), primary_key=True)
     project_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("project.id"), primary_key=True)
+
+
+class TaskRunTimeIntervalProgress(Base, TablenameMixin, LoadTimestampMixin):
+    task_run_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_run.id"), primary_key=True)
+    right_bound_at: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
+    left_bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    collected_data_amount: Mapped[int] = mapped_column(INT, )
+    saved_data_amount: Mapped[int] = mapped_column(INT, )

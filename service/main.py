@@ -25,6 +25,7 @@ from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWa
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
     SATaskRunTimeIntervalExecutionBoundsRepo
+from service.adapters.outbound.repo.sa.impls.task_run_time_interval_progress import SATaskRunTimeIntervalProgressRepo
 from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
@@ -108,6 +109,8 @@ async def main():
     time_interval_task_progress_repo = SATimeIntervalTaskProgressRepo(database, models.TimeIntervalTaskProgress)
     task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database,
                                                                                             models.TaskRunTimeIntervalExecutionBounds)
+    task_run_time_interval_progress_repo = SATaskRunTimeIntervalProgressRepo(database,
+                                                                             models.TaskRunTimeIntervalProgress)
     waiting_task_run_provider = SAWaitingTaskRunProvider(database, task_run_repo)
     payload_repo = SAPayloadRepo(database, models.Payload)
     app_user_repo = SAAppUserRepo(database, models.AppUser)
