@@ -115,10 +115,8 @@ async def tasks_json(
     asc_sort = order_dir == 'asc'
     offset_page = start // length
 
-    # Фильтрация по поиску — ищем по group_name
+    # TODO: Фильтрация по поиску — ищем по group_name
     filter_dnf = FilterFieldsDNF.empty()
-    if search_val:
-        filter_dnf = FilterFieldsDNF.single('group_name', search_val, ConditionOperation.IN)
 
     pagination = PaginationQuery(
         offset_page=offset_page,
@@ -172,7 +170,7 @@ def format_task_row(item: TaskDetailed) -> dict:
     return {
         "DT_RowAttr": {"data-href": f"/tasks/{task.id}", "style": "cursor:pointer"},
         "id":         f'<span class="text-muted font-monospace">#{task.id}</span>',
-        "group_name": task.group_name,
+        "group_id": task.group_id,
         "status":     status_html,
         "priority":   task.priority.value.title(),
         "type":       f'<code>{task.type.value}</code>',
