@@ -22,13 +22,14 @@ from service.domain.use_cases.external.get_task import GetTaskUCRq
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
-from service.domain.use_cases.external.monitoring_algorithm import GetAllMonitoringAlgorithmsUCRq, \
-    CreateMonitoringAlgorithmUCRq
+from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
+from service.domain.use_cases.external.project import CreateProjectUCRq, GetProjectTaskGroupsUCRq, \
+    RemoveTaskGroupFromProjectUCRq, AddTaskGroupToProjectUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
 from service.ports.common.path_utils import get_project_root
-from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF, ConditionOperation
+from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF
 
-router = APIRouter()
+router = APIRouter(tags=["HTML Router"])
 
 templates = Jinja2Templates(directory=get_project_root().joinpath('templates'))
 
@@ -71,11 +72,6 @@ async def logout(request: Request, response: Response):
     return redirect
 
 
-@router.get("/projects", response_class=HTMLResponse)
-def projects_page(request: Request, ):
-    return templates.TemplateResponse(request=request, name="tasks.html")
-
-
 @router.get("/tasks", response_class=HTMLResponse)
 async def tasks_page(request: Request):
     rs = await request.app.state.use_case_facade.get_tasks_detailed(
@@ -87,6 +83,7 @@ async def tasks_page(request: Request):
         context={"tasks": rs.tasks}
     )
 
+
 # DataTables присылает: draw, start, length, order[0][column], order[0][dir], search[value]
 COLUMN_MAP = {
     '0': 'id',
@@ -97,18 +94,19 @@ COLUMN_MAP = {
     '5': 'status_updated_at',
 }
 
+
 @router.get("/tasks/json")
 async def tasks_json(
-    request: Request,
-    draw: int = 1,
-    start: int = 0,
-    length: int = 25,
-    # DataTables передаёт order и search через QueryString
+        request: Request,
+        draw: int = 1,
+        start: int = 0,
+        length: int = 25,
+        # DataTables передаёт order и search через QueryString
 ):
     params = dict(request.query_params)
 
-    order_col  = params.get('order[0][column]', '0')
-    order_dir  = params.get('order[0][dir]', 'desc')
+    order_col = params.get('order[0][column]', '0')
+    order_dir = params.get('order[0][dir]', 'desc')
     search_val = params.get('search[value]', '').strip()
 
     order_by = COLUMN_MAP.get(order_col, 'id')
@@ -169,13 +167,13 @@ def format_task_row(item: TaskDetailed) -> dict:
 
     return {
         "DT_RowAttr": {"data-href": f"/tasks/{task.id}", "style": "cursor:pointer"},
-        "id":         f'<span class="text-muted font-monospace">#{task.id}</span>',
+        "id": f'<span class="text-muted font-monospace">#{task.id}</span>',
         "group_id": task.group_id,
-        "status":     status_html,
-        "priority":   task.priority.value.title(),
-        "type":       f'<code>{task.type.value}</code>',
-        "algorithm":  algo_html,
-        "payload":    payload_html,
+        "status": status_html,
+        "priority": task.priority.value.title(),
+        "type": f'<code>{task.type.value}</code>',
+        "algorithm": algo_html,
+        "payload": payload_html,
         "updated_at": task.status_updated_at.strftime('%d.%m.%Y %H:%M'),
     }
 
@@ -286,12 +284,14 @@ async def deactivate_user(request: Request, user_id: int):
         DeactivateUserUCRq(target_user_id=user_id,
                            current_user_id=current_user.id)
     )
+
+
 @router.post("/users/{user_id}/activate")
 async def activate_user(request: Request, user_id: int):
     current_user = request.state.user
     return await request.app.state.admin_use_case_facade.activate_user(
         ActivateUserUCRq(target_user_id=user_id,
-                           current_user_id=current_user.id)
+                         current_user_id=current_user.id)
     )
 
 
@@ -303,6 +303,49 @@ async def monitoring_algorithms_page(request: Request):
         context={"algorithms": rs.monitoring_algorithms}
     )
 
+
 @router.post("/monitoring-algorithms")
 async def create_monitoring_algorithm(request: Request, rq: CreateMonitoringAlgorithmUCRq):
     return await request.app.state.use_case_facade.create_monitoring_algorithm(rq)
+
+
+@router.get("/projects")
+async def projects_page(request: Request):
+    rs = await request.app.state.use_case_facade.get_all_projects()
+    return templates.TemplateResponse(
+        request=request, name="projects.html",
+        context={"projects": rs.projects}
+    )
+
+
+@router.post("/projects/create")
+async def create_project(request: Request, rq: CreateProjectUCRq):
+    return await request.app.state.use_case_facade.create_project(rq)
+
+
+@router.get("/projects/{project_id}/task-groups")
+async def get_project_task_groups(request: Request, project_id: int):
+    rs = await request.app.state.use_case_facade.get_project_task_groups(
+        GetProjectTaskGroupsUCRq(project_id=project_id))
+    task_groups = rs.task_groups if rs.task_groups else []
+    return task_groups
+
+
+@router.get("/task-groups/without-project")
+async def get_task_groups_without_project(request: Request):
+    rs = await request.app.state.use_case_facade.get_task_groups_without_project()
+    task_groups = rs.task_groups if rs.task_groups else []
+    return task_groups
+
+
+@router.post("/projects/task-group/bind")
+async def add_task_group_to_project(request: Request, rq: AddTaskGroupToProjectUCRq):
+    rs = await request.app.state.use_case_facade.add_task_group_to_project(rq)
+    return rs
+
+
+
+@router.post("/projects/task-group/unbind")
+async def remove_task_group_from_project(request: Request, rq: RemoveTaskGroupFromProjectUCRq):
+    rs = await request.app.state.use_case_facade.remove_task_group_from_project(rq)
+    return rs

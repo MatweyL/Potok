@@ -3,10 +3,11 @@
 from abc import ABC
 from typing import Optional, List
 
+from pydantic import Field
+
 from service.domain.schemas.project import Project, ProjectPK
 from service.domain.schemas.task_group import TaskGroup, TaskGroupPK
 from service.domain.schemas.task_group_by_project import TaskGroupByProject, TaskGroupByProjectPK
-from service.domain.schemas.task_run_metrics import TaskRunAvgMetrics, TaskRunMetrics
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.domain.use_cases.external.task_group import GetAllTaskGroupUC, GetAllTaskGroupUCRq
 from service.ports.outbound.repo.abstract import Repo
@@ -83,6 +84,22 @@ class UpdateProjectUC(ProjectUC):
         return UpdateProjectUCRs(success=True, request=request, project=updated)
 
 
+class GetAllProjectsUCRq(UCRequest):
+    pass
+
+
+class GetAllProjectsUCRs(UCResponse):
+    request: GetAllProjectsUCRq
+    projects: List[Project]
+
+
+class GetAllProjectsUC(ProjectUC):
+
+    async def apply(self, request: GetAllProjectsUCRq) -> GetAllProjectsUCRs:
+        projects = await self._project_repo.get_all()
+        return GetAllProjectsUCRs(success=True, request=request, projects=projects)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Базовый класс для UC работающих со связкой проект-группа
 # ══════════════════════════════════════════════════════════════════════════════
@@ -107,12 +124,12 @@ class ProjectTaskGroupUC(UseCase, ABC):
 
 class AddTaskGroupToProjectUCRq(UCRequest):
     project_id: int
-    task_group_id: int
+    task_group_ids: List[int]
 
 
 class AddTaskGroupToProjectUCRs(UCResponse):
     request: AddTaskGroupToProjectUCRq
-    task_group_by_project: Optional[TaskGroupByProject] = None
+    task_group_by_project_list: Optional[List[TaskGroupByProject]] = None
 
 
 class AddTaskGroupToProjectUC(ProjectTaskGroupUC):
@@ -125,33 +142,37 @@ class AddTaskGroupToProjectUC(ProjectTaskGroupUC):
             )
 
         # Группа существует?
-        task_group = await self._task_group_repo.get(TaskGroupPK(id=request.task_group_id))
-        if not task_group:
+        task_groups = await self._task_group_repo.filter(
+            FilterFieldsDNF.single('id', request.task_group_ids, ConditionOperation.IN))
+        if not task_groups:
             return AddTaskGroupToProjectUCRs(
-                success=False, error="Task group not found", request=request
+                success=False, error="Task groups not found", request=request
             )
 
         # Группа уже привязана к какому-то проекту?
         # У одной группы — только один проект
         existing_links = await self._task_group_by_project_repo.filter(
-            FilterFieldsDNF.single('group_id', request.task_group_id)
+            FilterFieldsDNF.single('group_id', request.task_group_ids, ConditionOperation.IN)
         )
         if existing_links:
             linked_project_id = existing_links[0].project_id
+            group_id = existing_links[0].group_id
             return AddTaskGroupToProjectUCRs(
                 success=False,
-                error=f"Task group already belongs to project #{linked_project_id}",
+                error=f"Task group already belongs to project (for example, #{linked_project_id} contains {group_id=})",
                 request=request,
             )
 
-        link = await self._task_group_by_project_repo.create(
-            TaskGroupByProject(
-                group_id=request.task_group_id,
-                project_id=request.project_id,
-            )
+        links = await self._task_group_by_project_repo.create_all(
+            [
+                TaskGroupByProject(
+                    group_id=task_group_id,
+                    project_id=request.project_id,
+                ) for task_group_id in request.task_group_ids
+            ]
         )
         return AddTaskGroupToProjectUCRs(
-            success=True, request=request, task_group_by_project=link
+            success=True, request=request, task_group_by_project_list=links
         )
 
 
@@ -200,7 +221,8 @@ class GetProjectTaskGroupsUCRq(UCRequest):
 class GetProjectTaskGroupsUCRs(UCResponse):
     request: GetProjectTaskGroupsUCRq
     project: Optional[Project] = None
-    task_groups: List[TaskGroup] = []
+    task_groups: List[TaskGroup] = Field(default_factory=list)
+
 
 class GetProjectTaskGroupsUC(ProjectTaskGroupUC):
     def __init__(self, project_repo: Repo[Project, Project, ProjectPK],
@@ -272,3 +294,21 @@ class GetTaskGroupProjectUC(ProjectTaskGroupUC):
             )
 
         return GetTaskGroupProjectUCRs(success=True, request=request, project=project)
+
+
+class GetTaskGroupsWithoutProjectUCRq(UCRequest):
+    pass
+
+
+class GetTaskGroupsWithoutProjectUCRs(UCResponse):
+    request: GetTaskGroupsWithoutProjectUCRq
+    task_groups: List[TaskGroup]
+
+
+class GetTaskGroupsWithoutProjectUC(ProjectTaskGroupUC):
+    async def apply(self, request: GetTaskGroupsWithoutProjectUCRq) -> GetTaskGroupsWithoutProjectUCRs:
+        task_group_by_project_list = await self._task_group_by_project_repo.get_all()
+        task_group_ids = [task_group_by_project.group_id for task_group_by_project in task_group_by_project_list]
+        task_groups = await self._task_group_repo.filter(
+            FilterFieldsDNF.single('id', task_group_ids, ConditionOperation.NOT_IN))
+        return GetTaskGroupsWithoutProjectUCRs(success=True, request=request, task_groups=task_groups)

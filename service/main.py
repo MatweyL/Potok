@@ -62,6 +62,9 @@ from service.domain.use_cases.external.get_tasks import GetTasksUC
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
     GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC
+from service.domain.use_cases.external.project import GetAllProjectsUC, CreateProjectUC, GetProjectTaskGroupsUC, \
+    GetTaskGroupsWithoutProjectUC, AddTaskGroupToProjectUC, RemoveTaskGroupFromProjectUC
+from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetAllTaskGroupUC
 from service.domain.use_cases.external.update_payload import UpdatePayloadUC
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC, CreateTaskRunsUCRq
 from service.domain.use_cases.internal.receive_task_run_execution_status import ReceiveTaskRunExecutionStatusUC, \
@@ -117,7 +120,7 @@ async def main():
     refresh_token_repo = SARefreshTokenRepo(database, models.RefreshToken)
 
     task_group_repo = SATaskGroupRepo(database, models.TaskGroup)
-    project_repo = SAProjectRepo(database, models.TaskGroup)
+    project_repo = SAProjectRepo(database, models.Project)
     task_group_by_project_repo = SATaskGroupByProjectRepo(database, models.TaskGroupByProject)
     task_run_metrics_provider = SATaskRunMetricsProvider(database)
 
@@ -137,7 +140,7 @@ async def main():
     task_status_log_cleaner = TaskRunStatusLogCleaner(task_run_status_log_repo)
     hasher = Hasher()
     token_service = TokenService(settings.jwt_secret_key)
-    constant_balancing_algorithm = ConstantBalancingAlgorithm(500, task_group_repo,)
+    constant_balancing_algorithm = ConstantBalancingAlgorithm(500, task_group_repo, )
     aimd_balancing_algorithm = AIMDBalancingAlgorithm(task_group_repo,
                                                       task_run_metrics_provider, 10, 500,
                                                       50, 0.5,
@@ -160,10 +163,26 @@ async def main():
     get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                            periodic_monitoring_algorithm_repo,
                                                            single_monitoring_algorithm_repo, transaction_factory)
-    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_payload_uc, get_monitoring_algorithm_uc, task_repo)
+    get_task_group_uc = GetTaskGroupUC(task_group_repo)
+    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_payload_uc, get_monitoring_algorithm_uc,
+                                               task_group_repo, task_repo, )
+    get_all_task_group_uc = GetAllTaskGroupUC(task_group_repo)
+    get_task_groups_without_project_uc = GetTaskGroupsWithoutProjectUC(project_repo,task_group_repo,
+                                                                       task_group_by_project_repo)
+
+    get_all_projects_uc = GetAllProjectsUC(project_repo)
+    create_project_uc = CreateProjectUC(project_repo)
+    get_project_task_groups_uc = GetProjectTaskGroupsUC(project_repo, task_group_repo, task_group_by_project_repo,
+                                                        get_all_task_group_uc)
+
+    add_task_group_to_project_uc = AddTaskGroupToProjectUC(project_repo,task_group_repo,task_group_by_project_repo)
+    remove_task_group_from_project_uc = RemoveTaskGroupFromProjectUC(project_repo,task_group_repo,task_group_by_project_repo)
     use_case_facade = UseCaseFacade(create_tasks_uc, create_monitoring_algorithm_uc, get_all_monitoring_algorithms_uc,
                                     get_tasks_uc, get_task_uc, get_task_runs_uc, get_task_progress_uc, get_payloads_uc,
-                                    get_payload_uc, update_payload_uc, get_tasks_detailed_uc)
+                                    get_payload_uc, update_payload_uc, get_tasks_detailed_uc,
+                                    get_all_projects_uc, create_project_uc, get_project_task_groups_uc,
+                                    get_task_groups_without_project_uc, add_task_group_to_project_uc,
+                                    remove_task_group_from_project_uc,)
     set_use_case_facade(use_case_facade)
 
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,
@@ -182,7 +201,7 @@ async def main():
                                                               task_run_status_log_repo,
                                                               transaction_factory,
                                                               waiting_task_run_provider,
-                                                              aimd_balancing_algorithm,)
+                                                              aimd_balancing_algorithm, )
     send_task_runs_to_execution_uc = SendTaskRunsToExecutionUC(task_runs_producer, queue_creator)
     retrieve_and_send_task_runs_uc = RetrieveAndSendTaskRunsUC(retrieve_waiting_task_runs_uc,
                                                                send_task_runs_to_execution_uc)
@@ -215,7 +234,7 @@ async def main():
     refresh_token_uc = RefreshTokenUC(app_user_repo, refresh_token_repo, token_service)
     get_me_uc = GetMeUC(app_user_repo)
     reset_password_uc = ResetPasswordUC(app_user_repo, hasher)
-    auth_use_case_facade = AuthUseCaseFacade(login_uc, logout_uc, refresh_token_uc, get_me_uc,create_user_uc,
+    auth_use_case_facade = AuthUseCaseFacade(login_uc, logout_uc, refresh_token_uc, get_me_uc, create_user_uc,
                                              reset_password_uc)
 
     # USE CASE: Admin

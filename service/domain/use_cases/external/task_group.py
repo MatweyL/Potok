@@ -1,16 +1,14 @@
 from abc import ABC
 from typing import Optional, List, Dict, Any
 
-from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunMetricsProvider
 from service.domain.schemas.task_detailed import TaskDetailed
 from service.domain.schemas.task_group import TaskGroupPK, TaskGroup, TaskGroupBody
-from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunAvgMetrics, TaskRunGroupedMetrics, \
+from service.domain.schemas.task_run_metrics import TaskRunGroupedMetrics, \
     TaskRunGroupedAvgMetrics
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC, GetTasksDetailedUCRq
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import FilterFieldsDNF, UpdateFields, PaginationQuery
-from service.ports.outbound.repo.task_run import TaskRunMetricsProvider
 
 
 class TaskGroupUC(UseCase, ABC):

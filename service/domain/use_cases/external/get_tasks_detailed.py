@@ -6,12 +6,11 @@ from service.domain.schemas.monitoring_algorithm import MonitoringAlgorithmUnion
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import TaskPK, Task
 from service.domain.schemas.task_detailed import TaskDetailed
-from service.domain.schemas.task_group import TaskGroup
+from service.domain.schemas.task_group import TaskGroup, TaskGroupPK
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.domain.use_cases.external.get_payload import GetPayloadUC, GetPayloadUCRq
 from service.domain.use_cases.external.get_tasks import GetTasksUC, GetTasksUCRq
 from service.domain.use_cases.external.monitoring_algorithm import GetMonitoringAlgorithmUC, GetMonitoringAlgorithmUCRq
-from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetTaskGroupUCRq
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF
 
@@ -33,13 +32,13 @@ class GetTasksDetailedUC(UseCase):
             get_tasks_uc: GetTasksUC,
             get_payload_uc: GetPayloadUC,
             get_monitoring_algorithm_uc: GetMonitoringAlgorithmUC,
-            get_task_group_uc: GetTaskGroupUC,
+            task_group_repo: Repo[TaskGroup, TaskGroup, TaskGroupPK],
             task_repo: Repo[Task, Task, TaskPK],
     ):
         self._get_tasks_uc = get_tasks_uc
         self._get_payload_uc = get_payload_uc
         self._get_monitoring_algorithm_uc = get_monitoring_algorithm_uc
-        self._get_task_group_uc = get_task_group_uc
+        self._task_group_repo = task_group_repo
         self._task_repo = task_repo
 
     async def apply(self, request: GetTasksDetailedUCRq) -> GetTasksDetailedUCRs:
@@ -73,8 +72,8 @@ class GetTasksDetailedUC(UseCase):
             algorithm = algorithm_cache[task.monitoring_algorithm_id]
 
             if task.group_id not in task_group_cache:
-                task_group_rs = await self._get_task_group_uc.apply(GetTaskGroupUCRq(task_group_id=task.group_id))
-                task_group_cache[task.group_id] = task_group_rs.task_group if task_group_rs.success else None
+                task_group = await self._task_group_repo.get(TaskGroupPK(id=task.group_id))
+                task_group_cache[task.group_id] = task_group
             task_group = task_group_cache[task.group_id]
             result.append(TaskDetailed(task=task, payload=payload, monitoring_algorithm=algorithm, task_group=task_group))
         total = await self._task_repo.count_by_fields(FilterFieldsDNF.empty())

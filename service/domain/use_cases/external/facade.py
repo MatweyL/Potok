@@ -11,6 +11,11 @@ from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetaile
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq, \
     CreateMonitoringAlgorithmUCRs, GetAllMonitoringAlgorithmsUCRq, GetAllMonitoringAlgorithmsUCRs, \
     CreateMonitoringAlgorithmUC, GetAllMonitoringAlgorithmsUC
+from service.domain.use_cases.external.project import GetAllProjectsUCRs, GetAllProjectsUCRq, CreateProjectUCRs, \
+    CreateProjectUCRq, GetProjectTaskGroupsUCRq, GetProjectTaskGroupsUCRs, GetAllProjectsUC, CreateProjectUC, \
+    GetProjectTaskGroupsUC, GetTaskGroupsWithoutProjectUCRs, GetTaskGroupsWithoutProjectUCRq, \
+    GetTaskGroupsWithoutProjectUC, AddTaskGroupToProjectUCRq, AddTaskGroupToProjectUCRs, AddTaskGroupToProjectUC, \
+    RemoveTaskGroupFromProjectUCRq, RemoveTaskGroupFromProjectUCRs, RemoveTaskGroupFromProjectUC
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq, UpdatePayloadUCRs, UpdatePayloadUC
 
 
@@ -27,6 +32,12 @@ class UseCaseFacade:
                  get_payload_uc: GetPayloadUC,
                  update_payload_uc: UpdatePayloadUC,
                  get_tasks_detailed_uc: GetTasksDetailedUC,
+                 get_all_projects_uc: GetAllProjectsUC,
+                 create_project_uc: CreateProjectUC,
+                 get_project_task_groups: GetProjectTaskGroupsUC,
+                 get_task_groups_without_project: GetTaskGroupsWithoutProjectUC,
+                 add_task_group_to_project: AddTaskGroupToProjectUC,
+                 remove_task_group_from_project: RemoveTaskGroupFromProjectUC,
                  ):
         self._create_tasks_uc = create_tasks_uc
         self._create_monitoring_algorithm_uc = create_monitoring_algorithm_uc
@@ -39,6 +50,12 @@ class UseCaseFacade:
         self._get_payload_uc = get_payload_uc
         self._update_payload_uc = update_payload_uc
         self._get_tasks_detailed_uc = get_tasks_detailed_uc
+        self._get_all_projects_uc = get_all_projects_uc
+        self._create_project_uc = create_project_uc
+        self._get_project_task_groups = get_project_task_groups
+        self._get_task_groups_without_project = get_task_groups_without_project
+        self._add_task_group_to_project = add_task_group_to_project
+        self._remove_task_group_from_project = remove_task_group_from_project
 
     async def create_tasks(self, request: CreateTasksUCRq) -> CreateTasksUCRs:
         return await self._create_tasks_uc.apply(request)
@@ -73,3 +90,21 @@ class UseCaseFacade:
 
     async def get_tasks_detailed(self, request: GetTasksDetailedUCRq) -> GetTasksDetailedUCRs:
         return await self._get_tasks_detailed_uc.apply(request)
+
+    async def get_all_projects(self) -> GetAllProjectsUCRs:
+        return await self._get_all_projects_uc.apply(GetAllProjectsUCRq())
+
+    async def create_project(self, request: CreateProjectUCRq) -> CreateProjectUCRs:
+        return await self._create_project_uc.apply(request)
+
+    async def get_project_task_groups(self, request: GetProjectTaskGroupsUCRq) -> GetProjectTaskGroupsUCRs:
+        return await self._get_project_task_groups.apply(request)
+
+    async def get_task_groups_without_project(self) -> GetTaskGroupsWithoutProjectUCRs:
+        return await self._get_task_groups_without_project.apply(GetTaskGroupsWithoutProjectUCRq())
+
+    async def add_task_group_to_project(self, request: AddTaskGroupToProjectUCRq) -> AddTaskGroupToProjectUCRs:
+        return await self._add_task_group_to_project.apply(request)
+
+    async def remove_task_group_from_project(self, request: RemoveTaskGroupFromProjectUCRq) -> RemoveTaskGroupFromProjectUCRs:
+        return await self._remove_task_group_from_project.apply(request)

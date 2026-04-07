@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}Проекты - Поток{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Проекты</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+            Создать проект
+        </button>
+    </div>
+
+    <div id="projectsContainer" class="row g-4">
+        {% for project in projects %}
+        <div class="col-md-6 col-lg-4" data-project-id="{{ project.id }}">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                    <h5 class="card-title mb-0">
+                        <a href="/projects/{{ project.id }}" class="text-decoration-none text-dark fw-semibold">
+                            {{ project.title }}
+                        </a>
+                    </h5>
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">ID: {{ project.id }}</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-muted small mb-3">{{ project.description or "—" }}</p>
+
+                    <h6 class="mt-3 mb-2">Группы задач:</h6>
+                    <div class="task-groups-list" data-project-id="{{ project.id }}">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-outline-primary btn-sm mt-3 w-100"
+                            data-bs-toggle="modal"
+                            data-bs-target="#attachTaskGroupModal"
+                            data-project-id="{{ project.id }}"
+                            data-project-title="{{ project.title }}">
+                        + Привязать группу задач
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal: Создать проект -->
+<div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создать проект</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createProjectForm">
+                    <div class="mb-3">
+                        <label for="projectTitle" class="form-label">Название проекта <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="projectTitle" required maxlength="255">
+                    </div>
+                    <div class="mb-3">
+                        <label for="projectDescription" class="form-label">Описание</label>
+                        <textarea class="form-control" id="projectDescription" rows="3" maxlength="1000"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="createProjectBtn">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Привязать группу задач -->
+<div class="modal fade" id="attachTaskGroupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Привязать группу задач</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="attachProjectId">
+                <div class="mb-3">
+                    <label for="taskGroupSelect" class="form-label">Доступные группы задач</label>
+                    <select class="form-select" id="taskGroupSelect" multiple size="6">
+                        <option value="">Загрузка списка...</option>
+                    </select>
+                    <div class="form-text">Удерживайте <kbd>Ctrl</kbd> (или <kbd>Cmd</kbd> на Mac) для выбора нескольких групп</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="attachTaskGroupBtn">Привязать</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const API = {
+        getTaskGroups: (projectId) => `/projects/${projectId}/task-groups`,
+        getAvailableGroups: '/task-groups/without-project',
+        bind: '/projects/task-group/bind',
+        unbind: '/projects/task-group/unbind',
+        create: '/projects/create'
+    };
+
+    // Загрузка групп задач для каждой карточки проекта
+    document.querySelectorAll('.task-groups-list').forEach(container => {
+        const projectId = container.dataset.projectId;
+        fetchTaskGroups(projectId, container);
+    });
+
+    function fetchTaskGroups(projectId, container) {
+        fetch(API.getTaskGroups(projectId))
+            .then(res => res.json())
+            .then(groups => renderTaskGroups(projectId, container, groups))
+            .catch(err => {
+                console.error('Ошибка загрузки групп задач:', err);
+                container.innerHTML = '<span class="text-danger small">Ошибка загрузки</span>';
+            });
+    }
+
+    function renderTaskGroups(projectId, container, groups) {
+        container.innerHTML = '';
+        if (!groups || groups.length === 0) {
+            container.innerHTML = '<span class="text-muted small">Нет привязанных групп</span>';
+            return;
+        }
+        groups.forEach(group => {
+            const desc = group.description ?
+                (group.description.length > 50 ? group.description.substring(0, 50) + '…' : group.description) : '—';
+            const statusBadge = group.is_active
+                ? '<span class="badge bg-success-subtle text-success-emphasis">Активна</span>'
+                : '<span class="badge bg-secondary-subtle text-secondary-emphasis">Не активна</span>';
+
+            const item = document.createElement('div');
+            item.className = 'd-flex justify-content-between align-items-start mb-2 p-2 border rounded small bg-light';
+            item.innerHTML = `
+                <div class="flex-grow-1 me-2">
+                    <a href="/task-groups/${group.id}" class="text-decoration-none fw-medium text-dark">${escapeHtml(group.title)}</a>
+                    <div class="text-muted" style="font-size: 0.85em;">${escapeHtml(group.name)}</div>
+                    <div class="text-muted small text-truncate" title="${escapeHtml(group.description || '')}">${escapeHtml(desc)}</div>
+                    <div class="mt-1">${statusBadge}</div>
+                </div>
+                <button class="btn btn-outline-danger btn-sm detach-btn flex-shrink-0"
+                        data-project-id="${projectId}"
+                        data-group-id="${group.id}"
+                        title="Отвязать группу">
+                    Отвязать
+                </button>
+            `;
+            container.appendChild(item);
+        });
+        container.querySelectorAll('.detach-btn').forEach(btn => {
+            btn.addEventListener('click', handleDetach);
+        });
+    }
+
+    function handleDetach(e) {
+        const btn = e.currentTarget;
+        const projectId = btn.dataset.projectId;
+        const groupId = btn.dataset.groupId;
+
+        if (!confirm('Отвязать группу задач от проекта?')) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+
+        fetch(API.unbind, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: parseInt(projectId),
+                task_group_id: parseInt(groupId)
+            })
+        })
+        .then(res => res.json())
+        .then(() => {
+            const container = document.querySelector(`.task-groups-list[data-project-id="${projectId}"]`);
+            if (container) fetchTaskGroups(projectId, container);
+        })
+        .catch(err => {
+            console.error('Ошибка отвязки:', err);
+            alert('Ошибка при отвязке группы задач');
+            btn.disabled = false;
+            btn.textContent = 'Отвязать';
+        });
+    }
+
+    // Загрузка доступных групп при открытии модального окна привязки
+    const attachModal = document.getElementById('attachTaskGroupModal');
+    attachModal?.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const projectId = button.dataset.projectId;
+        document.getElementById('attachProjectId').value = projectId;
+
+        const select = document.getElementById('taskGroupSelect');
+        select.innerHTML = '<option value="">Загрузка...</option>';
+        select.disabled = true;
+
+        fetch(API.getAvailableGroups)
+            .then(res => res.json())
+            .then(groups => {
+                select.innerHTML = '';
+                if (!groups || groups.length === 0) {
+                    select.innerHTML = '<option value="" disabled>Нет доступных групп</option>';
+                    return;
+                }
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = `${group.title} (${group.name})`;
+                    select.appendChild(option);
+                });
+                select.disabled = false;
+            })
+            .catch(err => {
+                console.error('Ошибка загрузки доступных групп:', err);
+                select.innerHTML = '<option value="" disabled>Ошибка загрузки</option>';
+            });
+    });
+
+    // Привязка выбранных групп
+    document.getElementById('attachTaskGroupBtn')?.addEventListener('click', function() {
+        const projectId = document.getElementById('attachProjectId').value;
+        const select = document.getElementById('taskGroupSelect');
+        const selectedIds = Array.from(select.selectedOptions)
+            .filter(opt => opt.value)
+            .map(opt => parseInt(opt.value));
+
+        if (selectedIds.length === 0) {
+            alert('Выберите хотя бы одну группу задач');
+            return;
+        }
+
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Привязываю...';
+
+        fetch(API.bind, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: parseInt(projectId),
+                task_group_ids: selectedIds
+            })
+        })
+        .then(res => res.json())
+        .then(() => {
+            const modal = bootstrap.Modal.getInstance(attachModal);
+            modal.hide();
+            const container = document.querySelector(`.task-groups-list[data-project-id="${projectId}"]`);
+            if (container) fetchTaskGroups(projectId, container);
+        })
+        .catch(err => {
+            console.error('Ошибка привязки:', err);
+            alert('Ошибка при привязке групп задач');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = 'Привязать';
+        });
+    });
+
+    // Создание нового проекта
+    document.getElementById('createProjectBtn')?.addEventListener('click', function() {
+        const title = document.getElementById('projectTitle').value.trim();
+        const description = document.getElementById('projectDescription').value.trim();
+
+        if (!title) {
+            alert('Введите название проекта');
+            return;
+        }
+
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Создаю...';
+
+        fetch(API.create, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, description })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
+            modal.hide();
+            addProjectToDOM(data.id, title, description);
+            document.getElementById('createProjectForm').reset();
+        })
+        .catch(err => {
+            console.error('Ошибка создания проекта:', err);
+            alert('Ошибка при создании проекта');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = 'Создать';
+        });
+    });
+
+    function addProjectToDOM(id, title, description) {
+        const container = document.getElementById('projectsContainer');
+        const newCard = document.createElement('div');
+        newCard.className = 'col-md-6 col-lg-4';
+        newCard.dataset.projectId = id;
+        newCard.innerHTML = `
+            <div class="card h-100 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                    <h5 class="card-title mb-0">
+                        <a href="/projects/${id}" class="text-decoration-none text-dark fw-semibold">${escapeHtml(title)}</a>
+                    </h5>
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">ID: ${id}</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-muted small mb-3">${escapeHtml(description || '—')}</p>
+
+                    <h6 class="mt-3 mb-2">Группы задач:</h6>
+                    <div class="task-groups-list" data-project-id="${id}">
+                        <span class="text-muted small">Нет привязанных групп</span>
+                    </div>
+
+                    <button class="btn btn-outline-primary btn-sm mt-3 w-100"
+                            data-bs-toggle="modal"
+                            data-bs-target="#attachTaskGroupModal"
+                            data-project-id="${id}"
+                            data-project-title="${escapeHtml(title)}">
+                        + Привязать группу задач
+                    </button>
+                </div>
+            </div>
+        `;
+        container.insertBefore(newCard, container.firstChild);
+
+        // Навешиваем обработчик для новой кнопки привязки
+        newCard.querySelector('[data-bs-target="#attachTaskGroupModal"]')?.addEventListener('click', function() {
+            document.getElementById('attachProjectId').value = id;
+            loadAvailableGroupsToSelect();
+        });
+    }
+
+    function loadAvailableGroupsToSelect() {
+        const select = document.getElementById('taskGroupSelect');
+        select.innerHTML = '<option value="">Загрузка...</option>';
+        select.disabled = true;
+
+        fetch(API.getAvailableGroups)
+            .then(res => res.json())
+            .then(groups => {
+                select.innerHTML = '';
+                if (!groups || groups.length === 0) {
+                    select.innerHTML = '<option value="" disabled>Нет доступных групп</option>';
+                    return;
+                }
+                groups.forEach(group => {
+                    const option = document.createElement('option');
+                    option.value = group.id;
+                    option.textContent = `${group.title} (${group.name})`;
+                    select.appendChild(option);
+                });
+                select.disabled = false;
+            });
+    }
+
+    // Утилита для экранирования HTML
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
+</script>
+{% endblock %}
