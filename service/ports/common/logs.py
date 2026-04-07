@@ -2,8 +2,12 @@ import logging
 import sys
 from typing import Optional
 
+import loguru
+
 APP_NAME = "potok"
-logger = logging.getLogger(APP_NAME)
+logging_logger = logging.getLogger(APP_NAME)
+loguru_logger = loguru.logger
+logger = loguru_logger
 
 
 def setup_logging(
@@ -25,8 +29,8 @@ def setup_logging(
         format_string = '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s'
 
     # Очищаем существующие обработчики
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
+    for handler in logging_logger.handlers[:]:
+        logging_logger.removeHandler(handler)
 
     # Создаем обработчик для stderr или указанного потока
     if stream is None:
@@ -49,19 +53,19 @@ def setup_logging(
             file_handler.setFormatter(formatter)
             handlers.append(file_handler)
         except Exception as e:
-            logger.error(f"Не удалось создать файловый обработчик: {e}")
+            logging_logger.error(f"Не удалось создать файловый обработчик: {e}")
 
     # Добавляем обработчики к логгеру
     for handler in handlers:
-        logger.addHandler(handler)
+        logging_logger.addHandler(handler)
 
     # Устанавливаем уровень
-    logger.setLevel(level)
+    logging_logger.setLevel(level)
 
     # Предотвращаем передачу логов корневому логгеру
-    logger.propagate = False
+    logging_logger.propagate = False
 
-    logger.debug("Логирование инициализировано для %s", APP_NAME)
+    logging_logger.debug("Логирование инициализировано для %s", APP_NAME)
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
@@ -75,37 +79,37 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
         Дочерний логгер с наследованием настроек
     """
     if name:
-        return logger.getChild(name)
-    return logger
+        return logging_logger.getChild(name)
+    return logging_logger
 
 
 # Функции для удобного управления уровнем логирования
 def set_log_level(level: int) -> None:
     """Установить уровень логирования."""
-    logger.setLevel(level)
-    for handler in logger.handlers:
+    logging_logger.setLevel(level)
+    for handler in logging_logger.handlers:
         handler.setLevel(level)
 
 
 def disable_logging() -> None:
     """Отключить логирование."""
-    logger.setLevel(logging.CRITICAL + 1)
+    logging_logger.setLevel(logging.CRITICAL + 1)
 
 
 def enable_logging(level: int = logging.WARNING) -> None:
     """Включить логирование."""
-    logger.setLevel(level)
+    logging_logger.setLevel(level)
 
 
 # Добавим полезные методы для работы с логгером
 def add_handler(handler: logging.Handler) -> None:
     """Добавить кастомный обработчик к логгеру."""
-    logger.addHandler(handler)
+    logging_logger.addHandler(handler)
 
 
 def remove_handler(handler: logging.Handler) -> None:
     """Удалить обработчик из логгера."""
-    logger.removeHandler(handler)
+    logging_logger.removeHandler(handler)
 
 
 # Инициализация логирования при импорте

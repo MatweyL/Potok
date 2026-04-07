@@ -112,6 +112,7 @@ class TaskGroup(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
     name: Mapped[str] = mapped_column(TEXT, nullable=False, )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     queue_per_priority: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    execution_arguments: Mapped[Dict] = mapped_column(JSONWithDatetime, nullable=True)
 
 
 class TaskGroupByProject(Base, TablenameMixin, LoadTimestampMixin):

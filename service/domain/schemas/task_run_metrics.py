@@ -8,9 +8,11 @@ class TaskRunGroupedAvgMetrics(BaseModel):
     group_name: str
     period_s: int
 
-    avg_queued_duration: float
-    avg_execution_duration: float
-    avg_retry_count: float  # group by status having count(*) > 1
+    avg_queued_duration: float = 0
+    avg_execution_duration: float = 0
+    avg_retry_count: float = 0  # where status in (TEMP_ERROR, WAITING, INTERRUPTED) group by status having count(*) > 1
+    avg_temp_error_count: float = 0
+    avg_interrupted_count: float = 0
 
 
 class TaskRunAvgMetrics(BaseModel):
@@ -42,6 +44,10 @@ class TaskRunGroupedMetrics(BaseModel):
     @cached_property
     def failed(self):
         return self.temp_error + self.interrupted
+
+    @cached_property
+    def throughput(self):
+        return self.succeed / self.period_s
 
 
 class TaskRunMetrics(BaseModel):

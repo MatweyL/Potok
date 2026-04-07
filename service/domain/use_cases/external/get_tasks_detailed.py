@@ -6,10 +6,12 @@ from service.domain.schemas.monitoring_algorithm import MonitoringAlgorithmUnion
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import TaskPK, Task
 from service.domain.schemas.task_detailed import TaskDetailed
+from service.domain.schemas.task_group import TaskGroup
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.domain.use_cases.external.get_payload import GetPayloadUC, GetPayloadUCRq
 from service.domain.use_cases.external.get_tasks import GetTasksUC, GetTasksUCRq
 from service.domain.use_cases.external.monitoring_algorithm import GetMonitoringAlgorithmUC, GetMonitoringAlgorithmUCRq
+from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetTaskGroupUCRq
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF
 
@@ -31,22 +33,24 @@ class GetTasksDetailedUC(UseCase):
             get_tasks_uc: GetTasksUC,
             get_payload_uc: GetPayloadUC,
             get_monitoring_algorithm_uc: GetMonitoringAlgorithmUC,
+            get_task_group_uc: GetTaskGroupUC,
             task_repo: Repo[Task, Task, TaskPK],
     ):
         self._get_tasks_uc = get_tasks_uc
         self._get_payload_uc = get_payload_uc
         self._get_monitoring_algorithm_uc = get_monitoring_algorithm_uc
+        self._get_task_group_uc = get_task_group_uc
         self._task_repo = task_repo
 
     async def apply(self, request: GetTasksDetailedUCRq) -> GetTasksDetailedUCRs:
         tasks_rs = await self._get_tasks_uc.apply(GetTasksUCRq(pagination=request.pagination))
         if not tasks_rs.success:
-            return GetTasksDetailedUCRs(success=False, error=tasks_rs.error, request=request, total=0)
+            return GetTasksDetailedUCRs(success=False, error=tasks_rs.error, request=request, total=0, total_filtered=0)
 
         # Кеши на время одного запроса
         payload_cache: Dict[int, Optional[Payload]] = {}
         algorithm_cache: Dict[int, Optional[MonitoringAlgorithmUnion]] = {}
-
+        task_group_cache: Dict[int, Optional[TaskGroup]] = {}
         result: List[TaskDetailed] = []
 
         for task in tasks_rs.tasks:
@@ -68,7 +72,11 @@ class GetTasksDetailedUC(UseCase):
                 )
             algorithm = algorithm_cache[task.monitoring_algorithm_id]
 
-            result.append(TaskDetailed(task=task, payload=payload, monitoring_algorithm=algorithm))
+            if task.group_id not in task_group_cache:
+                task_group_rs = await self._get_task_group_uc.apply(GetTaskGroupUCRq(task_group_id=task.group_id))
+                task_group_cache[task.group_id] = task_group_rs.task_group if task_group_rs.success else None
+            task_group = task_group_cache[task.group_id]
+            result.append(TaskDetailed(task=task, payload=payload, monitoring_algorithm=algorithm, task_group=task_group))
         total = await self._task_repo.count_by_fields(FilterFieldsDNF.empty())
         filter_fields_dnf = request.pagination.filter_fields_dnf if request.pagination.filter_fields_dnf else FilterFieldsDNF.empty()
         total_filtered = await self._task_repo.count_by_fields(filter_fields_dnf)

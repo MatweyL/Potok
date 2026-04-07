@@ -12,7 +12,8 @@ class SATaskGroupRepo(AbstractSARepo):
                                 title=obj.title,
                                 description=obj.description,
                                 is_active=obj.is_active,
-                                queue_per_priority=obj.queue_per_priority, )
+                                queue_per_priority=obj.queue_per_priority,
+                                execution_arguments=obj.execution_arguments, )
 
     def to_domain(self, obj: models.TaskGroup) -> TaskGroup:
         return TaskGroup(id=obj.id,
@@ -20,7 +21,8 @@ class SATaskGroupRepo(AbstractSARepo):
                          title=obj.title,
                          description=obj.description,
                          is_active=obj.is_active,
-                         queue_per_priority=obj.queue_per_priority,)
+                         queue_per_priority=obj.queue_per_priority,
+                         execution_arguments=obj.execution_arguments, )
 
     def pk_to_model_pk(self, pk: TaskGroupPK) -> Dict:
         return {"id": pk.id}

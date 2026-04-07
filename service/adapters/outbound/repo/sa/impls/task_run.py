@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 
 from sqlalchemy import text, select, union_all
 
@@ -10,7 +10,8 @@ from service.domain.schemas.enums import TaskRunStatus
 from service.domain.schemas.execution_bounds import as_execution_bounds
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task_run import TaskRun, TaskRunPK
-from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunGroupedMetrics
+from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunGroupedMetrics, TaskRunAvgMetrics, \
+    TaskRunGroupedAvgMetrics
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.task_run import WaitingTaskRunProvider, TaskRunMetricsProvider
 
@@ -85,21 +86,33 @@ class SAWaitingTaskRunProvider(WaitingTaskRunProvider):
 
 
 class SATaskRunMetricsProvider(TaskRunMetricsProvider):
+
     def __init__(self, database: Database, ):
         self._database = database
 
-    async def provide_by_period(self, period_s: int) -> TaskRunMetrics:
+    async def provide_by_period(self, period_s: int, group_name: Union[Optional[str],List[str]]=None) -> TaskRunMetrics:
 
         bound_datetime = datetime.now() - timedelta(seconds=period_s)
 
         async with self._database.session as session:
-            query = text("""
+            if group_name:
+                if isinstance(group_name, str):
+                    group_name_predicate = "AND group_name = :group_name"
+                else:
+                    group_name_predicate = "AND group_name IN :group_name"
+            else:
+                group_name_predicate = ""
+
+            query = text(f"""
                 SELECT group_name, status, COUNT(*) as cnt 
                 FROM task_run 
-                WHERE status_updated_at < :bound_datetime 
+                WHERE status_updated_at > :bound_datetime {group_name_predicate}
                 GROUP BY group_name, status
             """)
-            result = await session.execute(query, {'bound_datetime': bound_datetime})
+            query_kwargs = {"bound_datetime": bound_datetime}
+            if group_name:
+                query_kwargs["group_name"] = group_name
+            result = await session.execute(query, query_kwargs)
             rows = result.fetchall()
 
             grouped_metrics_by_name: Dict[str, TaskRunGroupedMetrics] = {}
@@ -137,3 +150,60 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
                     task_run_grouped_metrics.queued = cnt
 
             return TaskRunMetrics(grouped_metrics_by_name=grouped_metrics_by_name)
+
+    async def provide_avg_by_period(self, period_s: int,  group_name: Union[Optional[str],List[str]]=None) -> TaskRunAvgMetrics:
+
+        bound_datetime = datetime.now() - timedelta(seconds=period_s)
+
+        async with self._database.session as session:
+            if group_name:
+                if isinstance(group_name, str):
+                    group_name_predicate = "AND group_name = :group_name"
+                else:
+                    group_name_predicate = "AND group_name IN :group_name"
+            else:
+                group_name_predicate = ""
+
+            query = text(f"""
+                SELECT 
+                    tr.group_name,
+                    trsl.status,
+                    COUNT(*)::float / NULLIF(
+                        (SELECT COUNT(*) FROM task_run tr2 WHERE tr2.group_name = tr.group_name), 
+                        0
+                    ) as avg_per_task
+                FROM task_run_status_log trsl
+                JOIN task_run tr ON tr.id = trsl.task_run_id 
+                                    AND trsl.status IN ('TEMP_ERROR', 'INTERRUPTED', 'WAITING')
+                                    AND trsl.status_updated_at > :bound_datetime {group_name_predicate}
+                GROUP BY tr.group_name, trsl.status
+                ORDER BY tr.group_name, trsl.status;"""
+                         )
+            query_kwargs = {'bound_datetime': bound_datetime}
+            if group_name:
+                query_kwargs["group_name"] = group_name
+            result = await session.execute(query,query_kwargs)
+            rows = result.fetchall()
+
+            grouped_avg_metrics_by_name: Dict[str, TaskRunGroupedAvgMetrics] = {}
+
+            for row in rows:
+                group_name = row[0]
+                status = row[1]
+                cnt = row[2]
+                # Инициализируем метрики для группы, если ещё нет
+                if group_name not in grouped_avg_metrics_by_name:
+                    grouped_avg_metrics_by_name[group_name] = TaskRunGroupedAvgMetrics(
+                        group_name=group_name,
+                        period_s=period_s
+                    )
+
+                task_run_grouped_avg_metrics = grouped_avg_metrics_by_name[group_name]
+                if status == TaskRunStatus.WAITING:
+                    task_run_grouped_avg_metrics.avg_retry_count = cnt - 1
+                elif status == TaskRunStatus.TEMP_ERROR:
+                    task_run_grouped_avg_metrics.avg_temp_error_count = cnt
+                elif status == TaskRunStatus.INTERRUPTED:
+                    task_run_grouped_avg_metrics.avg_interrupted_count = cnt
+
+            return TaskRunAvgMetrics(grouped_avg_metrics_by_name=grouped_avg_metrics_by_name)
