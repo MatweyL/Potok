@@ -19,9 +19,7 @@ class TaskRunAvgMetrics(BaseModel):
     grouped_avg_metrics_by_name: Dict[str, TaskRunGroupedAvgMetrics]
 
 
-class TaskRunGroupedMetrics(BaseModel):
-    group_name: str
-    period_s: int
+class StatusMetrics(BaseModel):
 
     waiting: int = 0
     succeed: int = 0
@@ -45,6 +43,11 @@ class TaskRunGroupedMetrics(BaseModel):
     def failed(self):
         return self.temp_error + self.interrupted
 
+
+class TaskRunGroupedMetrics(StatusMetrics):
+    group_name: str
+    period_s: int
+
     @cached_property
     def throughput(self):
         return self.succeed / self.period_s
@@ -52,3 +55,7 @@ class TaskRunGroupedMetrics(BaseModel):
 
 class TaskRunMetrics(BaseModel):
     grouped_metrics_by_name: Dict[str, TaskRunGroupedMetrics]
+
+
+class TasksRunsStatusMetrics(BaseModel):
+    status_metrics_by_task_id: Dict[int, StatusMetrics]

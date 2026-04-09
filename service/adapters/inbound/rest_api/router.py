@@ -10,6 +10,7 @@ from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
 from service.domain.use_cases.external.get_tasks import GetTasksUCRq
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
+from service.domain.use_cases.external.task_group import CreateTaskGroupUC, CreateTaskGroupUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
 from service.ports.outbound.repo.fields import PaginationQuery
 
@@ -96,3 +97,8 @@ async def create_monitoring_algorithm(create_monitoring_algorithm_uc_rq: CreateM
 @router.get("/monitoring-algorithms")
 async def get_all_monitoring_algorithms():
     return await get_use_case_facade().get_all_monitoring_algorithms()
+
+
+@router.post("/task-group")
+async def create_task_group(create_task_group_uc_rq: CreateTaskGroupUCRq):
+    return await get_use_case_facade().create_task_group(create_task_group_uc_rq)

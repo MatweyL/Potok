@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}{{ task_group.title }} - Группа задач{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+    <!-- Заголовок и кнопка редактирования -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Детали группы задач</h1>
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTaskGroupModal">
+            ✏️ Редактировать группу
+        </button>
+    </div>
+
+    <!-- Компонент карточки группы задач -->
+    {% set group = task_group %}
+    {% set stats = task_group_statistics %}
+    {% set show_verbose = true %}
+    {% set show_project = true %}
+    <div id="taskGroupCard">
+        {% include 'components/task_group_card.html' %}
+    </div>
+
+    <!-- Таблица задач -->
+        <!-- Таблица задач -->
+    <h2 class="h5 mt-5 mb-3">Список задач</h2>
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <table id="tasksTable" class="table table-hover align-middle mb-0" style="width:100%">
+                <thead class="bg-light text-secondary small text-uppercase">
+                    <tr>
+                        <th style="width: 50px;">ID</th>
+                        <th>Приоритет</th>
+                        <th>Полезная нагрузка</th>
+                        <th>Тип задачи</th>
+                        <th>Алгоритм мониторинга</th>
+                        <th style="width: 110px;">Последние запуски</th>
+                        <th style="width: 150px;">Статистика запусков</th>
+                        <th>Статус</th>
+                        <th>Обновление статуса</th>
+                        <th>Загрузка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Данные подгружаются динамически -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Модальное окно редактирования группы задач -->
+<div class="modal fade" id="editTaskGroupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать группу задач</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTaskGroupForm">
+                    <div class="mb-3">
+                        <label for="editTitle" class="form-label">Название <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editTitle" value="{{ task_group.title }}" required maxlength="255">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editName" class="form-label">Короткое имя</label>
+                        <input type="text" class="form-control" id="editName" value="{{ task_group.name }}" readonly disabled>
+                        <div class="form-text">Короткое имя является системным идентификатором и не подлежит изменению</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editDescription" class="form-label">Описание</label>
+                        <textarea class="form-control" id="editDescription" rows="3" maxlength="1000">{{ task_group.description }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editExecArgs" class="form-label">Аргументы выполнения (JSON)</label>
+                        <textarea class="form-control font-monospace small" id="editExecArgs" rows="4" 
+                                  placeholder='{"key": "value"}'>{{ task_group.execution_arguments | tojson if task_group.execution_arguments }}</textarea>
+                    </div>
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="editQueuePerPriority" {% if task_group.queue_per_priority %}checked{% endif %}>
+                        <label class="form-check-label" for="editQueuePerPriority">Отдельные очереди на приоритет</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveTaskGroupBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const toUpperCaseMap = (map) => new Map([...map].map(([k, v]) => [k.toUpperCase(), v]));
+
+document.addEventListener('DOMContentLoaded', function() {
+    const RUN_STYLES = {
+        'succeed':      { bg: '#28a745', text: '#fff', label: 'Успешно' },
+        'error':        { bg: '#dc3545', text: '#fff', label: 'Ошибка' },
+        'execution':    { bg: '#007bff', text: '#fff', label: 'Выполняется' },
+        'temp_error':   { bg: '#fd7e14', text: '#fff', label: 'Врем. ошибка' },
+        'interrupted':  { bg: '#6f42c1', text: '#fff', label: 'Прервано' },
+        'cancelled':    { bg: '#6c757d', text: '#fff', label: 'Отменено' },
+        'waiting':      { bg: '#e9ecef', text: '#6c757d', label: 'Ожидает' },
+        'queued':       { bg: '#adb5bd', text: '#fff', label: 'В очереди' }
+    };
+
+    // 🔹 Маленькая точка для последних запусков (без текста внутри)
+    const renderRunDot = (runId, status, url) => {
+        const style = RUN_STYLES[status?.toLowerCase()] || RUN_STYLES['waiting'];
+        const statusLabel = style.label;
+        return `<a href="${url}"
+                  class="d-inline-block rounded-circle me-1"
+                  style="width: 20px; height: 20px; background-color: ${style.bg}; border: 2px solid ${style.bg};"
+                  title="Запуск #${runId}: ${statusLabel}">
+                </a>`;
+    };
+
+    // 🔸 Крупный кружок со счётчиком для статистики
+    const renderStatBadge = (count, status, url) => {
+        const style = RUN_STYLES[status?.toLowerCase()] || RUN_STYLES['waiting'];
+        return `<a href="${url}"
+                  class="d-inline-flex align-items-center justify-content-center rounded-circle text-decoration-none mx-1"
+                  style="width: 28px; height: 28px; font-size: 12px; font-weight: 600;
+                         background-color: ${style.bg}; color: ${style.text}; border: 2px solid ${style.bg};"
+                  title="${style.label}: ${count} запусков">
+                  ${count}
+                </a>`;
+    };
+
+    const groupId = {{ task_group.id }};
+
+    // Инициализация DataTables с AJAX-подгрузкой
+        const tasksTable = $('#tasksTable').DataTable({
+        serverSide: true,
+        processing: true,
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [[7, 'desc']],
+        ajax: {
+            url: '/tasks/',
+            type: 'GET',
+            data: function(d) {
+                // Маппим параметры DataTables на ваш API
+                d.group_id = groupId;
+                d.offset = d.start;
+                d.limit = d.length;
+                d.sort_by = 'id';
+                d.sort_asc = d.order.length > 0 ? d.order[0].dir === 'asc' : false;
+
+                // Удаляем служебные поля, которые API не понимает
+                delete d.columns;
+                delete d.order;
+                delete d.search;
+                delete d.start;
+                delete d.length;
+                // d.draw НЕ удаляем! Он нужен DataTables для синхронизации
+            },
+            dataFilter: function(rawJson) {       // ✅ используем dataFilter вместо dataSrc
+        const json = JSON.parse(rawJson);
+        console.log('📦 Ответ от сервера:', json);
+
+        let items = [];
+        let total = 0;
+
+        if (Array.isArray(json)) {
+            items = json;
+            total = json.length;
+        } else if (json.data && Array.isArray(json.data)) {
+            items = json.data;
+            total = json.recordsTotal || json.total_count || json.total || items.length;
+        } else if (json.items || json.results) {
+            items = json.items || json.results;
+            total = json.total_count || json.count || json.total || items.length;
+        }
+
+        console.log(`✅ Извлечено задач: ${items.length}, Всего: ${total}`);
+
+        // dataFilter должен вернуть JSON-строку в формате DataTables
+        return JSON.stringify({
+            draw: json.draw,
+            recordsTotal: total,
+            recordsFiltered: total,
+            data: items
+        });
+    },
+    error: function(xhr, error, thrown) {
+        console.error('❌ DataTables AJAX ошибка:', error, thrown);
+        alert('Не удалось загрузить задачи. Проверьте консоль разработчика (F12).');
+    }
+        },
+        columns: [
+    { data: 'task.id', className: 'fw-medium' },
+    {
+        data: 'task.priority',
+        render: function(data) { return data !== null && data !== undefined ? data : '—'; }
+    },
+    {
+        data: 'payload.data',
+        render: function(data) {
+            if (!data) return '<span class="text-muted">—</span>';
+            const jsonStr = JSON.stringify(data);
+            const safeTitle = jsonStr.replace(/"/g, '&quot;');
+            const display = jsonStr.length > 60 ? jsonStr.substring(0, 60) + '…' : jsonStr;
+            return `<span class="text-muted small text-break" title="${safeTitle}">${display}</span>`;
+        }
+    },
+    {
+        data: 'task.type',
+        render: function(data) {
+            return `<span class="badge bg-primary-subtle text-primary-emphasis">${data}</span>`
+        }
+    },
+    {
+        data: 'monitoring_algorithm',
+        render: function(algo) {
+            if (!algo) return '<span class="text-muted">—</span>';
+
+            const noise = algo.timeout_noize ?? 0;
+            let content = '';
+            let typeBadge = '';
+
+            if (algo.type === 'PERIODIC') {
+                typeBadge = '<span class="badge bg-primary me-2">PERIODIC</span>';
+                content = `<span class="fw-semibold">${algo.timeout}</span> <span class="text-muted">±</span> <span class="fw-semibold">${noise}</span>`;
+            }
+            else if (algo.type === 'SINGLE') {
+                typeBadge = '<span class="badge bg-info me-2">SINGLE</span>';
+                const timeouts = (algo.timeouts && algo.timeouts.length > 0)
+                    ? algo.timeouts.map(t => `<span class="badge bg-secondary me-1">${t}</span>`).join('')
+                    : '<span class="badge bg-warning">мгновенно</span>';
+                content = `<div class="d-inline-flex align-items-center gap-1">${timeouts} <span class="text-muted mx-1">±</span> <span class="fw-semibold">${noise}</span></div>`;
+            }
+            else {
+                return `<span class="text-muted">${algo.type?.value || '—'}</span>`;
+            }
+
+            return `<a href="/monitoring-algorithms/${algo.id}" class="text-decoration-none">
+                        <div class="d-flex align-items-center">
+                            ${typeBadge}
+                            <div>${content}</div>
+                        </div>
+                    </a>`;
+        }
+    },
+
+      // 🟢 Колонка: Последние запуски (точки без текста)
+        {
+            data: 'task_runs_recent',
+            title: 'Запуски',
+            className: 'text-center',
+            render: function(runs) {
+                if (!runs || runs.length === 0) return '<span class="text-muted small">—</span>';
+                return runs.slice(0, 3).map(run =>
+                    renderRunDot(run.id, run.status, `/task-runs/${run.id}`)
+                ).join('');
+            }
+        },
+
+        // 📈 Колонка: Статистика запусков (кружки с цифрами)
+        {
+            data: 'task_runs_status_metrics',
+            title: 'Статистика',
+            className: 'text-center',
+            render: function(stats, type, row) {
+                if (!stats) return '<span class="text-muted small">—</span>';
+                const taskId = row.task.id;
+                const statusOrder = ['execution', 'queued', 'waiting', 'temp_error', 'interrupted', 'error', 'succeed', 'cancelled'];
+                const sortedKeys = Object.keys(stats).sort((a, b) => statusOrder.indexOf(a) - statusOrder.indexOf(b));
+
+
+                const badges = sortedKeys.map(status => {
+                    const count = stats[status];
+                    if (count === 0 && status !== 'execution') return '';
+                    return renderStatBadge(count, status, `/tasks/${taskId}/?task_run_status=${status}`);
+                }).filter(Boolean).join('');
+
+                // ✅ Flex-контейнер: 4px между рядами, 8px между кружками в строке
+                return badges
+                    ? `<div class="d-flex flex-wrap align-items-center justify-content-center" style="gap: 4px 8px;">${badges}</div>`
+                    : '<span class="text-muted small">—</span>';
+            }
+        },
+        {
+            data: 'task.status',
+            render: function(data) {
+                return `<span class="badge bg-secondary-subtle text-secondary-emphasis">${data}</span>`
+            }
+        },
+        { data: 'task.status_updated_at', defaultContent: '<span class="text-muted">—</span>', className: 'small text-nowrap' },
+        { data: 'task.loaded_at', defaultContent: '<span class="text-muted">—</span>', className: 'small text-nowrap' },
+],
+        columnDefs: [
+            { orderable: false, targets: [2] }
+        ]
+    });
+
+    // Логика редактирования группы задач (без изменений)
+    const saveBtn = document.getElementById('saveTaskGroupBtn');
+    saveBtn?.addEventListener('click', async function() {
+        const title = document.getElementById('editTitle').value.trim();
+        const description = document.getElementById('editDescription').value.trim();
+        let executionArguments = null;
+        const execArgsRaw = document.getElementById('editExecArgs').value.trim();
+
+        if (execArgsRaw) {
+            try {
+                executionArguments = JSON.parse(execArgsRaw);
+                if (typeof executionArguments !== 'object' || executionArguments === null) throw new Error('Ожидается JSON-объект');
+            } catch (e) {
+                alert('Ошибка формата JSON в поле "Аргументы выполнения": ' + e.message);
+                return;
+            }
+        }
+
+        const queuePerPriority = document.getElementById('editQueuePerPriority').checked;
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Сохранение...';
+
+        try {
+            const response = await fetch(`/task-groups/${groupId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+
+                    title, description, execution_arguments: executionArguments, queue_per_priority: queuePerPriority,
+                    task_group_id: groupId,
+                })
+            });
+
+            if (!response.ok) throw new Error((await response.json()).detail || 'Ошибка сервера');
+
+            // Точечное обновление DOM
+            document.getElementById('taskGroupCard').querySelector('.card-header h5 a').textContent = title;
+            document.getElementById('taskGroupCard').querySelector('.card-body > p.card-text').textContent = description || 'Описание отсутствует';
+
+            const argsPre = document.getElementById('taskGroupCard').querySelector('pre code');
+            if (argsPre) argsPre.textContent = executionArguments ? JSON.stringify(executionArguments, null, 2) : '';
+
+            const queueBadge = document.getElementById('taskGroupCard').querySelector('.col-md-6 .badge');
+            if (queueBadge) {
+                queueBadge.className = queuePerPriority
+                    ? 'badge bg-primary-subtle text-primary-emphasis'
+                    : 'badge bg-secondary-subtle text-secondary-emphasis';
+                queueBadge.textContent = queuePerPriority ? 'Отдельные очереди на приоритет' : 'Общая очередь для всех приоритетов';
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('editTaskGroupModal')).hide();
+        } catch (error) {
+            console.error('Ошибка обновления группы:', error);
+            alert('Не удалось сохранить изменения: ' + error.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Сохранить';
+        }
+    });
+});
+</script>
+{% endblock %}

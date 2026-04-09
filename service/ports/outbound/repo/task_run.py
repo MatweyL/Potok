@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Union
 
 from service.domain.schemas.task_run import TaskRun
-from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunAvgMetrics
+from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunAvgMetrics, StatusMetrics, \
+    TasksRunsStatusMetrics
 
 
 class WaitingTaskRunProvider(ABC):
@@ -20,4 +21,8 @@ class TaskRunMetricsProvider(ABC):
     @abstractmethod
     async def provide_avg_by_period(self, period_s: int,
                                     group_name: Union[Optional[str], List[str]] = None) -> TaskRunAvgMetrics:
+        pass
+
+    @abstractmethod
+    async def provide_tasks_runs_status_metrics(self, tasks_ids: List[int]) -> TasksRunsStatusMetrics:
         pass

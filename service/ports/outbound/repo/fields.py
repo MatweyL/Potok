@@ -1,7 +1,7 @@
 import enum
 from typing import Optional, Any, List, Dict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ConditionOperation(str, enum.Enum):
@@ -79,7 +79,9 @@ class FilterFieldsDNF(BaseModel):
 
 
 class PaginationQuery(BaseModel):
-    offset_page: Optional[int] = None
+    offset_page: Optional[int] = Field(default=None, description="ЭТО НЕ page, ЭТО ИМЕННО offset! Потом будет"
+                                                                 " переименовано на offset,"
+                                                                 " делать offset_page = offset // limit не нужно")
     limit_per_page: Optional[int] = None
     order_by: Optional[str] = None
     asc_sort: Optional[bool] = None

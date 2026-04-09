@@ -17,18 +17,18 @@ class TaskPK(BaseModel):
 
 
 class TaskConfiguration(BaseModel):
-    group_id: int
-    priority: PriorityType = PriorityType.MEDIUM
-    type: TaskType = TaskType.UNDEFINED
-    monitoring_algorithm_id: int
-    execution_arguments: Optional[Dict[str, Any]] = None
+    group_id: int = Field(description="Идентификатор группы")
+    priority: PriorityType = Field(default=PriorityType.MEDIUM, description="Приоритет источника")
+    type: TaskType = Field(default=TaskType.UNDEFINED, description="Тип задачи, определяющий способ учета прогресса")
+    monitoring_algorithm_id: int= Field(description="Идентификатор алгоритма мониторинга")
+    execution_arguments: Optional[Dict[str, Any]] = Field(default=None, description="Идентификатор группы")
 
 
 class Task(TaskPK, TaskConfiguration):
-    status: TaskStatus
-    status_updated_at: datetime
+    status: TaskStatus= Field(description="Статус выполнения задачи")
+    status_updated_at: datetime= Field(description="Время обновления статуса")
     payload_id: int = Field(description="Идентификатор полезной нагрузки задачи")
-    loaded_at: Optional[datetime] = None
+    loaded_at: Optional[datetime] = Field(default=None, description="Дата загрузки задачи в хранилище")
 
 
 class TaskStatusLogPK(BaseModel):

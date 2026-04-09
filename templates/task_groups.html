@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %} Все группы задач - Поток{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+
+    <h2 class="h5 mb-3">Группы задач</h2>
+
+    {% if task_groups %}
+    <div class="row g-4">
+        {% for group in task_groups %}
+        {% set stats = task_group_statistics_by_name.get(group.name) %}
+        {% set project = project_by_task_group_name.get(group.name) %}
+        {% include 'components/task_group_card.html' %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-light border text-center py-4">
+        <span class="text-muted">Не создано еще ни одной группы задач</span>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %}

@@ -12,7 +12,8 @@ from service.adapters.outbound.repo.sa.impls.project import SAProjectRepo
 from service.adapters.outbound.repo.sa.impls.task import SATaskRepo
 from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
 from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
-from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider
+from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider, \
+    SATaskRunMetricsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
     SATaskRunTimeIntervalExecutionBoundsRepo
@@ -27,6 +28,7 @@ from service.domain.services.uniqueness_payload_checker import UniquenessPayload
 from service.domain.use_cases.external.auth.create_first_admin import CreateFirstAdminUC
 from service.domain.use_cases.external.auth.create_user import CreateUserUC
 from service.domain.use_cases.external.create_tasks import CreateTasksUC
+from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
     GetAllMonitoringAlgorithmsUC
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC
@@ -149,6 +151,10 @@ def sa_task_group_by_project_repo(database):
 @pytest.fixture
 def sa_waiting_task_run_provider(database, sa_task_run_repo):
     return SAWaitingTaskRunProvider(database, sa_task_run_repo)
+
+@pytest.fixture
+def sa_task_run_metrics_provider(database):
+    return SATaskRunMetricsProvider(database)
 @pytest.fixture
 def actual_execution_bounds_provider(sa_time_interval_task_progress_repo):
     return ActualTimeIntervalExecutionBoundsProvider(sa_time_interval_task_progress_repo)
@@ -236,3 +242,8 @@ def create_user_uc(sa_app_user_repo, hasher):
 @pytest.fixture
 def create_first_admin_uc(create_user_uc, sa_app_user_repo):
     return CreateFirstAdminUC(create_user_uc, sa_app_user_repo)
+
+@pytest.fixture
+def get_all_task_group_statistics_uc(sa_task_group_repo, sa_task_run_metrics_provider):
+    return GetAllTaskGroupStatisticsUC(sa_task_group_repo, sa_task_run_metrics_provider)
+

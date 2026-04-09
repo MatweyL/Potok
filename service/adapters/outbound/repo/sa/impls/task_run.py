@@ -11,7 +11,7 @@ from service.domain.schemas.execution_bounds import as_execution_bounds
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task_run import TaskRun, TaskRunPK
 from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunGroupedMetrics, TaskRunAvgMetrics, \
-    TaskRunGroupedAvgMetrics
+    TaskRunGroupedAvgMetrics, TasksRunsStatusMetrics, StatusMetrics
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.task_run import WaitingTaskRunProvider, TaskRunMetricsProvider
 
@@ -86,6 +86,53 @@ class SAWaitingTaskRunProvider(WaitingTaskRunProvider):
 
 
 class SATaskRunMetricsProvider(TaskRunMetricsProvider):
+
+    async def provide_tasks_runs_status_metrics(self, tasks_ids: List[int]) -> TasksRunsStatusMetrics:
+
+        async with self._database.session as session:
+
+            query = text(f"""
+                SELECT task_id, status, COUNT(*) as cnt 
+                FROM task_run 
+                WHERE task_id = ANY(:tasks_ids)
+                GROUP BY task_id, status
+            """)
+            query_kwargs = {"tasks_ids": tasks_ids}
+            result = await session.execute(query, query_kwargs)
+            rows = result.fetchall()
+
+            status_metrics_by_task_id: Dict[int, StatusMetrics] = {}
+
+            for row in rows:
+                task_id = row[0]
+                status = row[1]
+                cnt = row[2]
+
+                # Инициализируем метрики для группы, если ещё нет
+                if task_id not in status_metrics_by_task_id:
+                    status_metrics_by_task_id[task_id] = StatusMetrics()
+
+                status_metrics = status_metrics_by_task_id[task_id]
+
+                # Обрабатываем все возможные статусы
+                if status == TaskRunStatus.SUCCEED:
+                    status_metrics.succeed = cnt
+                elif status == TaskRunStatus.WAITING:
+                    status_metrics.waiting = cnt
+                elif status == TaskRunStatus.INTERRUPTED:
+                    status_metrics.interrupted = cnt
+                elif status == TaskRunStatus.CANCELLED:
+                    status_metrics.cancelled = cnt
+                elif status == TaskRunStatus.EXECUTION:
+                    status_metrics.execution = cnt
+                elif status == TaskRunStatus.ERROR:
+                    status_metrics.error = cnt
+                elif status == TaskRunStatus.TEMP_ERROR:
+                    status_metrics.temp_error = cnt
+                elif status == TaskRunStatus.QUEUED:
+                    status_metrics.queued = cnt
+
+            return TasksRunsStatusMetrics(status_metrics_by_task_id=status_metrics_by_task_id)
 
     def __init__(self, database: Database, ):
         self._database = database
@@ -200,7 +247,7 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
 
                 task_run_grouped_avg_metrics = grouped_avg_metrics_by_name[group_name]
                 if status == TaskRunStatus.WAITING:
-                    task_run_grouped_avg_metrics.avg_retry_count = cnt - 1
+                    task_run_grouped_avg_metrics.avg_retry_count = max(cnt - 1, 0)
                 elif status == TaskRunStatus.TEMP_ERROR:
                     task_run_grouped_avg_metrics.avg_temp_error_count = cnt
                 elif status == TaskRunStatus.INTERRUPTED:

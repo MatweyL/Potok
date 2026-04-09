@@ -1,13 +1,15 @@
 # service/domain/use_cases/project_uc.py
 
 from abc import ABC
-from typing import Optional, List
+from functools import cached_property
+from typing import Optional, List, Dict
 
 from pydantic import Field
 
 from service.domain.schemas.project import Project, ProjectPK
 from service.domain.schemas.task_group import TaskGroup, TaskGroupPK
-from service.domain.schemas.task_group_by_project import TaskGroupByProject, TaskGroupByProjectPK
+from service.domain.schemas.task_group_by_project import TaskGroupByProject, TaskGroupByProjectPK, \
+    TaskGroupByProjectDetailed
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.domain.use_cases.external.task_group import GetAllTaskGroupUC, GetAllTaskGroupUCRq
 from service.ports.outbound.repo.abstract import Repo
@@ -312,3 +314,63 @@ class GetTaskGroupsWithoutProjectUC(ProjectTaskGroupUC):
         task_groups = await self._task_group_repo.filter(
             FilterFieldsDNF.single('id', task_group_ids, ConditionOperation.NOT_IN))
         return GetTaskGroupsWithoutProjectUCRs(success=True, request=request, task_groups=task_groups)
+
+
+class GetAllTaskGroupByProjectDetailedUCRq(UCRequest):
+    pass
+
+
+class GetAllTaskGroupByProjectDetailedUCRs(UCResponse):
+    request: GetAllTaskGroupByProjectDetailedUCRq
+    task_group_by_project_detailed_by_group_name: Dict[str, TaskGroupByProjectDetailed]
+
+    @cached_property
+    def project_by_task_group_name(self):
+        return {group_name: task_group_by_project_detailed.project
+                for group_name, task_group_by_project_detailed in
+                self.task_group_by_project_detailed_by_group_name.items()
+                }
+
+
+class GetAllTaskGroupByProjectDetailedUC(ProjectTaskGroupUC):
+    async def apply(self, request: GetAllTaskGroupByProjectDetailedUCRq) -> GetAllTaskGroupByProjectDetailedUCRs:
+        task_groups = await self._task_group_repo.get_all()
+        projects = await self._project_repo.get_all()
+        task_group_by_project_list = await self._task_group_by_project_repo.get_all()
+
+        task_group_by_id = {task_group.id: task_group for task_group in task_groups}
+        project_by_id = {project.id: project for project in projects}
+        task_group_by_project_detailed_by_group_name = {}
+
+        for task_group_by_project in task_group_by_project_list:
+            task_group = task_group_by_id.get(task_group_by_project.group_id)
+            project = project_by_id.get(task_group_by_project.project_id)
+            task_group_by_project_detailed = TaskGroupByProjectDetailed(group_id=task_group_by_project.group_id,
+                                                                        project_id=task_group_by_project.project_id,
+                                                                        task_group=task_group,
+                                                                        project=project, )
+            task_group_by_project_detailed_by_group_name[task_group.name] = task_group_by_project_detailed
+        return GetAllTaskGroupByProjectDetailedUCRs(
+            success=True,
+            request=request,
+            task_group_by_project_detailed_by_group_name=task_group_by_project_detailed_by_group_name,
+        )
+
+
+class GetProjectByTaskGroupUCRq(UCRequest):
+    task_group_id: int
+
+
+class GetProjectByTaskGroupUCRs(UCResponse):
+    request: GetProjectByTaskGroupUCRq
+    project: Optional[Project] = None
+
+
+class GetProjectByTaskGroupUC(ProjectTaskGroupUC):
+    async def apply(self, request: GetProjectByTaskGroupUCRq) -> GetProjectByTaskGroupUCRs:
+        task_groups = await self._task_group_by_project_repo.filter(FilterFieldsDNF.single("group_id", request.task_group_id))
+        if not task_groups:
+            return GetProjectByTaskGroupUCRs(success=False, request=request, error="Task group not found")
+        task_group = task_groups[0]
+        project = await self._project_repo.get(ProjectPK(id=task_group.project_id))
+        return GetProjectByTaskGroupUCRs(success=True, request=request, project=project,)

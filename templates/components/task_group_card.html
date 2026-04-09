@@ -1,0 +1,80 @@
+{# components/task_group_card.html #}
+{# Ожидаемые переменные в контексте: group, stats, project (опционально), show_project (опционально, по умолчанию True) #}
+
+{% set show_proj = show_project is not defined or show_project == true %}
+{% set verbose = show_verbose is defined and show_verbose == true %}
+
+<div class="card shadow-sm border-0 h-100">
+    <!-- Шапка карточки -->
+    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h5 class="card-title mb-0">
+            <a href="/task-groups/{{ group.id }}" class="text-decoration-none fw-semibold text-dark">
+                {{ group.title }}
+            </a>
+        </h5>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <code class="bg-light px-2 py-1 rounded small text-muted">{{ group.name }}</code>
+            {% if group.is_active %}
+                <span class="badge bg-success-subtle text-success-emphasis">Активна</span>
+            {% else %}
+                <span class="badge bg-secondary-subtle text-secondary-emphasis">Не активна</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- Блок информации о проекте -->
+        {% if show_proj %}
+            {% if project %}
+                <div class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l4.992-5.99a.75.75 0 0 0-.01-1.05z"/>
+                    </svg>
+                    <span>Привязана к проекту:</span>
+                    <a href="/projects/{{ project.id }}" class="fw-medium text-decoration-none text-reset">{{ project.title }}</a>
+                </div>
+            {% else %}
+                <div class="alert alert-light border py-2 px-3 mb-3 small d-flex align-items-center gap-2 text-muted">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 0a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm0 3.5a1 1 0 1 1-1 1 1 1 0 0 1 1-1Zm1 8.5H7V6h2Z"/>
+                    </svg>
+                    <span>Не привязана ни к какому проекту</span>
+                </div>
+            {% endif %}
+        {% endif %}
+<!-- Расширенные параметры (только при show_verbose=true) -->
+        {% if verbose %}
+        <div class="mb-3 p-3 bg-light rounded border">
+            <h6 class="text-primary fw-semibold mb-3 small text-uppercase">Расширенные параметры</h6>
+            <div class="row g-3 small">
+                <div class="col-md-6">
+                    <div class="fw-medium text-muted mb-1">Аргументы выполнения</div>
+                    {% if group.execution_arguments %}
+                    <pre class="bg-white p-2 rounded border mb-0 text-break" style="max-height: 130px; overflow-y: auto; font-size: 0.85em;"><code>{{ group.execution_arguments | tojson(indent=2) }}</code></pre>
+                    {% else %}
+                    <div class="text-muted fst-italic">Не заданы</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <div class="fw-medium text-muted mb-1">Стратегия очередей</div>
+                    {% if group.queue_per_priority is not none %}
+                        {% if group.queue_per_priority %}
+                        <span class="badge bg-primary-subtle text-primary-emphasis">Отдельные очереди на приоритет</span>
+                        {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis">Общая очередь для всех приоритетов</span>
+                        {% endif %}
+                    {% else %}
+                    <div class="text-muted fst-italic">Не определено</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Описание -->
+        <p class="card-text text-muted mb-4">{{ group.description or "Описание отсутствует" }}</p>
+
+        <!-- Метрики -->
+        {% include 'components/task_group_metrics.html' %}
+    </div>
+</div>

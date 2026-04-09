@@ -56,15 +56,19 @@ from service.domain.use_cases.external.facade import UseCaseFacade
 from service.domain.use_cases.external.get_payload import GetPayloadUC
 from service.domain.use_cases.external.get_payloads import GetPayloadsUC
 from service.domain.use_cases.external.get_task import GetTaskUC
+from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUC, \
+    GetTaskGroupStatisticsUC
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUC
-from service.domain.use_cases.external.get_task_runs import GetTaskRunsUC
+from service.domain.use_cases.external.get_task_runs import GetTaskRunsUC, GetTasksRunsUC
 from service.domain.use_cases.external.get_tasks import GetTasksUC
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
     GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC
 from service.domain.use_cases.external.project import GetAllProjectsUC, CreateProjectUC, GetProjectTaskGroupsUC, \
-    GetTaskGroupsWithoutProjectUC, AddTaskGroupToProjectUC, RemoveTaskGroupFromProjectUC
-from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetAllTaskGroupUC
+    GetTaskGroupsWithoutProjectUC, AddTaskGroupToProjectUC, RemoveTaskGroupFromProjectUC, UpdateProjectUC, \
+    GetAllTaskGroupByProjectDetailedUC, GetProjectByTaskGroupUC
+from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetAllTaskGroupUC, CreateTaskGroupUC, \
+    UpdateTaskGroupUC
 from service.domain.use_cases.external.update_payload import UpdatePayloadUC
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC, CreateTaskRunsUCRq
 from service.domain.use_cases.internal.receive_task_run_execution_status import ReceiveTaskRunExecutionStatusUC, \
@@ -156,6 +160,7 @@ async def main():
     get_tasks_uc = GetTasksUC(task_repo)
     get_task_uc = GetTaskUC(task_repo)
     get_task_runs_uc = GetTaskRunsUC(task_repo, task_run_repo)
+    get_tasks_runs_uc = GetTasksRunsUC(task_run_repo)
     get_task_progress_uc = GetTaskProgressUC(task_repo, time_interval_task_progress_repo)
     get_payload_uc = GetPayloadUC(payload_repo)
     get_payloads_uc = GetPayloadsUC(payload_repo)
@@ -163,26 +168,57 @@ async def main():
     get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                            periodic_monitoring_algorithm_repo,
                                                            single_monitoring_algorithm_repo, transaction_factory)
+
+    create_task_group_uc = CreateTaskGroupUC(task_group_repo)
     get_task_group_uc = GetTaskGroupUC(task_group_repo)
-    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_payload_uc, get_monitoring_algorithm_uc,
-                                               task_group_repo, task_repo, )
+    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_task_runs_uc, get_payload_uc,
+                                               get_monitoring_algorithm_uc,
+                                               task_group_repo, task_repo, task_run_metrics_provider, )
     get_all_task_group_uc = GetAllTaskGroupUC(task_group_repo)
-    get_task_groups_without_project_uc = GetTaskGroupsWithoutProjectUC(project_repo,task_group_repo,
+    get_task_groups_without_project_uc = GetTaskGroupsWithoutProjectUC(project_repo, task_group_repo,
                                                                        task_group_by_project_repo)
 
     get_all_projects_uc = GetAllProjectsUC(project_repo)
     create_project_uc = CreateProjectUC(project_repo)
+    update_project_uc = UpdateProjectUC(project_repo)
     get_project_task_groups_uc = GetProjectTaskGroupsUC(project_repo, task_group_repo, task_group_by_project_repo,
                                                         get_all_task_group_uc)
-
-    add_task_group_to_project_uc = AddTaskGroupToProjectUC(project_repo,task_group_repo,task_group_by_project_repo)
-    remove_task_group_from_project_uc = RemoveTaskGroupFromProjectUC(project_repo,task_group_repo,task_group_by_project_repo)
-    use_case_facade = UseCaseFacade(create_tasks_uc, create_monitoring_algorithm_uc, get_all_monitoring_algorithms_uc,
-                                    get_tasks_uc, get_task_uc, get_task_runs_uc, get_task_progress_uc, get_payloads_uc,
-                                    get_payload_uc, update_payload_uc, get_tasks_detailed_uc,
-                                    get_all_projects_uc, create_project_uc, get_project_task_groups_uc,
-                                    get_task_groups_without_project_uc, add_task_group_to_project_uc,
-                                    remove_task_group_from_project_uc,)
+    get_all_task_group_statistics_uc = GetAllTaskGroupStatisticsUC(task_group_repo, task_run_metrics_provider)
+    get_task_group_statistics_uc = GetTaskGroupStatisticsUC(task_group_repo, task_run_metrics_provider)
+    add_task_group_to_project_uc = AddTaskGroupToProjectUC(project_repo, task_group_repo, task_group_by_project_repo)
+    remove_task_group_from_project_uc = RemoveTaskGroupFromProjectUC(project_repo, task_group_repo,
+                                                                     task_group_by_project_repo)
+    get_all_task_group_by_project_detailed_uc = GetAllTaskGroupByProjectDetailedUC(project_repo, task_group_repo,
+                                                                                   task_group_by_project_repo, )
+    get_project_by_task_group_uc = GetProjectByTaskGroupUC(project_repo, task_group_repo, task_group_by_project_repo)
+    update_task_group_uc = UpdateTaskGroupUC(task_group_repo)
+    use_case_facade = UseCaseFacade(create_tasks_uc,
+                                    create_monitoring_algorithm_uc,
+                                    get_all_monitoring_algorithms_uc,
+                                    get_tasks_uc,
+                                    get_task_uc,
+                                    get_task_runs_uc,
+                                    get_task_progress_uc,
+                                    get_payloads_uc,
+                                    get_payload_uc,
+                                    update_payload_uc,
+                                    get_tasks_detailed_uc,
+                                    get_all_projects_uc,
+                                    create_project_uc,
+                                    get_project_task_groups_uc,
+                                    get_task_groups_without_project_uc,
+                                    add_task_group_to_project_uc,
+                                    remove_task_group_from_project_uc,
+                                    get_all_task_group_statistics_uc,
+                                    update_project_uc,
+                                    get_all_task_group_uc,
+                                    create_task_group_uc,
+                                    get_all_task_group_by_project_detailed_uc,
+                                    get_task_group_uc,
+                                    get_task_group_statistics_uc,
+                                    get_project_by_task_group_uc,
+                                    update_task_group_uc,
+                                    get_tasks_runs_uc, )
     set_use_case_facade(use_case_facade)
 
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,

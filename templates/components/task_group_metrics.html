@@ -1,0 +1,107 @@
+{# components/task_group_metrics.html #}
+{# Ожидается переменная: stats (dict или None) в текущем контексте #}
+
+{% if stats %}
+<div>
+<div class="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                          <rect x="2" y="8" width="3" height="6" />
+                          <rect x="6" y="5" width="3" height="9" />
+                          <rect x="10" y="2" width="3" height="12" />
+                        </svg>
+                        <h6 class="text-primary fw-semibold mb-0 small text-uppercase">Статистика выполнения</h6>
+</div>
+<div class="row g-3">
+    <!-- Общие показатели -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="p-3 bg-light rounded border h-100">
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Всего задач:</span>
+                <span class="fw-medium">{{ stats.total_count if stats.total_count is not none else '—' }}</span>
+            </div>
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Завершено:</span>
+                <span class="fw-medium">{{ stats.completed_count if stats.completed_count is not none else '—' }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Пропускная способность:</span>
+                <span class="fw-medium">{{ "%.3f"|format(stats.throughput) if stats.throughput is not none else '—' }} зад/сек</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Текущее состояние -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="p-3 bg-light rounded border h-100">
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">В очереди:</span>
+                <span>{{ stats.queued_count if stats.queued_count is not none else '—' }}</span>
+            </div>
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Ожидают:</span>
+                <span>{{ stats.waiting_count if stats.waiting_count is not none else '—' }}</span>
+            </div>
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Выполняются:</span>
+                <span>{{ stats.execution_count if stats.execution_count is not none else '—' }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Успешно:</span>
+                <span class="text-success fw-medium">{{ stats.succeed_count if stats.succeed_count is not none else '—' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Завершения с проблемами -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="p-3 bg-light rounded border h-100">
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Ошибки (фатальные):</span>
+                <span class="text-danger">{{ stats.error_count if stats.error_count is not none else '—' }}</span>
+            </div>
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Ошибки (повтор):</span>
+                <span class="text-warning">{{ stats.temp_error_count if stats.temp_error_count is not none else '—' }}</span>
+            </div>
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Прервано:</span>
+                <span>{{ stats.interrupted_count if stats.interrupted_count is not none else '—' }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Отменено:</span>
+                <span>{{ stats.cancelled_count if stats.cancelled_count is not none else '—' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Время и повторы -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="p-3 bg-light rounded border h-100">
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Период сбора:</span>
+                <span class="fw-medium">{{ stats.period_s if stats.period_s is not none else '—' }} сек</span>
+            </div>
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Ср. время в очереди:</span>
+                <span>{{ "%.1f"|format(stats.avg_queued_duration) if stats.avg_queued_duration is not none else '—' }} сек</span>
+            </div>
+            <div class="mb-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Ср. время выполнения:</span>
+                <span>{{ "%.1f"|format(stats.avg_execution_duration) if stats.avg_execution_duration is not none else '—' }} сек</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Ср. кол-во повторов:</span>
+                <span>{{ "%.2f"|format(stats.avg_retry_count) if stats.avg_retry_count is not none else '—' }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-4 text-muted bg-light rounded border">
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-bar-chart-line mb-2" viewBox="0 0 16 16">
+        <path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1V2z"/>
+    </svg>
+    <div class="small fw-medium">Метрик пока что нет</div>
+</div>
+</div>
+{% endif %}

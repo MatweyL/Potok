@@ -4,7 +4,7 @@ from hashlib import md5
 from typing import Optional, Dict
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, Field
 
 
 class PayloadPK(BaseModel):
@@ -18,8 +18,11 @@ class PayloadPK(BaseModel):
 
 
 class PayloadBody(BaseModel):
-    data: Optional[Dict] = None
-    checksum: UUID = None
+    data: Optional[Dict] = Field(default=None, description="Словарь, содержащий в себе нужные данные"
+                                                           " для выполнения задач")
+    checksum: UUID = Field(default=None, description="md5-хеш полезной нагрузки, взятый от поля data."
+                                                     " Позволяет избегать создания  разных полезных нагрузок"
+                                                     " с одинаковым полем data")
 
     @model_validator(mode='after')
     def set_checksum(self):

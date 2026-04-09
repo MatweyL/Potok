@@ -3,6 +3,7 @@ from typing import List, Union
 from pydantic import BaseModel, Field
 
 from service.domain.schemas.enums import MonitoringAlgorithmType
+from service.ports.common.json_schema_pretty_print import print_json_schema
 
 
 class MonitoringAlgorithmPK(BaseModel):

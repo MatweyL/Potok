@@ -1,5 +1,3 @@
-import json
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
@@ -8,7 +6,6 @@ from starlette.responses import HTMLResponse, Response, RedirectResponse
 from starlette.templating import Jinja2Templates
 
 from service.domain.schemas.enums import AppUserRole
-from service.domain.schemas.task_detailed import TaskDetailed
 from service.domain.use_cases.external.admin.activate_user import ActivateUserUCRq
 from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUCRq
 from service.domain.use_cases.external.auth.create_user import CreateUserUCRq
@@ -19,15 +16,19 @@ from service.domain.use_cases.external.create_tasks import CreateTasksUCRq
 from service.domain.use_cases.external.get_payload import GetPayloadUCRq
 from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq
 from service.domain.use_cases.external.get_task import GetTaskUCRq
+from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUCRq, \
+    GetTaskGroupStatisticsUCRq
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
 from service.domain.use_cases.external.project import CreateProjectUCRq, GetProjectTaskGroupsUCRq, \
-    RemoveTaskGroupFromProjectUCRq, AddTaskGroupToProjectUCRq
+    RemoveTaskGroupFromProjectUCRq, AddTaskGroupToProjectUCRq, UpdateProjectUCRq, GetProjectByTaskGroupUCRq
+from service.domain.use_cases.external.task_group import GetAllTaskGroupUCRq, GetTaskGroupUCRq, UpdateTaskGroupUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
+from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
-from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF
+from service.ports.outbound.repo.fields import PaginationQuery
 
 router = APIRouter(tags=["HTML Router"])
 
@@ -70,112 +71,6 @@ async def logout(request: Request, response: Response):
     redirect.delete_cookie("access_token")
     redirect.delete_cookie("refresh_token")
     return redirect
-
-
-@router.get("/tasks", response_class=HTMLResponse)
-async def tasks_page(request: Request):
-    rs = await request.app.state.use_case_facade.get_tasks_detailed(
-        GetTasksDetailedUCRq(pagination=PaginationQuery())
-    )
-    return templates.TemplateResponse(
-        request=request,
-        name="tasks.html",
-        context={"tasks": rs.tasks}
-    )
-
-
-# DataTables присылает: draw, start, length, order[0][column], order[0][dir], search[value]
-COLUMN_MAP = {
-    '0': 'id',
-    '1': 'group_name',
-    '2': 'status',
-    '3': 'priority',
-    '4': 'type',
-    '5': 'status_updated_at',
-}
-
-
-@router.get("/tasks/json")
-async def tasks_json(
-        request: Request,
-        draw: int = 1,
-        start: int = 0,
-        length: int = 25,
-        # DataTables передаёт order и search через QueryString
-):
-    params = dict(request.query_params)
-
-    order_col = params.get('order[0][column]', '0')
-    order_dir = params.get('order[0][dir]', 'desc')
-    search_val = params.get('search[value]', '').strip()
-
-    order_by = COLUMN_MAP.get(order_col, 'id')
-    asc_sort = order_dir == 'asc'
-    offset_page = start // length
-
-    # TODO: Фильтрация по поиску — ищем по group_name
-    filter_dnf = FilterFieldsDNF.empty()
-
-    pagination = PaginationQuery(
-        offset_page=offset_page,
-        limit_per_page=length,
-        order_by=order_by,
-        asc_sort=asc_sort,
-        filter_fields_dnf=filter_dnf,
-    )
-
-    rs = await request.app.state.use_case_facade.get_tasks_detailed(
-        GetTasksDetailedUCRq(pagination=pagination)
-    )
-
-    # DataTables ожидает recordsTotal и recordsFiltered
-    # нужен total count — добавь в GetTasksDetailedUCRs поле total: int
-    return {
-        "draw": draw,
-        "recordsTotal": rs.total,
-        "recordsFiltered": rs.total,
-        "data": [format_task_row(item) for item in rs.tasks],
-    }
-
-
-def format_task_row(item: TaskDetailed) -> dict:
-    task = item.task
-    algo = item.monitoring_algorithm
-    payload = item.payload
-
-    algo_html = '—'
-    if algo:
-        algo_html = f'<code class="text-muted small">#{algo.id}</code> {algo.type.title()}'
-        if hasattr(algo, 'timeout'):
-            noise = f' ± {algo.timeout_noize}с' if algo.timeout_noize else ''
-            algo_html += f'<div class="text-muted small">{algo.timeout}с{noise}</div>'
-
-    payload_html = '—'
-    if payload and payload.data:
-        payload_html = f'<code class="small">{json.dumps(payload.data, ensure_ascii=False)}</code>'
-
-    status_classes = {
-        'NEW': 'e0e7ff" style="color:#4338ca',
-        'EXECUTION': 'fef3c7" style="color:#b45309',
-        'SUCCEED': 'dcfce7" style="color:#15803d',
-        'FINISHED': 'f1f5f9" style="color:#64748b',
-        'CANCELLED': 'fee2e2" style="color:#b91c1c',
-        'ERROR': 'fee2e2" style="color:#991b1b',
-    }
-    bg = status_classes.get(task.status.value, 'f1f5f9" style="color:#64748b')
-    status_html = f'<span style="background:#{bg};font-size:.75rem;font-weight:500;padding:.2rem .6rem;border-radius:20px">{task.status.value.title()}</span>'
-
-    return {
-        "DT_RowAttr": {"data-href": f"/tasks/{task.id}", "style": "cursor:pointer"},
-        "id": f'<span class="text-muted font-monospace">#{task.id}</span>',
-        "group_id": task.group_id,
-        "status": status_html,
-        "priority": task.priority.value.title(),
-        "type": f'<code>{task.type.value}</code>',
-        "algorithm": algo_html,
-        "payload": payload_html,
-        "updated_at": task.status_updated_at.strftime('%d.%m.%Y %H:%M'),
-    }
 
 
 @router.get("/monitoring-algorithms/json")
@@ -344,8 +239,97 @@ async def add_task_group_to_project(request: Request, rq: AddTaskGroupToProjectU
     return rs
 
 
-
 @router.post("/projects/task-group/unbind")
 async def remove_task_group_from_project(request: Request, rq: RemoveTaskGroupFromProjectUCRq):
     rs = await request.app.state.use_case_facade.remove_task_group_from_project(rq)
     return rs
+
+
+@router.get("/projects/{project_id}")
+async def project_page(request: Request, project_id: int):
+    all_task_group_statistics_rs = await request.app.state.use_case_facade.get_all_task_group_statistics(
+        GetAllTaskGroupStatisticsUCRq())
+    project_task_groups_rs = await request.app.state.use_case_facade.get_project_task_groups(
+        GetProjectTaskGroupsUCRq(project_id=project_id))
+    return templates.TemplateResponse(
+        request=request, name="project.html",
+        context={"task_groups": project_task_groups_rs.task_groups,
+                 "project": project_task_groups_rs.project,
+                 "task_group_statistics_by_name": all_task_group_statistics_rs.task_group_statistics_by_name}
+    )
+
+
+@router.put("/projects/{project_id}")
+async def update_project(request: Request, project_id: int, rq: UpdateProjectUCRq):
+    if project_id != rq.project_id:
+        raise HTTPException(status_code=400, detail="project_id must be equals in get params and body")
+    rs = await request.app.state.use_case_facade.update_project(rq)
+    return rs
+
+
+@router.get("/task-groups")
+async def task_groups_page(request: Request):
+    all_task_group_statistics_rs = await request.app.state.use_case_facade.get_all_task_group_statistics(
+        GetAllTaskGroupStatisticsUCRq())
+    task_groups_rs = await request.app.state.use_case_facade.get_all_task_group(GetAllTaskGroupUCRq())
+    all_task_group_by_project_detailed_rs = await request.app.state.use_case_facade.get_all_task_group_by_project_detailed()
+
+    return templates.TemplateResponse(
+        request=request, name="task_groups.html",
+        context={"task_groups": task_groups_rs.task_groups,
+                 "task_group_statistics_by_name": all_task_group_statistics_rs.task_group_statistics_by_name,
+                 "project_by_task_group_name": all_task_group_by_project_detailed_rs.project_by_task_group_name, }
+    )
+
+
+@router.get("/task-groups/{task_group_id}")
+async def task_group_page(request: Request, task_group_id: int):
+    task_group_rs = await request.app.state.use_case_facade.get_task_group(
+        GetTaskGroupUCRq(task_group_id=task_group_id))
+    task_group_statistics_rs = await request.app.state.use_case_facade.get_task_group_statistics(
+        GetTaskGroupStatisticsUCRq(task_group_id=task_group_id))
+    project_rs = await request.app.state.use_case_facade.get_project_by_task_group_uc(
+        GetProjectByTaskGroupUCRq(task_group_id=task_group_id))
+    return templates.TemplateResponse(
+        request=request, name="task_group.html",
+        context={
+            "task_group": task_group_rs.task_group,
+            "task_group_statistics": task_group_statistics_rs.task_group_statistics,
+            "project": project_rs.project,
+        }
+    )
+
+
+@router.put("/task-groups/{task_group_id}")
+async def update_group(request: Request,task_group_id: int, rq: UpdateTaskGroupUCRq):
+    update_rs = await request.app.state.use_case_facade.update_task_group(rq)
+    return update_rs
+
+
+@router.get("/tasks/")
+async def tasks_json(
+        request: Request,
+        draw: int = 1,
+        offset: int = 0,
+        limit: int = 25,
+        order_by: str = 'id',
+        asc_sort: bool = False
+):
+
+    pagination = PaginationQuery(
+        offset_page=offset,
+        limit_per_page=limit,
+        order_by=order_by,
+        asc_sort=asc_sort,
+    )
+
+    rs = await request.app.state.use_case_facade.get_tasks_detailed(
+        GetTasksDetailedUCRq(pagination=pagination)
+    )
+
+    return {
+        "draw": int(draw),
+        "recordsTotal": rs.total,
+        "recordsFiltered": rs.total,
+        "data": [item.model_dump() for item in rs.tasks],
+    }
