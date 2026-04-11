@@ -1,0 +1,29 @@
+{% macro render_monitoring_algorithm(algo) %}
+  {% if algo %}
+    <a href="/monitoring-algorithms/{{ algo.id }}" class="text-decoration-none">
+        <div class="d-flex align-items-center flex-wrap gap-1">
+            {% if algo.type == 'PERIODIC' or algo.type.value == 'PERIODIC' %}
+            <span class="badge bg-primary">PERIODIC</span>
+            <span class="small text-dark fw-semibold">{{ algo.timeout }}</span>
+            <span class="text-muted small">±</span>
+            <span class="small text-dark fw-semibold">{{ algo.timeout_noize | default(0) }}</span>
+            {% elif algo.type == 'SINGLE' or algo.type.value == 'SINGLE' %}
+            <span class="badge bg-info">SINGLE</span>
+            {% if algo.timeouts and algo.timeouts | length > 0 %}
+                {% for t in algo.timeouts %}
+                <span class="badge bg-secondary">{{ t }}</span>
+                {% endfor %}
+            {% else %}
+            <span class="badge bg-warning text-dark">мгновенно</span>
+            {% endif %}
+            <span class="text-muted small">±</span>
+            <span class="small text-dark fw-semibold">{{ algo.timeout_noize | default(0) }}</span>
+            {% else %}
+            <span class="text-muted small">{{ algo.type }}</span>
+            {% endif %}
+        </div>
+    </a>
+    {% else %}
+    <span class="text-muted">—</span>
+  {% endif %}
+{% endmacro %}

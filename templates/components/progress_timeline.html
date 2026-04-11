@@ -1,0 +1,53 @@
+{% macro render_timeline(task_progress) %}
+  <!-- Подключаем CSS автоматически при использовании макроса -->
+
+  <div class="timeline-container">
+    <div class="timeline-line"></div>
+
+    {% for p in task_progress|sort(attribute="right_bound_at") %}
+      {% set is_done = p.collected_data_amount > 0 or p.saved_data_amount > 0 %}
+      {% set progress_percent = ((p.saved_data_amount / p.collected_data_amount) * 100) if p.collected_data_amount > 0 else 0 %}
+
+      <div class="timeline-item {% if is_done %}timeline-item--done{% else %}timeline-item--pending{% endif %}">
+        
+        <div class="timeline-dot">
+          {% if is_done %}
+            <i class="bi bi-check-circle-fill"></i>
+          {% else %}
+            <i class="bi bi-clock"></i>
+          {% endif %}
+        </div>
+
+        <div class="timeline-content">
+          <div class="timeline-date">
+            {{ p.right_bound_at.strftime('%d.%m.%Y') }}
+            <span class="timeline-time">{{ p.right_bound_at.strftime('%H:%M') }}</span>
+          </div>
+
+          {% if is_done %}
+            <div class="progress-info">
+              <div class="d-flex justify-content-between small mb-1">
+                <span>Собрано</span>
+                <span class="fw-semibold">{{ p.collected_data_amount }}</span>
+              </div>
+              <div class="progress" style="height: 6px;">
+                <div class="progress-bar bg-success" 
+                     role="progressbar" 
+                     style="width: {{ progress_percent }}%" 
+                     aria-valuenow="{{ progress_percent }}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100"></div>
+              </div>
+              <div class="d-flex justify-content-between small mt-1">
+                <span class="text-muted">Сохранено</span>
+                <span class="fw-semibold text-success">{{ p.saved_data_amount }}</span>
+              </div>
+            </div>
+          {% else %}
+            <div class="text-muted small fst-italic">Нет данных</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endmacro %}

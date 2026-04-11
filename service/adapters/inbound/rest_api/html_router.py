@@ -17,11 +17,10 @@ from service.domain.use_cases.external.auth.reset_password import ResetPasswordU
 from service.domain.use_cases.external.create_tasks import CreateTasksUCRq
 from service.domain.use_cases.external.get_payload import GetPayloadUCRq
 from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq
-from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUCRq
+from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUCRq, GetTaskDetailedUCRs
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUCRq, \
     GetTaskGroupStatisticsUCRq
-from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
-from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
+from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq, GetTaskRunsUCRs
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq, \
     GetMonitoringAlgorithmUCRq
@@ -29,6 +28,8 @@ from service.domain.use_cases.external.project import CreateProjectUCRq, GetProj
     RemoveTaskGroupFromProjectUCRq, AddTaskGroupToProjectUCRq, UpdateProjectUCRq, GetProjectByTaskGroupUCRq
 from service.domain.use_cases.external.task_group import GetAllTaskGroupUCRq, GetTaskGroupUCRq, UpdateTaskGroupUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
+from service.domain.use_cases.external.update_task import UpdateTaskUCRq
+from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
 from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF, ConditionOperation
 
@@ -90,35 +91,6 @@ def task_create_page(request: Request):
 async def create_tasks(request: Request, rq: CreateTasksUCRq):
     rs = await request.app.state.use_case_facade.create_tasks(rq)
     return rs
-
-
-@router.get("/tasks/{task_id}", response_class=HTMLResponse)
-async def task_detail_page(request: Request, task_id: int, task_run_status: Optional[TaskRunStatus] = None):
-    task_rs = await request.app.state.use_case_facade.get_task(GetTaskDetailedUCRq(task_id=task_id))
-    if not task_rs.success:
-        raise HTTPException(status_code=404)
-
-    payload_rs = await request.app.state.use_case_facade.get_payload(
-        GetPayloadUCRq(payload_id=task_rs.task.payload_id)
-    )
-    progress_rs = await request.app.state.use_case_facade.get_task_progress(
-        GetTaskProgressUCRq(task_id=task_id)
-    )
-    runs_rs = await request.app.state.use_case_facade.get_task_runs(
-        GetTaskRunsUCRq(task_id=task_id,
-                        task_run_status=task_run_status)
-    )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="task_detail.html",
-        context={
-            "task": task_rs.task,
-            "payload": payload_rs.payload,
-            "task_progress": progress_rs.task_progress,
-            "task_runs": runs_rs.task_runs,
-        }
-    )
 
 
 @router.patch("/payloads/{payload_id}")
@@ -282,6 +254,7 @@ async def task_groups_json(request: Request):
     rs = await request.app.state.use_case_facade.get_all_task_group(GetAllTaskGroupUCRq())
     return rs
 
+
 @router.get("/task-groups/{task_group_id}")
 async def task_group_page(request: Request, task_group_id: int):
     task_group_rs = await request.app.state.use_case_facade.get_task_group(
@@ -384,7 +357,7 @@ async def payloads_json(request: Request,
 @router.get("/payloads/{payload_id}", response_class=HTMLResponse)
 async def payload_page(request: Request, payload_id: int):
     rs = await request.app.state.use_case_facade.get_payload(
-        GetPayloadUCRq(payload_id=payload_id,)
+        GetPayloadUCRq(payload_id=payload_id, )
     )
     return templates.TemplateResponse(
         request=request, name="payload.html",
@@ -394,3 +367,64 @@ async def payload_page(request: Request, payload_id: int):
         }
     )
 
+
+@router.get("/tasks/{task_id}", response_class=HTMLResponse)
+async def task_detailed_page(request: Request, task_id: int, task_run_status: Optional[str] = None):
+    task_detailed_rs: GetTaskDetailedUCRs = await request.app.state.use_case_facade.get_task_detailed(
+        GetTaskDetailedUCRq(task_id=task_id))
+    if not task_detailed_rs.success:
+        raise HTTPException(status_code=404, detail=task_detailed_rs.error)
+    task_detailed = task_detailed_rs.task_detailed
+    return templates.TemplateResponse(
+        request=request,
+        name="task_detailed.html",
+        context={
+            "task": task_detailed.task,
+            "task_group": task_detailed.task_group,
+            "monitoring_algorithm": task_detailed.monitoring_algorithm,
+            "payload": task_detailed.payload,
+            "progress": task_detailed.progress,
+            "runs_status_metrics": task_detailed.runs_status_metrics,
+            "task_run_status": task_run_status
+        }
+    )
+
+
+@router.patch("/tasks/{task_id}", )
+async def update_task(request: Request, task_id: int, rq: UpdateTaskUCRq):
+    rs: GetTaskDetailedUCRs = await request.app.state.use_case_facade.update_task(rq)
+    return rs
+
+
+@router.get("/task-runs/")
+async def task_runs_json(request: Request,
+                      task_id: int,
+                      draw: int = 1,
+                      offset: int = 0,
+                      limit: int = 25,
+                      order_by: str = 'id',
+                      asc_sort: bool = False,
+                      task_run_status: Optional[str] = None
+                      ):
+    if task_run_status:
+        # Если указать TaskRunStatus в запросе, он некорректно конвертируется: сначала преобразуется в перечисление,
+        # а затем опять в строку: WAITING (str) -> TaskRunStatus.WAITING (enum) -> TaskRunStatus.WAITING(str)
+        try:
+            task_run_status = TaskRunStatus(task_run_status[task_run_status.find('.') + 1:])
+        except ValueError as e:
+            logger.exception(e)
+            raise HTTPException(status_code=400, detail=f'unknown status: {task_run_status}')
+    pagination = PaginationQuery(offset_page=offset,
+                                 limit_per_page=limit,
+                                 order_by=order_by,
+                                 asc_sort=asc_sort
+                                 )
+    rs: GetTaskRunsUCRs = await request.app.state.use_case_facade.get_task_runs(GetTaskRunsUCRq(task_id=task_id,
+                                                                                                pagination=pagination,
+                                                                                                task_run_status=task_run_status))
+    return {
+        "draw": int(draw),
+        "recordsTotal": rs.total,
+        "recordsFiltered": rs.total,
+        "data": [task_run.model_dump() for task_run in rs.task_runs],
+    }

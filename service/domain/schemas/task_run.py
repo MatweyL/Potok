@@ -1,6 +1,6 @@
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, Union
 
 from pydantic import BaseModel
 
@@ -68,7 +68,8 @@ class TaskRunTimeIntervalProgressPK(BaseModel):
     right_bound_at: datetime
 
     def __eq__(self, other):
-        return isinstance(other, TaskRunTimeIntervalProgressPK) and self.task_run_id == other.task_run_id and self.right_bound_at == other.right_bound_at
+        return isinstance(other,
+                          TaskRunTimeIntervalProgressPK) and self.task_run_id == other.task_run_id and self.right_bound_at == other.right_bound_at
 
     def __hash__(self):
         return hash((self.task_run_id, self.right_bound_at))
@@ -79,3 +80,5 @@ class TaskRunTimeIntervalProgress(TaskRunTimeIntervalProgressPK):
     collected_data_amount: int
     saved_data_amount: int
 
+
+TaskRunProgress = Union[TaskRunTimeIntervalProgress]

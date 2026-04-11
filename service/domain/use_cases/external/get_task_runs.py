@@ -20,6 +20,7 @@ class GetTaskRunsUCRs(UCResponse):
     request: GetTaskRunsUCRq
     task: Optional[Task] = None
     task_runs: List[TaskRun] = Field(default_factory=list)
+    total: int = 0
 
 
 class GetTaskRunsUC(UseCase):
@@ -43,7 +44,8 @@ class GetTaskRunsUC(UseCase):
             task_runs = await self._task_runs_repo.paginated(pagination)
         else:
             task_runs = await self._task_runs_repo.filter(filter_fields_dnf)
-        return GetTaskRunsUCRs(success=True, request=request, task=task, task_runs=task_runs)
+        total = await self._task_runs_repo.count_by_fields(filter_fields_dnf)
+        return GetTaskRunsUCRs(success=True, request=request, task=task, task_runs=task_runs, total=total)
 
 
 class GetTasksRunsUCRq(UCRequest):
@@ -56,7 +58,7 @@ class GetTasksRunsUCRs(UCResponse):
     task_runs_by_task_id: Dict[int, List[TaskRun]]
 
 
-class GetTasksRunsUC(UseCase):
+class GetTasksRunsUC(UseCase):  # FIXME: add group by task and start using in get tasks detailed uc
 
     def __init__(self,
                  task_runs_repo: Repo[TaskRun, TaskRun, TaskRunPK]):

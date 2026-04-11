@@ -1,0 +1,67 @@
+{% macro render_task_runs_status_metrics(run_stats, task) %}
+    {% if run_stats %}
+        {% set status_order = ['execution', 'queued', 'waiting', 'temp_error', 'interrupted', 'error', 'succeed', 'cancelled'] %}
+
+        <div class="d-flex flex-wrap align-items-center justify-content-center" style="gap: 4px 8px;">
+            {% set run_stats = run_stats.model_dump() %}
+            {% for status in status_order %}
+                {% if status in run_stats %}
+                    {% set count = run_stats[status] %}
+
+                    {% if count > 0 or status == 'execution' %}
+                        {# Определяем цвета и подпись #}
+                        {% if status == 'succeed' %}
+                            {% set bg = '#28a745' %}
+                            {% set text = '#fff' %}
+                            {% set label = 'Успешно' %}
+                        {% elif status == 'error' %}
+                            {% set bg = '#dc3545' %}
+                            {% set text = '#fff' %}
+                            {% set label = 'Ошибка' %}
+                        {% elif status == 'execution' %}
+                            {% set bg = '#007bff' %}
+                            {% set text = '#fff' %}
+                            {% set label = 'Выполняется' %}
+                        {% elif status == 'temp_error' %}
+                            {% set bg = '#fd7e14' %}
+                            {% set text = '#fff' %}
+                            {% set label = 'Врем. ошибка' %}
+                        {% elif status == 'interrupted' %}
+                            {% set bg = '#6f42c1' %}
+                            {% set text = '#fff' %}
+                            {% set label = 'Прервано' %}
+                        {% elif status == 'cancelled' %}
+                            {% set bg = '#6c757d' %}
+                            {% set text = '#fff' %}
+                            {% set label = 'Отменено' %}
+                        {% elif status == 'waiting' %}
+                            {% set bg = '#e9ecef' %}
+                            {% set text = '#6c757d' %}
+                            {% set label = 'Ожидает' %}
+                        {% elif status == 'queued' %}
+                            {% set bg = '#adb5bd' %}
+                            {% set text = '#fff' %}
+                            {% set label = 'В очереди' %}
+                        {% else %}
+                            {% set bg = '#e9ecef' %}
+                            {% set text = '#6c757d' %}
+                            {% set label = status %}
+                        {% endif %}
+
+                        <a href="/tasks/{{ task.id }}/?task_run_status={{ status | upper }}"
+                           class="d-inline-flex align-items-center justify-content-center rounded-circle text-decoration-none"
+                           style="width: 28px; height: 28px; font-size: 12px; font-weight: 600;
+                                  background-color: {{ bg }}; color: {{ text }};
+                                  border: 2px solid {{ bg }}; flex-shrink: 0;"
+                           title="{{ label }}: {{ count }} запусков">
+                            {{ count }}
+                        </a>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        </div>
+
+    {% else %}
+        <span class="text-muted small">—</span>
+    {% endif %}
+{% endmacro %}

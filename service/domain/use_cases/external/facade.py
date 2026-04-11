@@ -7,6 +7,10 @@ from service.domain.use_cases.external.get_task_group_statistics import GetAllTa
     GetTaskGroupStatisticsUCRs
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRs, GetTaskProgressUCRq, \
     GetTaskProgressUC
+from service.domain.use_cases.external.get_task_run_detailed import GetTaskRunDetailedUC, GetTaskRunDetailedUCRq, \
+    GetTaskRunDetailedUCRs
+from service.domain.use_cases.external.get_task_run_status_logs import GetTaskRunStatusLogsUC, GetTaskRunStatusLogsUCRq, \
+    GetTaskRunStatusLogsUCRs
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRs, GetTaskRunsUCRq, GetTaskRunsUC, \
     GetTasksRunsUC, GetTasksRunsUCRq, GetTasksRunsUCRs
 from service.domain.use_cases.external.get_tasks import GetTasksUC, GetTasksUCRq, GetTasksUCRs
@@ -27,6 +31,7 @@ from service.domain.use_cases.external.task_group import GetAllTaskGroupUC, GetA
     CreateTaskGroupUCRq, CreateTaskGroupUCRs, CreateTaskGroupUC, GetTaskGroupUCRq, GetTaskGroupUCRs, GetTaskGroupUC, \
     UpdateTaskGroupUCRq, UpdateTaskGroupUC, UpdateTaskGroupUCRs
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq, UpdatePayloadUCRs, UpdatePayloadUC
+from service.domain.use_cases.external.update_task import UpdateTaskUC, UpdateTaskUCRq, UpdateTaskUCRs
 
 
 class UseCaseFacade:
@@ -59,6 +64,9 @@ class UseCaseFacade:
                  update_task_group_uc: UpdateTaskGroupUC,
                  get_tasks_runs_uc: GetTasksRunsUC,
                  get_monitoring_algorithm_uc: GetMonitoringAlgorithmUC,
+                 get_task_run_status_logs_uc: GetTaskRunStatusLogsUC,
+                 get_task_run_detailed_uc: GetTaskRunDetailedUC,
+                 update_task_uc: UpdateTaskUC,
                  ):
         self._create_tasks_uc = create_tasks_uc
         self._create_monitoring_algorithm_uc = create_monitoring_algorithm_uc
@@ -88,6 +96,9 @@ class UseCaseFacade:
         self._update_task_group_uc = update_task_group_uc
         self._get_tasks_runs_uc = get_tasks_runs_uc
         self._get_monitoring_algorithm_uc = get_monitoring_algorithm_uc
+        self._get_task_run_status_logs_uc = get_task_run_status_logs_uc
+        self._get_task_run_detailed_uc = get_task_run_detailed_uc
+        self._update_task_uc = update_task_uc
 
     async def create_tasks(self, request: CreateTasksUCRq) -> CreateTasksUCRs:
         return await self._create_tasks_uc.apply(request)
@@ -175,3 +186,12 @@ class UseCaseFacade:
 
     async def get_monitoring_algorithm(self, request: GetMonitoringAlgorithmUCRq) -> GetMonitoringAlgorithmUCRs:
         return await self._get_monitoring_algorithm_uc.apply(request)
+
+    async def get_task_run_status_logs(self, request: GetTaskRunStatusLogsUCRq) -> GetTaskRunStatusLogsUCRs:
+        return await self._get_task_run_status_logs_uc.apply(request)
+
+    async def get_task_run_detailed(self, request: GetTaskRunDetailedUCRq) -> GetTaskRunDetailedUCRs:
+        return await self._get_task_run_detailed_uc.apply(request)
+
+    async def update_task(self, request: UpdateTaskUCRq) -> UpdateTaskUCRs:
+        return await self._update_task_uc.apply(request)

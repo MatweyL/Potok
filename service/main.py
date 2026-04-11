@@ -59,6 +59,8 @@ from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedU
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUC, \
     GetTaskGroupStatisticsUC
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUC
+from service.domain.use_cases.external.get_task_run_detailed import GetTaskRunDetailedUC
+from service.domain.use_cases.external.get_task_run_status_logs import GetTaskRunStatusLogsUC
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUC, GetTasksRunsUC
 from service.domain.use_cases.external.get_tasks import GetTasksUC
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC
@@ -70,6 +72,7 @@ from service.domain.use_cases.external.project import GetAllProjectsUC, CreatePr
 from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetAllTaskGroupUC, CreateTaskGroupUC, \
     UpdateTaskGroupUC
 from service.domain.use_cases.external.update_payload import UpdatePayloadUC
+from service.domain.use_cases.external.update_task import UpdateTaskUC
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC, CreateTaskRunsUCRq
 from service.domain.use_cases.internal.receive_task_run_execution_status import ReceiveTaskRunExecutionStatusUC, \
     ReceiveTaskRunExecutionStatusUCRq
@@ -149,7 +152,7 @@ async def main():
                                                       task_run_metrics_provider, 10, 500,
                                                       50, 0.5,
                                                       600)
-    # USE CASE
+    # USE CASE: external
     create_monitoring_algorithm_uc = CreateMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                                  periodic_monitoring_algorithm_repo,
                                                                  single_monitoring_algorithm_repo,
@@ -163,9 +166,12 @@ async def main():
     get_task_progress_uc = GetTaskProgressUC(task_repo, time_interval_task_progress_repo)
     get_payloads_uc = GetPayloadsUC(payload_repo)
     update_payload_uc = UpdatePayloadUC(payload_repo)
+    update_task_uc = UpdateTaskUC(task_repo)
     get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                            periodic_monitoring_algorithm_repo,
                                                            single_monitoring_algorithm_repo, transaction_factory)
+    get_task_run_status_logs_uc = GetTaskRunStatusLogsUC(task_run_status_log_repo)
+    get_task_run_detailed_uc = GetTaskRunDetailedUC(task_run_repo, task_run_time_interval_progress_repo)
 
     create_task_group_uc = CreateTaskGroupUC(task_group_repo)
     get_task_group_uc = GetTaskGroupUC(task_group_repo)
@@ -220,9 +226,13 @@ async def main():
                                     get_project_by_task_group_uc,
                                     update_task_group_uc,
                                     get_tasks_runs_uc,
-                                    get_monitoring_algorithm_uc, )
+                                    get_monitoring_algorithm_uc,
+                                    get_task_run_status_logs_uc,
+                                    get_task_run_detailed_uc,
+                                    update_task_uc,)
     set_use_case_facade(use_case_facade)
 
+    # USE CASE: internal
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,
                                            task_run_time_interval_execution_bounds_repo,
                                            transaction_factory, task_to_execute_provider_registry,
@@ -297,11 +307,11 @@ async def main():
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [
-        rmq_producer_connection,
-        rmq_producer,
-        rmq_consumer_connection,
-        rmq_consumer,
-        rmq_task_run_execution_status_consumer,
+        # rmq_producer_connection,
+        # rmq_producer,
+        # rmq_consumer_connection,
+        # rmq_consumer,
+        # rmq_task_run_execution_status_consumer,
 
     ]
     periodic_runners = [

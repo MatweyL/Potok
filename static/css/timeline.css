@@ -1,0 +1,88 @@
+/* Timeline Component Styles */
+.timeline-container {
+  position: relative;
+  padding: 20px 0;
+  max-width: 100%;
+}
+
+.timeline-line {
+  position: absolute;
+  top: 28px;
+  left: 19px;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, #e9ecef, #dee2e6);
+  border-radius: 2px;
+  z-index: 1;
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  margin-bottom: 28px;
+  z-index: 2;
+}
+
+.timeline-item:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-dot {
+  width: 42px;
+  height: 42px;
+  background: #fff;
+  border: 3px solid #6c757d;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.timeline-item--done .timeline-dot {
+  border-color: #198754;
+  background: #198754;
+  color: white;
+}
+
+.timeline-content {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 14px 18px;
+  flex: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+}
+
+.timeline-item--done .timeline-content {
+  border-color: #d1e7dd;
+  background: #f8fff9;
+}
+
+.timeline-date {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+}
+
+.timeline-time {
+  font-weight: 400;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.timeline-item--pending .timeline-content {
+  background: #f8f9fa;
+  border-color: #dee2e6;
+}
+
+/* Дополнительно: чтобы Bootstrap tooltip лучше выглядел */
+.timeline-content .progress {
+  height: 6px;
+}

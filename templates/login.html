@@ -98,7 +98,7 @@
 
             if (data.success) {
                 window.__accessToken = data.access_token;
-                window.location.href = '/tasks';
+                window.location.href = '/projects';
             } else {
                 errorMsg.textContent = data.error || 'Неверный логин или пароль';
                 errorMsg.classList.remove('d-none');

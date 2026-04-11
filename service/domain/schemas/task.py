@@ -20,13 +20,13 @@ class TaskConfiguration(BaseModel):
     group_id: int = Field(description="Идентификатор группы")
     priority: PriorityType = Field(default=PriorityType.MEDIUM, description="Приоритет источника")
     type: TaskType = Field(default=TaskType.UNDEFINED, description="Тип задачи, определяющий способ учета прогресса")
-    monitoring_algorithm_id: int= Field(description="Идентификатор алгоритма мониторинга")
+    monitoring_algorithm_id: int = Field(description="Идентификатор алгоритма мониторинга")
     execution_arguments: Optional[Dict[str, Any]] = Field(default=None, description="Идентификатор группы")
 
 
 class Task(TaskPK, TaskConfiguration):
-    status: TaskStatus= Field(description="Статус выполнения задачи")
-    status_updated_at: datetime= Field(description="Время обновления статуса")
+    status: TaskStatus = Field(description="Статус выполнения задачи")
+    status_updated_at: datetime = Field(description="Время обновления статуса")
     payload_id: int = Field(description="Идентификатор полезной нагрузки задачи")
     loaded_at: Optional[datetime] = Field(default=None, description="Дата загрузки задачи в хранилище")
 
