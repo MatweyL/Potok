@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
@@ -5,7 +7,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response, RedirectResponse
 from starlette.templating import Jinja2Templates
 
-from service.domain.schemas.enums import AppUserRole
+from service.domain.schemas.enums import AppUserRole, TaskRunStatus
 from service.domain.use_cases.external.admin.activate_user import ActivateUserUCRq
 from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUCRq
 from service.domain.use_cases.external.auth.create_user import CreateUserUCRq
@@ -15,20 +17,20 @@ from service.domain.use_cases.external.auth.reset_password import ResetPasswordU
 from service.domain.use_cases.external.create_tasks import CreateTasksUCRq
 from service.domain.use_cases.external.get_payload import GetPayloadUCRq
 from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq
-from service.domain.use_cases.external.get_task import GetTaskUCRq
+from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUCRq
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUCRq, \
     GetTaskGroupStatisticsUCRq
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
-from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
+from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq, \
+    GetMonitoringAlgorithmUCRq
 from service.domain.use_cases.external.project import CreateProjectUCRq, GetProjectTaskGroupsUCRq, \
     RemoveTaskGroupFromProjectUCRq, AddTaskGroupToProjectUCRq, UpdateProjectUCRq, GetProjectByTaskGroupUCRq
 from service.domain.use_cases.external.task_group import GetAllTaskGroupUCRq, GetTaskGroupUCRq, UpdateTaskGroupUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
-from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
-from service.ports.outbound.repo.fields import PaginationQuery
+from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF, ConditionOperation
 
 router = APIRouter(tags=["HTML Router"])
 
@@ -91,8 +93,8 @@ async def create_tasks(request: Request, rq: CreateTasksUCRq):
 
 
 @router.get("/tasks/{task_id}", response_class=HTMLResponse)
-async def task_detail_page(request: Request, task_id: int):
-    task_rs = await request.app.state.use_case_facade.get_task(GetTaskUCRq(task_id=task_id))
+async def task_detail_page(request: Request, task_id: int, task_run_status: Optional[TaskRunStatus] = None):
+    task_rs = await request.app.state.use_case_facade.get_task(GetTaskDetailedUCRq(task_id=task_id))
     if not task_rs.success:
         raise HTTPException(status_code=404)
 
@@ -103,7 +105,8 @@ async def task_detail_page(request: Request, task_id: int):
         GetTaskProgressUCRq(task_id=task_id)
     )
     runs_rs = await request.app.state.use_case_facade.get_task_runs(
-        GetTaskRunsUCRq(task_id=task_id)
+        GetTaskRunsUCRq(task_id=task_id,
+                        task_run_status=task_run_status)
     )
 
     return templates.TemplateResponse(
@@ -118,21 +121,13 @@ async def task_detail_page(request: Request, task_id: int):
     )
 
 
-@router.get("/payloads", response_class=HTMLResponse)
-async def payloads_page(request: Request):
-    rs = await request.app.state.use_case_facade.get_payloads(
-        GetPayloadsUCRq(pagination=PaginationQuery())
-    )
-    return templates.TemplateResponse(
-        request=request, name="payloads.html",
-        context={"payloads": rs.payloads}
-    )
-
-
 @router.patch("/payloads/{payload_id}")
 async def update_payload(request: Request, payload_id: int, rq: UpdatePayloadUCRq):
     rs = await request.app.state.use_case_facade.update_payload(rq)
     return rs
+
+
+# -- КОД ВЫШЕ ПОДЛЕЖИТ РЕФАКТОРИНГУ --
 
 
 @router.get("/users", response_class=HTMLResponse)
@@ -282,6 +277,11 @@ async def task_groups_page(request: Request):
     )
 
 
+@router.get("/task-groups/json")
+async def task_groups_json(request: Request):
+    rs = await request.app.state.use_case_facade.get_all_task_group(GetAllTaskGroupUCRq())
+    return rs
+
 @router.get("/task-groups/{task_group_id}")
 async def task_group_page(request: Request, task_group_id: int):
     task_group_rs = await request.app.state.use_case_facade.get_task_group(
@@ -301,7 +301,7 @@ async def task_group_page(request: Request, task_group_id: int):
 
 
 @router.put("/task-groups/{task_group_id}")
-async def update_group(request: Request,task_group_id: int, rq: UpdateTaskGroupUCRq):
+async def update_group(request: Request, task_group_id: int, rq: UpdateTaskGroupUCRq):
     update_rs = await request.app.state.use_case_facade.update_task_group(rq)
     return update_rs
 
@@ -309,13 +309,13 @@ async def update_group(request: Request,task_group_id: int, rq: UpdateTaskGroupU
 @router.get("/tasks/")
 async def tasks_json(
         request: Request,
+        group_id: Optional[int] = None,
         draw: int = 1,
         offset: int = 0,
         limit: int = 25,
         order_by: str = 'id',
         asc_sort: bool = False
 ):
-
     pagination = PaginationQuery(
         offset_page=offset,
         limit_per_page=limit,
@@ -324,12 +324,73 @@ async def tasks_json(
     )
 
     rs = await request.app.state.use_case_facade.get_tasks_detailed(
-        GetTasksDetailedUCRq(pagination=pagination)
+        GetTasksDetailedUCRq(pagination=pagination, task_group_id=group_id)
     )
 
     return {
         "draw": int(draw),
         "recordsTotal": rs.total,
-        "recordsFiltered": rs.total,
+        "recordsFiltered": rs.total,  # TODO: заменить на total_filtered
         "data": [item.model_dump() for item in rs.tasks],
     }
+
+
+@router.get("/monitoring-algorithms/{monitoring_algorithm_id}")
+async def monitoring_algorithm_page(request: Request, monitoring_algorithm_id: int):
+    monitoring_algorithm_rs = await request.app.state.use_case_facade.get_monitoring_algorithm(
+        GetMonitoringAlgorithmUCRq(monitoring_algorithm_id=monitoring_algorithm_id))
+
+    return templates.TemplateResponse(
+        request=request, name="monitoring_algorithm.html",
+        context={
+            "algorithm": monitoring_algorithm_rs.monitoring_algorithm
+        }
+    )
+
+
+@router.get("/payloads", response_class=HTMLResponse)
+async def payloads_page(request: Request):
+    return templates.TemplateResponse(
+        request=request, name="payloads.html",
+    )
+
+
+@router.get("/payloads/", )
+async def payloads_json(request: Request,
+                        draw: int = 1,
+                        offset: int = 0,
+                        limit: int = 25,
+                        order_by: str = 'id',
+                        asc_sort: bool = False,
+                        search_value: Optional[str] = None):
+    pagination = PaginationQuery(offset_page=offset,
+                                 limit_per_page=limit,
+                                 order_by=order_by,
+                                 asc_sort=asc_sort
+                                 )
+    if search_value:
+        pagination.filter_fields_dnf = FilterFieldsDNF.single('data', search_value, ConditionOperation.CONTAINS)
+    rs = await request.app.state.use_case_facade.get_payloads(
+        GetPayloadsUCRq(pagination=pagination)
+    )
+    return {
+        "draw": int(draw),
+        "recordsTotal": rs.total,
+        "recordsFiltered": rs.total,
+        "data": [payload.model_dump() for payload in rs.payloads],
+    }
+
+
+@router.get("/payloads/{payload_id}", response_class=HTMLResponse)
+async def payload_page(request: Request, payload_id: int):
+    rs = await request.app.state.use_case_facade.get_payload(
+        GetPayloadUCRq(payload_id=payload_id,)
+    )
+    return templates.TemplateResponse(
+        request=request, name="payload.html",
+        context={
+            "payload": rs.payload,
+            "tasks_detailed": rs.tasks_detailed_linked,
+        }
+    )
+

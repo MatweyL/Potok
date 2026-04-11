@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Поток — Задачи{% endblock %}
+{% block title %}Поток — Новая задача{% endblock %}
 {% block extra_css %}{% endblock %}
 {% block body %}
 
@@ -25,8 +25,11 @@
       <div class="row g-3 mb-4">
 
         <div class="col-12">
-          <label class="form-label">Группа <span class="text-danger">*</span></label>
-          <input type="text" id="groupName" class="form-control" placeholder="например, monitoring"/>
+          <label class="form-label">Группа задач <span class="text-danger">*</span></label>
+          <select id="groupId" class="form-select">
+            <option value="">Загрузка...</option>
+          </select>
+          <div id="groupDetails" class="form-text"></div>
         </div>
 
         <div class="col-sm-6">
@@ -40,20 +43,20 @@
         <div class="col-sm-6">
           <label class="form-label">Приоритет</label>
           <select id="priority" class="form-select">
-            <option value="LOWEST">Lowest</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM" selected>Medium</option>
-            <option value="HIGH">High</option>
-            <option value="HIGHEST">Highest</option>
+            <option value="LOWEST">Нижайший</option>
+            <option value="LOW">Низкий</option>
+            <option value="MEDIUM" selected>Средний</option>
+            <option value="HIGH">Высокий</option>
+            <option value="HIGHEST">Наивысший</option>
           </select>
         </div>
 
         <div class="col-sm-6">
           <label class="form-label">Тип задачи</label>
           <select id="taskType" class="form-select">
-            <option value="UNDEFINED" selected>Undefined</option>
-            <option value="TIME_INTERVAL">Time interval</option>
-            <option value="PAGINATION">Pagination</option>
+            <option value="UNDEFINED" selected>Не задан</option>
+            <option value="TIME_INTERVAL">Временной интервал</option>
+            <option value="PAGINATION">Пагинация</option>
           </select>
         </div>
 
@@ -94,7 +97,47 @@
 {% endblock %}
 {% block extra_js %}
 <script>
-// ── Алгоритмы ─────────────────────────────────────────
+// ── Группы задач ──────────────────────────────────────
+async function loadGroups() {
+  try {
+    const res = await fetch('/task-groups/json');
+    const data = await res.json();
+    const groups = data.task_groups || [];
+
+    const sel = document.getElementById('groupId');
+    sel.innerHTML = '';
+
+    if (!groups.length) {
+      sel.innerHTML = '<option value="">Нет доступных групп</option>';
+      return;
+    }
+
+    groups.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.id;
+      opt.textContent = `${g.title}`;
+      opt.dataset.name = g.name;
+      sel.appendChild(opt);
+    });
+
+    updateGroupDetails();
+  } catch {
+    document.getElementById('groupId').innerHTML =
+      '<option value="">Ошибка загрузки</option>';
+  }
+}
+
+function updateGroupDetails() {
+  const sel = document.getElementById('groupId');
+  const selected = sel.options[sel.selectedIndex];
+  const el = document.getElementById('groupDetails');
+  if (!selected || !selected.value) { el.textContent = ''; return; }
+  el.innerHTML = `Системное имя: <code>${selected.dataset.name}</code>`;
+}
+
+document.getElementById('groupId').addEventListener('change', updateGroupDetails);
+
+// ── Алгоритмы мониторинга ─────────────────────────────
 let algorithms = [];
 
 async function loadAlgorithms() {
@@ -165,8 +208,8 @@ document.getElementById('payloads').addEventListener('input', () => {
 
 // ── Отправка ──────────────────────────────────────────
 document.getElementById('submitBtn').addEventListener('click', async () => {
-  const groupName = document.getElementById('groupName').value.trim();
-  if (!groupName) return showAlert('Укажите группу', 'danger');
+  const groupId = parseInt(document.getElementById('groupId').value);
+  if (!groupId) return showAlert('Выберите группу задач', 'danger');
 
   const algorithmId = parseInt(document.getElementById('algorithmId').value);
   if (!algorithmId) return showAlert('Выберите алгоритм мониторинга', 'danger');
@@ -201,7 +244,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   const body = {
     payloads: payloads.map(data => ({ data })),
     task_configuration: {
-      group_name: groupName,
+      group_id: groupId,
       monitoring_algorithm_id: algorithmId,
       priority: document.getElementById('priority').value,
       type: document.getElementById('taskType').value,
@@ -242,11 +285,7 @@ function showAlert(msg, type) {
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-  await fetch('/auth/logout', { method: 'POST' });
-  window.location.href = '/login';
-});
-
+loadGroups();
 loadAlgorithms();
 </script>
 {% endblock %}

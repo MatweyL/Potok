@@ -8,7 +8,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 class="h3 mb-0">Детали группы задач</h1>
         <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTaskGroupModal">
-            ✏️ Редактировать группу
+            Редактировать группу
         </button>
     </div>
 
@@ -81,6 +81,10 @@
                     <div class="mb-3 form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="editQueuePerPriority" {% if task_group.queue_per_priority %}checked{% endif %}>
                         <label class="form-check-label" for="editQueuePerPriority">Отдельные очереди на приоритет</label>
+                    </div>
+                    <div class="mb-3 form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="editIsActive" {% if task_group.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="editIsActive">Активна</label>
                     </div>
                 </form>
             </div>
@@ -161,52 +165,65 @@ document.addEventListener('DOMContentLoaded', function() {
                 // d.draw НЕ удаляем! Он нужен DataTables для синхронизации
             },
             dataFilter: function(rawJson) {       // ✅ используем dataFilter вместо dataSrc
-        const json = JSON.parse(rawJson);
-        console.log('📦 Ответ от сервера:', json);
+                const json = JSON.parse(rawJson);
+                console.log('📦 Ответ от сервера:', json);
 
-        let items = [];
-        let total = 0;
+                let items = [];
+                let total = 0;
 
-        if (Array.isArray(json)) {
-            items = json;
-            total = json.length;
-        } else if (json.data && Array.isArray(json.data)) {
-            items = json.data;
-            total = json.recordsTotal || json.total_count || json.total || items.length;
-        } else if (json.items || json.results) {
-            items = json.items || json.results;
-            total = json.total_count || json.count || json.total || items.length;
-        }
+                if (Array.isArray(json)) {
+                    items = json;
+                    total = json.length;
+                } else if (json.data && Array.isArray(json.data)) {
+                    items = json.data;
+                    total = json.recordsTotal || json.total_count || json.total || items.length;
+                } else if (json.items || json.results) {
+                    items = json.items || json.results;
+                    total = json.total_count || json.count || json.total || items.length;
+                }
 
-        console.log(`✅ Извлечено задач: ${items.length}, Всего: ${total}`);
+                console.log(`✅ Извлечено задач: ${items.length}, Всего: ${total}`);
 
-        // dataFilter должен вернуть JSON-строку в формате DataTables
-        return JSON.stringify({
-            draw: json.draw,
-            recordsTotal: total,
-            recordsFiltered: total,
-            data: items
-        });
-    },
+                // dataFilter должен вернуть JSON-строку в формате DataTables
+                return JSON.stringify({
+                    draw: json.draw,
+                    recordsTotal: total,
+                    recordsFiltered: total,
+                    data: items
+                });
+            },
     error: function(xhr, error, thrown) {
         console.error('❌ DataTables AJAX ошибка:', error, thrown);
         alert('Не удалось загрузить задачи. Проверьте консоль разработчика (F12).');
     }
         },
         columns: [
-    { data: 'task.id', className: 'fw-medium' },
+    {
+        data: 'task.id',
+        className: 'fw-medium',
+        render: function(data) {
+            return `<a href="/tasks/${data}" class="text-decoration-none">${data}</a>`
+        }
+    },
     {
         data: 'task.priority',
         render: function(data) { return data !== null && data !== undefined ? data : '—'; }
     },
     {
-        data: 'payload.data',
-        render: function(data) {
+        data: 'payload',
+        render: function(payload) {
+            const data = payload.data;
             if (!data) return '<span class="text-muted">—</span>';
             const jsonStr = JSON.stringify(data);
             const safeTitle = jsonStr.replace(/"/g, '&quot;');
             const display = jsonStr.length > 60 ? jsonStr.substring(0, 60) + '…' : jsonStr;
-            return `<span class="text-muted small text-break" title="${safeTitle}">${display}</span>`;
+            return `<a href="/payloads/${payload.id}" class="text-decoration-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H5.5A2.5 2.5 0 0 0 3 5.5v5A2.5 2.5 0 0 0 5.5 13h5a2.5 2.5 0 0 0 2.5-2.5V8.364a.5.5 0 0 0-1 0V10.5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 4 10.5v-5A1.5 1.5 0 0 1 5.5 4h2.136a.5.5 0 0 0 .5-.5z"/>
+                          <path fill-rule="evenodd" d="M10.5 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0V3.707L6.854 9.854a.5.5 0 1 1-.708-.708L13.293 3H10.5a.5.5 0 0 1-.5-.5z"/>
+                        </svg>
+                    </a>
+                    <span class="text-muted small text-break" title="${safeTitle}">${display}</span>`;
         }
     },
     {
@@ -263,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 📈 Колонка: Статистика запусков (кружки с цифрами)
         {
-            data: 'task_runs_status_metrics',
+            data: 'runs_status_metrics',
             title: 'Статистика',
             className: 'text-center',
             render: function(stats, type, row) {
@@ -287,8 +304,21 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         {
             data: 'task.status',
+            title: 'Статус',
             render: function(data) {
-                return `<span class="badge bg-secondary-subtle text-secondary-emphasis">${data}</span>`
+                if (!data) return '<span class="text-muted">—</span>';
+
+                const statusMap = {
+                    'NEW':         { cls: 'bg-info-subtle text-info-emphasis', label: 'Создана' },
+                    'EXECUTION':   { cls: 'bg-primary-subtle text-primary-emphasis', label: 'Выполняется' },
+                    'SUCCEED':     { cls: 'bg-success-subtle text-success-emphasis', label: 'Успешно' },
+                    'FINISHED':    { cls: 'bg-secondary-subtle text-secondary-emphasis', label: 'Завершена' },
+                    'CANCELLED':   { cls: 'bg-dark-subtle text-dark-emphasis', label: 'Отменена' },
+                    'ERROR':       { cls: 'bg-danger-subtle text-danger-emphasis', label: 'Ошибка' }
+                };
+
+                const style = statusMap[data] || statusMap['FINISHED']; // fallback
+                return `<span class="badge ${style.cls}">${style.label}</span>`;
             }
         },
         { data: 'task.status_updated_at', defaultContent: '<span class="text-muted">—</span>', className: 'small text-nowrap' },
@@ -318,6 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const queuePerPriority = document.getElementById('editQueuePerPriority').checked;
+        const isActive = document.getElementById('editIsActive').checked;
 
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Сохранение...';
@@ -329,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
 
                     title, description, execution_arguments: executionArguments, queue_per_priority: queuePerPriority,
-                    task_group_id: groupId,
+                    task_group_id: groupId, is_active: isActive
                 })
             });
 
@@ -348,6 +379,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     ? 'badge bg-primary-subtle text-primary-emphasis'
                     : 'badge bg-secondary-subtle text-secondary-emphasis';
                 queueBadge.textContent = queuePerPriority ? 'Отдельные очереди на приоритет' : 'Общая очередь для всех приоритетов';
+            }
+            const isActiveBadge = document.getElementById('taskGroupCard').querySelector('.d-flex.align-items-center .badge');
+            console.log(isActiveBadge)
+            if (isActiveBadge) {
+                isActiveBadge.className = isActive
+                    ? 'badge bg-success-subtle text-success-emphasis'
+                    : 'badge bg-secondary-subtle text-secondary-emphasis';
+                isActiveBadge.textContent = isActive ? 'Активна' : 'Не активна';
             }
 
             bootstrap.Modal.getInstance(document.getElementById('editTaskGroupModal')).hide();

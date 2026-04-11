@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Type
 
 from more_itertools import batched
 from pydantic import BaseModel
-from sqlalchemy import update, select, or_, ColumnElement, and_, asc, desc, func, delete
+from sqlalchemy import update, select, or_, ColumnElement, and_, asc, desc, func, delete, JSON, String, cast, TEXT
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.sql.operators import gt, eq, ge, lt, le, ne
 
@@ -263,6 +263,8 @@ def filter_field_as_sqlalchemy_literal(filter_field: FilterField, model_class: T
         return column.is_not(None)
     if filter_field.operation == ConditionOperation.IN:
         return column.in_(filter_field.value)
+    if filter_field.operation == ConditionOperation.CONTAINS:
+        return cast(column, TEXT).icontains(str(filter_field.value))
     if filter_field.operation == ConditionOperation.NOT_IN:
         return column.notin_(filter_field.value)
     raise RuntimeError(f"Unknown operation type: {filter_field.operation}")

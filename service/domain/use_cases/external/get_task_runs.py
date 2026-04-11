@@ -2,16 +2,18 @@ from typing import Optional, List, Dict
 
 from pydantic import Field
 
+from service.domain.schemas.enums import TaskRunStatus
 from service.domain.schemas.task import Task, TaskPK
 from service.domain.schemas.task_run import TaskRunPK, TaskRun
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.repo.abstract import Repo
-from service.ports.outbound.repo.fields import FilterFieldsDNF, PaginationQuery, ConditionOperation
+from service.ports.outbound.repo.fields import FilterFieldsDNF, PaginationQuery, ConditionOperation, FilterField
 
 
 class GetTaskRunsUCRq(UCRequest):
     task_id: int
     pagination: Optional[PaginationQuery] = None
+    task_run_status: Optional[TaskRunStatus] = None
 
 
 class GetTaskRunsUCRs(UCResponse):
@@ -33,6 +35,8 @@ class GetTaskRunsUC(UseCase):
         if not task:
             return GetTaskRunsUCRs(success=False, error="Not found", request=request)
         filter_fields_dnf = FilterFieldsDNF.single('task_id', request.task_id)
+        if request.task_run_status:
+            filter_fields_dnf.conjunctions[0].group.append(FilterField(name='status', value=request.task_run_status))
         if request.pagination:
             pagination = request.pagination
             pagination.filter_fields_dnf = filter_fields_dnf

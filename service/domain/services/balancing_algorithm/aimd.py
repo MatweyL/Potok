@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 from service.domain.schemas.task_group import TaskGroup, TaskGroupPK
 from service.domain.services.balancing_algorithm.abstract import BalancingAlgorithm
@@ -35,8 +35,8 @@ class AIMDBalancingAlgorithm(BalancingAlgorithm):
         self._beta = beta
         self._batch_size_by_group = {}
 
-    async def calculate_batch_size_by_group(self) -> Dict[str, int]:
-        task_run_metrics = await self._task_run_metrics_provider.provide_by_period(self._period_s)
+    async def calculate_batch_size_by_group(self, group_names: List[str]) -> Dict[str, int]:
+        task_run_metrics = await self._task_run_metrics_provider.provide_by_period(self._period_s, group_names)
         batch_size_by_group = {}
         for group_name, task_run_grouped_metrics in task_run_metrics.grouped_metrics_by_name.items():
             succeed = task_run_grouped_metrics.completed

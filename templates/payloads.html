@@ -1,188 +1,110 @@
 {% extends "base.html" %}
-{% block title %}Поток — Задачи{% endblock %}
-{% block extra_css %}
-<style>
-    .editable-cell { cursor: pointer; }
-    .editable-cell:hover { background: #f8f9fa; }
 
-    .cell-view { white-space: pre-wrap; font-family: monospace; font-size: 0.82rem; }
-    .cell-edit { display: none; }
-    .cell-edit textarea {
-      width: 100%;
-      font-family: monospace;
-      font-size: 0.82rem;
-      min-height: 80px;
-      resize: vertical;
-    }
+{% block title %}Данные для сбора - Поток{% endblock %}
 
-    .cell-actions { display: none; gap: 0.3rem; margin-top: 0.3rem; }
-
-    tr.editing .cell-view   { display: none; }
-    tr.editing .cell-edit   { display: block; }
-    tr.editing .cell-actions { display: flex; }
-    tr.editing .edit-hint   { display: none; }
-  </style>
-{% endblock %}
 {% block body %}
-
-<div class="container-fluid px-4 py-4">
-  <h1 class="fs-4 fw-bold mb-4">Payload-ы</h1>
-
-  <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
-
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <table id="payloadsTable" class="table table-hover align-middle" style="width:100%">
-        <thead class="table-light">
-          <tr>
-            <th style="width:80px">ID</th>
-            <th>Data</th>
-            <th style="width:280px">Checksum</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for payload in payloads %}
-          <tr data-id="{{ payload.id }}">
-
-            <td class="text-muted font-monospace">#{{ payload.id }}</td>
-
-            <!-- Редактируемая ячейка Data -->
-            <td class="editable-cell" title="Нажмите для редактирования">
-              <div class="cell-view">{{ payload.data | tojson(indent=2) if payload.data else '—' }}</div>
-              <div class="cell-edit">
-                <textarea class="form-control">{{ payload.data | tojson(indent=2) if payload.data else '' }}</textarea>
-                <div class="cell-actions">
-                  <button class="btn btn-sm btn-primary btn-save">Сохранить</button>
-                  <button class="btn btn-sm btn-outline-secondary btn-cancel">Отмена</button>
-                  <span class="text-danger small save-error ms-2 d-none"></span>
-                </div>
-              </div>
-              <div class="edit-hint text-muted small mt-1">✎ нажмите чтобы изменить</div>
-            </td>
-
-            <td class="font-monospace text-muted small">{{ payload.checksum }}</td>
-
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 fw-bold text-dark">Данные для сбора</h1>
     </div>
-  </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <table id="payloadsTable" class="table table-hover align-middle mb-0" style="width:100%">
+                <thead class="bg-light text-secondary small text-uppercase">
+                    <tr>
+                        <th style="width: 80px;">ID</th>
+                        <th>Данные</th>
+                        <th style="width: 250px;">Уникальный хеш</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Данные подгружаются динамически -->
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
-
 {% endblock %}
+
 {% block extra_js %}
-
 <script>
-$(document).ready(function () {
+document.addEventListener('DOMContentLoaded', function() {
+    $('#payloadsTable').DataTable({
+        serverSide: true,
+        processing: true,
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [[0, 'desc']], // По умолчанию sort_by=id, sort_asc=false
+        ajax: {
+            url: '/payloads/',
+            data: function(d) {
+                // Маппинг параметров DataTables -> ваш API
+                d.offset = d.start;
+                d.limit = d.length;
 
-  $('#payloadsTable').DataTable({
-    language: { url: 'https://cdn.datatables.net/plug-ins/2.0.3/i18n/ru.json' },
-    pageLength: 25,
-    order: [[0, 'desc']],
-    columnDefs: [
-      { orderable: false, targets: [1] }  // Data не сортируем
-    ],
-  });
+                if (d.order.length > 0) {
+                    const colIdx = d.order[0].column;
+                    const dir = d.order[0].dir;
+                    const sortMap = { 0: 'id', 1: 'data', 2: 'checksum' };
+                    d.sort_by = sortMap[colIdx] || 'id';
+                    d.sort_asc = dir === 'asc';
+                } else {
+                    d.sort_by = 'id';
+                    d.sort_asc = false;
+                }
+                d.search_value = d.search.value;
+                // Удаляем служебные поля DT, чтобы не ломать API
+                delete d.start; delete d.length; //delete d.draw;
+                delete d.columns; delete d.order; delete d.search;
+            },
+            dataFilter: function(rawJson) {
+                // Адаптация ответа под формат DataTables
+                const json = JSON.parse(rawJson);
+                console.log('📦 Ответ от сервера:', json);
 
-  // ── Клик по ячейке — войти в режим редактирования ──
-  $('#payloadsTable tbody').on('click', 'td.editable-cell', function () {
-    const tr = $(this).closest('tr');
-    if (tr.hasClass('editing')) return;  // уже редактируется
-
-    // Снимаем редактирование с других строк
-    cancelAll();
-
-    tr.addClass('editing');
-    $(this).find('textarea').focus();
-  });
-
-  // ── Отмена ──
-  $('#payloadsTable tbody').on('click', '.btn-cancel', function (e) {
-    e.stopPropagation();
-    const tr = $(this).closest('tr');
-    cancelRow(tr);
-  });
-
-  // ── Сохранение ──
-  $('#payloadsTable tbody').on('click', '.btn-save', async function (e) {
-    e.stopPropagation();
-    const tr = $(this).closest('tr');
-    const payloadId = tr.data('id');
-    const textarea = tr.find('textarea');
-    const errEl = tr.find('.save-error');
-    const raw = textarea.val().trim();
-
-    // Валидация JSON
-    let parsedData = null;
-    if (raw) {
-      try { parsedData = JSON.parse(raw); }
-      catch {
-        errEl.text('Невалидный JSON').removeClass('d-none');
-        return;
-      }
-    }
-    errEl.addClass('d-none');
-
-    const btn = $(this);
-    btn.prop('disabled', true).text('...');
-
-    try {
-      const res = await fetch(`/payloads/${payloadId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payload_id: payloadId, payload_data: parsedData }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        // Обновляем отображение без перезагрузки
-        const newData = data.payload.data;
-        const formatted = newData ? JSON.stringify(newData, null, 2) : '—';
-        tr.find('.cell-view').text(formatted);
-        textarea.val(newData ? JSON.stringify(newData, null, 2) : '');
-        tr.find('td:last').text(data.payload.checksum);
-        cancelRow(tr);
-        showAlert('Сохранено', 'success');
-      } else {
-        errEl.text(data.error || 'Ошибка').removeClass('d-none');
-      }
-    } catch {
-      errEl.text('Сетевая ошибка').removeClass('d-none');
-    } finally {
-      btn.prop('disabled', false).text('Сохранить');
-    }
-  });
-
-  // ── Escape — отмена ──
-  $(document).on('keydown', function (e) {
-    if (e.key === 'Escape') cancelAll();
-  });
-
-  function cancelRow(tr) {
-    tr.removeClass('editing');
-    tr.find('.save-error').addClass('d-none');
-  }
-
-  function cancelAll() {
-    $('#payloadsTable tbody tr.editing').each(function () {
-      cancelRow($(this));
+                const items = json.data || json.items || json.results || json;
+                const total = json.recordsTotal;
+                // dataFilter должен вернуть JSON-строку в формате DataTables
+                return JSON.stringify({
+                    draw: json.draw,
+                    recordsTotal: total,
+                    recordsFiltered: total,
+                    data: items
+                });
+            },
+            error: function(xhr, error, thrown) {
+                console.error('Ошибка загрузки полезных нагрузок:', error);
+                $('#payloadsTable').append(`<tbody><tr><td colspan="3" class="text-center text-danger py-3">Не удалось загрузить данные</td></tr></tbody>`);
+            }
+        },
+        columns: [
+            {
+                data: 'id',
+                render: function(data) {
+                    return data ? `<a href="/payloads/${data}" class="text-decoration-none fw-medium">${data}</a>` : '—';
+                }
+            },
+            {
+                data: 'data',
+                render: function(data) {
+                    if (!data) return '<span class="text-muted">—</span>';
+                    const jsonStr = JSON.stringify(data);
+                    const preview = jsonStr.length > 120 ? jsonStr.substring(0, 120) + '…' : jsonStr;
+                    return `<pre class="mb-0 bg-light p-2 rounded small text-break m-0" title="${jsonStr.replace(/"/g, '&quot;').replace(/\n/g, ' ')}">${preview}</pre>`;
+                }
+            },
+            {
+                data: 'checksum',
+                render: function(data) {
+                    return data ? `<code class="bg-light px-2 py-1 rounded small d-inline-block text-truncate" style="max-width:100%;">${data}</code>` : '<span class="text-muted">—</span>';
+                }
+            }
+        ],
+        columnDefs: [
+            { orderable: false, targets: [] } // Сортировка включена, если бэкенд поддерживает
+        ]
     });
-  }
-
-  // ── Logout ──
-  document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await fetch('/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
-  });
-
 });
-
-function showAlert(msg, type) {
-  const el = document.getElementById('alertBox');
-  el.className = `alert alert-${type} mb-3`;
-  el.textContent = msg;
-  setTimeout(() => el.classList.add('d-none'), 2000);
-}
 </script>
 {% endblock %}

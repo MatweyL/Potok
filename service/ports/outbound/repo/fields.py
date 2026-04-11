@@ -15,6 +15,7 @@ class ConditionOperation(str, enum.Enum):
     NOT_NULL = "NOT_NULL"
     IN = "IN"
     NOT_IN = "NOT_IN"
+    CONTAINS = "CONTAINS"
 
 
 class LogicOperation(str, enum.Enum):

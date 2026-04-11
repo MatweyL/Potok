@@ -55,7 +55,7 @@ from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.facade import UseCaseFacade
 from service.domain.use_cases.external.get_payload import GetPayloadUC
 from service.domain.use_cases.external.get_payloads import GetPayloadsUC
-from service.domain.use_cases.external.get_task import GetTaskUC
+from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUC
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUC, \
     GetTaskGroupStatisticsUC
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUC
@@ -158,11 +158,9 @@ async def main():
     create_tasks_uc = CreateTasksUC(transaction_factory, uniqueness_payload_checker, payload_repo, task_repo,
                                     task_status_log_repo)
     get_tasks_uc = GetTasksUC(task_repo)
-    get_task_uc = GetTaskUC(task_repo)
     get_task_runs_uc = GetTaskRunsUC(task_repo, task_run_repo)
     get_tasks_runs_uc = GetTasksRunsUC(task_run_repo)
     get_task_progress_uc = GetTaskProgressUC(task_repo, time_interval_task_progress_repo)
-    get_payload_uc = GetPayloadUC(payload_repo)
     get_payloads_uc = GetPayloadsUC(payload_repo)
     update_payload_uc = UpdatePayloadUC(payload_repo)
     get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
@@ -171,12 +169,15 @@ async def main():
 
     create_task_group_uc = CreateTaskGroupUC(task_group_repo)
     get_task_group_uc = GetTaskGroupUC(task_group_repo)
-    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_task_runs_uc, get_payload_uc,
-                                               get_monitoring_algorithm_uc,
+    get_task_detailed_uc = GetTaskDetailedUC(task_repo, payload_repo, task_group_repo, get_monitoring_algorithm_uc, get_task_progress_uc, task_run_metrics_provider)
+    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_task_runs_uc,
+                                               get_monitoring_algorithm_uc,payload_repo,
                                                task_group_repo, task_repo, task_run_metrics_provider, )
     get_all_task_group_uc = GetAllTaskGroupUC(task_group_repo)
     get_task_groups_without_project_uc = GetTaskGroupsWithoutProjectUC(project_repo, task_group_repo,
                                                                        task_group_by_project_repo)
+
+    get_payload_uc = GetPayloadUC(payload_repo, task_repo, get_tasks_detailed_uc,)
 
     get_all_projects_uc = GetAllProjectsUC(project_repo)
     create_project_uc = CreateProjectUC(project_repo)
@@ -196,7 +197,7 @@ async def main():
                                     create_monitoring_algorithm_uc,
                                     get_all_monitoring_algorithms_uc,
                                     get_tasks_uc,
-                                    get_task_uc,
+                                    get_task_detailed_uc,
                                     get_task_runs_uc,
                                     get_task_progress_uc,
                                     get_payloads_uc,
@@ -218,7 +219,8 @@ async def main():
                                     get_task_group_statistics_uc,
                                     get_project_by_task_group_uc,
                                     update_task_group_uc,
-                                    get_tasks_runs_uc, )
+                                    get_tasks_runs_uc,
+                                    get_monitoring_algorithm_uc, )
     set_use_case_facade(use_case_facade)
 
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,
@@ -233,7 +235,8 @@ async def main():
                                                                            task_run_time_interval_progress_repo,
                                                                            transaction_factory,
                                                                            instant_upload=False)
-    retrieve_waiting_task_runs_uc = RetrieveWaitingTaskRunsUC(task_run_repo,
+    retrieve_waiting_task_runs_uc = RetrieveWaitingTaskRunsUC(task_group_repo,
+                                                              task_run_repo,
                                                               task_run_status_log_repo,
                                                               transaction_factory,
                                                               waiting_task_run_provider,

@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+
+{% block title %}Полезная нагрузка #{{ payload.id }}{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4">
+
+    <!-- Заголовок -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="/payloads" class="text-decoration-none">Данные для сбора</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">#{{ payload.id }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">Полезная нагрузка <span class="text-muted fw-normal">#{{ payload.id }}</span></h1>
+        </div>
+    </div>
+
+    <!-- Карточка полезной нагрузки -->
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Информация о полезной нагрузке</h5>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis font-monospace">ID: {{ payload.id }}</span>
+            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editPayloadModal">
+                Редактировать
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="row g-4">
+                <!-- ID -->
+                <div class="col-md-2 col-sm-4">
+                    <div class="p-3 bg-light rounded border h-100">
+                        <div class="text-muted small fw-medium mb-1 text-uppercase" style="font-size: 0.72em; letter-spacing: 0.05em;">Идентификатор</div>
+                        <div class="fw-semibold fs-5">{{ payload.id }}</div>
+                    </div>
+                </div>
+
+                <!-- Checksum -->
+                <div class="col-md-4 col-sm-8">
+                    <div class="p-3 bg-light rounded border h-100">
+                        <div class="text-muted small fw-medium mb-1 text-uppercase" style="font-size: 0.72em; letter-spacing: 0.05em;">Контрольная сумма (MD5)</div>
+                        <code id="payloadChecksum" class="text-break" style="font-size: 0.88em;">{{ payload.checksum }}</code>
+                    </div>
+                </div>
+
+                <!-- Data -->
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded border h-100">
+                        <div class="text-muted small fw-medium mb-2 text-uppercase" style="font-size: 0.72em; letter-spacing: 0.05em;">Данные (data)</div>
+                        <pre id="payloadDataCode" class="bg-white p-2 rounded border mb-0 text-break" style="max-height: 200px; overflow-y: auto; font-size: 0.83em;"><code>{{ payload.data | tojson(indent=2) }}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Список задач -->
+    <h2 class="h5 mb-3">
+        Связанные задачи
+        <span class="badge bg-secondary-subtle text-secondary-emphasis ms-2 fw-normal" style="font-size: 0.8em;">{{ tasks_detailed | length }}</span>
+    </h2>
+
+    {% if tasks_detailed %}
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <table id="tasksTable" class="table table-hover align-middle mb-0" style="width:100%">
+                <thead class="bg-light text-secondary small text-uppercase">
+                    <tr>
+                        <th style="width: 50px;">ID</th>
+                        <th>Группа</th>
+                        <th>Приоритет</th>
+                        <th>Тип задачи</th>
+                        <th>Алгоритм мониторинга</th>
+                        <th style="width: 110px;">Последние запуски</th>
+                        <th style="width: 160px;">Статистика запусков</th>
+                        <th>Статус</th>
+                        <th>Обновление статуса</th>
+                        <th>Загрузка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in tasks_detailed %}
+                    {% set task = item.task %}
+                    {% set task_group = item.task_group %}
+                    {% set algo = item.monitoring_algorithm %}
+                    {% set runs = item.task_runs_recent %}
+                    {% set run_stats = item.runs_status_metrics %}
+
+                    <tr>
+                        <!-- ID -->
+                        <td>
+                            <a href="/tasks/{{ task.id }}" class="text-decoration-none fw-medium text-dark">{{ task.id }}</a>
+                        </td>
+
+                        <!-- Группа -->
+                        <td>
+                            {% if task_group %}
+                            <a href="/task-groups/{{ task_group.id }}" class="text-decoration-none">
+                                <div class="fw-medium text-dark">{{ task_group.title }}</div>
+                                <code class="text-muted" style="font-size: 0.8em;">{{ task_group.name }}</code>
+                            </a>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Приоритет -->
+                        <td>
+                            {% if task.priority is not none %}
+                            <span class="badge bg-primary-subtle text-primary-emphasis">{{ task.priority.value }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Тип задачи -->
+                        <td>
+                            {% if task.type is not none %}
+                            <span class="badge bg-primary-subtle text-primary-emphasis">{{ task.type.value }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Алгоритм мониторинга -->
+                        <td>
+                            {% if algo %}
+                            <a href="/monitoring-algorithms/{{ algo.id }}" class="text-decoration-none">
+                                <div class="d-flex align-items-center flex-wrap gap-1">
+                                    {% if algo.type == 'PERIODIC' or algo.type.value == 'PERIODIC' %}
+                                    <span class="badge bg-primary">PERIODIC</span>
+                                    <span class="small text-dark fw-semibold">{{ algo.timeout }}</span>
+                                    <span class="text-muted small">±</span>
+                                    <span class="small text-dark fw-semibold">{{ algo.timeout_noize | default(0) }}</span>
+                                    {% elif algo.type == 'SINGLE' or algo.type.value == 'SINGLE' %}
+                                    <span class="badge bg-info">SINGLE</span>
+                                    {% if algo.timeouts and algo.timeouts | length > 0 %}
+                                        {% for t in algo.timeouts %}
+                                        <span class="badge bg-secondary">{{ t }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">мгновенно</span>
+                                    {% endif %}
+                                    <span class="text-muted small">±</span>
+                                    <span class="small text-dark fw-semibold">{{ algo.timeout_noize | default(0) }}</span>
+                                    {% else %}
+                                    <span class="text-muted small">{{ algo.type }}</span>
+                                    {% endif %}
+                                </div>
+                            </a>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Последние запуски -->
+                        <td class="text-center">
+                            {% if runs and runs | length > 0 %}
+                            <div class="d-flex align-items-center justify-content-center gap-1 flex-wrap">
+                                {% for run in runs[:3] %}
+                                {% set status_lower = run.status | lower %}
+                                {% if status_lower == 'succeed' %}{% set dot_color = '#28a745' %}{% set dot_label = 'Успешно' %}
+                                {% elif status_lower == 'error' %}{% set dot_color = '#dc3545' %}{% set dot_label = 'Ошибка' %}
+                                {% elif status_lower == 'execution' %}{% set dot_color = '#007bff' %}{% set dot_label = 'Выполняется' %}
+                                {% elif status_lower == 'temp_error' %}{% set dot_color = '#fd7e14' %}{% set dot_label = 'Врем. ошибка' %}
+                                {% elif status_lower == 'interrupted' %}{% set dot_color = '#6f42c1' %}{% set dot_label = 'Прервано' %}
+                                {% elif status_lower == 'cancelled' %}{% set dot_color = '#6c757d' %}{% set dot_label = 'Отменено' %}
+                                {% elif status_lower == 'waiting' %}{% set dot_color = '#e9ecef' %}{% set dot_label = 'Ожидает' %}
+                                {% elif status_lower == 'queued' %}{% set dot_color = '#adb5bd' %}{% set dot_label = 'В очереди' %}
+                                {% else %}{% set dot_color = '#e9ecef' %}{% set dot_label = run.status %}
+                                {% endif %}
+                                <a href="/task-runs/{{ run.id }}"
+                                   class="d-inline-block rounded-circle"
+                                   style="width: 20px; height: 20px; background-color: {{ dot_color }}; border: 2px solid {{ dot_color }}; flex-shrink: 0;"
+                                   title="Запуск #{{ run.id }}: {{ dot_label }}">
+                                </a>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Статистика запусков -->
+                        <td class="text-center">
+                            {% if run_stats %}
+                                {% set status_order = ['execution', 'queued', 'waiting', 'temp_error', 'interrupted', 'error', 'succeed', 'cancelled'] %}
+
+                                <div class="d-flex flex-wrap align-items-center justify-content-center" style="gap: 4px 8px;">
+                                    {% set run_stats = run_stats.model_dump() %}
+                                    {% for status in status_order %}
+                                        {% if status in run_stats %}
+                                            {% set count = run_stats[status] %}
+
+                                            {% if count > 0 or status == 'execution' %}
+                                                {# Определяем цвета и подпись #}
+                                                {% if status == 'succeed' %}
+                                                    {% set bg = '#28a745' %}
+                                                    {% set text = '#fff' %}
+                                                    {% set label = 'Успешно' %}
+                                                {% elif status == 'error' %}
+                                                    {% set bg = '#dc3545' %}
+                                                    {% set text = '#fff' %}
+                                                    {% set label = 'Ошибка' %}
+                                                {% elif status == 'execution' %}
+                                                    {% set bg = '#007bff' %}
+                                                    {% set text = '#fff' %}
+                                                    {% set label = 'Выполняется' %}
+                                                {% elif status == 'temp_error' %}
+                                                    {% set bg = '#fd7e14' %}
+                                                    {% set text = '#fff' %}
+                                                    {% set label = 'Врем. ошибка' %}
+                                                {% elif status == 'interrupted' %}
+                                                    {% set bg = '#6f42c1' %}
+                                                    {% set text = '#fff' %}
+                                                    {% set label = 'Прервано' %}
+                                                {% elif status == 'cancelled' %}
+                                                    {% set bg = '#6c757d' %}
+                                                    {% set text = '#fff' %}
+                                                    {% set label = 'Отменено' %}
+                                                {% elif status == 'waiting' %}
+                                                    {% set bg = '#e9ecef' %}
+                                                    {% set text = '#6c757d' %}
+                                                    {% set label = 'Ожидает' %}
+                                                {% elif status == 'queued' %}
+                                                    {% set bg = '#adb5bd' %}
+                                                    {% set text = '#fff' %}
+                                                    {% set label = 'В очереди' %}
+                                                {% else %}
+                                                    {% set bg = '#e9ecef' %}
+                                                    {% set text = '#6c757d' %}
+                                                    {% set label = status %}
+                                                {% endif %}
+
+                                                <a href="/tasks/{{ task.id }}/?task_run_status={{ status }}"
+                                                   class="d-inline-flex align-items-center justify-content-center rounded-circle text-decoration-none"
+                                                   style="width: 28px; height: 28px; font-size: 12px; font-weight: 600;
+                                                          background-color: {{ bg }}; color: {{ text }};
+                                                          border: 2px solid {{ bg }}; flex-shrink: 0;"
+                                                   title="{{ label }}: {{ count }} запусков">
+                                                    {{ count }}
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <!-- Статус задачи -->
+                        <td>
+                            {% if task.status %}
+                            {% set s = task.status | upper %}
+                            {% if s == 'NEW' %}
+                            <span class="badge bg-info-subtle text-info-emphasis">Создана</span>
+                            {% elif s == 'EXECUTION' %}
+                            <span class="badge bg-primary-subtle text-primary-emphasis">Выполняется</span>
+                            {% elif s == 'SUCCEED' %}
+                            <span class="badge bg-success-subtle text-success-emphasis">Успешно</span>
+                            {% elif s == 'FINISHED' %}
+                            <span class="badge bg-secondary-subtle text-secondary-emphasis">Завершена</span>
+                            {% elif s == 'CANCELLED' %}
+                            <span class="badge bg-dark-subtle text-dark-emphasis">Отменена</span>
+                            {% elif s == 'ERROR' %}
+                            <span class="badge bg-danger-subtle text-danger-emphasis">Ошибка</span>
+                            {% else %}
+                            <span class="badge bg-light text-secondary border">{{ task.status }}</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Обновление статуса -->
+                        <td class="small text-nowrap text-muted">
+                            {{ task.status_updated_at or '—' }}
+                        </td>
+
+                        <!-- Загрузка -->
+                        <td class="small text-nowrap text-muted">
+                            {{ task.loaded_at or '—' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm border-0">
+        <div class="card-body text-center py-5 text-muted">
+            <div class="mb-2">Задачи не найдены</div>
+            <div class="small">К этой полезной нагрузке не привязано ни одной задачи</div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+<!-- Модальное окно редактирования полезной нагрузки -->
+<div class="modal fade" id="editPayloadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    Редактировать полезную нагрузку
+                    <span class="text-muted fw-normal">#{{ payload.id }}</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <label for="editPayloadData" class="form-label fw-medium">
+                    Данные (data) <span class="text-danger">*</span>
+                </label>
+                <div class="form-text mb-2 text-muted">
+                    Должен быть валидный JSON-объект. После сохранения контрольная сумма пересчитается автоматически.
+                </div>
+                <textarea class="form-control font-monospace"
+                          id="editPayloadData"
+                          rows="14"
+                          spellcheck="false"
+                          placeholder='{"key": "value"}'>{{ payload.data | tojson(indent=2) }}</textarea>
+                <div id="editPayloadDataError" class="invalid-feedback"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="savePayloadBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    {% if tasks_detailed %}
+    $('#tasksTable').DataTable({
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [[0, 'desc']],
+        language: {
+            search: 'Поиск:',
+            lengthMenu: 'Показывать _MENU_ записей',
+            info: 'Записи с _START_ по _END_ из _TOTAL_',
+            infoEmpty: 'Нет записей',
+            infoFiltered: '(отфильтровано из _MAX_)',
+            paginate: {
+                first: '«',
+                last: '»',
+                next: '›',
+                previous: '‹'
+            },
+            zeroRecords: 'Задачи не найдены',
+            emptyTable: 'Нет данных'
+        },
+        columnDefs: [
+            { orderable: false, targets: [5, 6] }
+        ]
+    });
+    {% endif %}
+});
+// Форматирование JSON при открытии модалки
+const editPayloadModal = document.getElementById('editPayloadModal');
+editPayloadModal?.addEventListener('show.bs.modal', function () {
+    const textarea = document.getElementById('editPayloadData');
+    try {
+        textarea.value = JSON.stringify(JSON.parse(textarea.value), null, 2);
+    } catch (_) {}
+    textarea.classList.remove('is-invalid');
+    document.getElementById('editPayloadDataError').textContent = '';
+});
+
+// Сохранение
+document.getElementById('savePayloadBtn')?.addEventListener('click', async function () {
+    const textarea = document.getElementById('editPayloadData');
+    const errorEl = document.getElementById('editPayloadDataError');
+    const saveBtn = this;
+
+    let parsedData;
+    try {
+        parsedData = JSON.parse(textarea.value);
+        if (typeof parsedData !== 'object' || parsedData === null || Array.isArray(parsedData)) {
+            throw new Error('Ожидается JSON-объект (не массив и не примитив)');
+        }
+    } catch (e) {
+        textarea.classList.add('is-invalid');
+        errorEl.textContent = 'Ошибка формата JSON: ' + e.message;
+        return;
+    }
+
+    textarea.classList.remove('is-invalid');
+    errorEl.textContent = '';
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Сохранение...';
+
+    try {
+        const response = await fetch(`/payloads/{{ payload.id }}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ payload_id: {{ payload.id }}, payload_data: parsedData })
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || `Ошибка сервера: ${response.status}`);
+        }
+
+        const updated = await response.json();
+
+        // Обновляем данные на странице без перезагрузки
+        document.getElementById('payloadDataCode').textContent = JSON.stringify(parsedData, null, 2);
+        if (updated.checksum) {
+            document.getElementById('payloadChecksum').textContent = updated.checksum;
+        }
+
+        bootstrap.Modal.getInstance(editPayloadModal).hide();
+    } catch (error) {
+        textarea.classList.add('is-invalid');
+        errorEl.textContent = 'Не удалось сохранить: ' + error.message;
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Сохранить';
+    }
+});
+</script>
+{% endblock %}

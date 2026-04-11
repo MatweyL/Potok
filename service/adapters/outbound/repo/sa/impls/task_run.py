@@ -146,7 +146,7 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
                 if isinstance(group_name, str):
                     group_name_predicate = "AND group_name = :group_name"
                 else:
-                    group_name_predicate = "AND group_name IN :group_name"
+                    group_name_predicate = "AND group_name = ANY(:group_name)"
             else:
                 group_name_predicate = ""
 

@@ -4,13 +4,13 @@ from service.di import get_use_case_facade
 from service.domain.use_cases.external.create_tasks import CreateTasksUCRq
 from service.domain.use_cases.external.get_payload import GetPayloadUCRq
 from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq
-from service.domain.use_cases.external.get_task import GetTaskUCRq
+from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUCRq
 from service.domain.use_cases.external.get_task_progress import GetTaskProgressUCRq
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq
 from service.domain.use_cases.external.get_tasks import GetTasksUCRq
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq
-from service.domain.use_cases.external.task_group import CreateTaskGroupUC, CreateTaskGroupUCRq
+from service.domain.use_cases.external.task_group import CreateTaskGroupUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
 from service.ports.outbound.repo.fields import PaginationQuery
 
@@ -54,7 +54,7 @@ async def get_tasks_detailed(offset_page: int = None,
 
 @router.get("/tasks/{task_id}")
 async def get_task(task_id: int):
-    return await get_use_case_facade().get_task(GetTaskUCRq(task_id=task_id))
+    return await get_use_case_facade().get_task_detailed(GetTaskDetailedUCRq(task_id=task_id))
 
 
 @router.get("/tasks/{task_id}/runs")

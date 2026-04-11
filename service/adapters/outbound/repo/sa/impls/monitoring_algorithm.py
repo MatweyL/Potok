@@ -53,13 +53,16 @@ class SAPeriodicMonitoringAlgorithmRepo(AbstractSARepo, MonitoringAlgorithmRepo)
                 .join(self._model_class,
                       onclause=eq(models.Task.monitoring_algorithm_id,
                                   self._model_class.id))
-                .where((
+                .join(models.TaskGroup,
+                      onclause=eq(models.Task.group_id,
+                                  models.TaskGroup.id))
+                .where(and_((
                         (models.Task.status == TaskStatus.NEW) |
                         and_(models.Task.status == TaskStatus.EXECUTION,
                              ready_to_execute_by_timeout) |
                         and_(models.Task.status == TaskStatus.SUCCEED,
                              ready_to_execute_by_timeout)
-                ))
+                ), models.TaskGroup.is_active))
             )
             result = await session.scalars(query, )
             tasks = result.all()
@@ -96,10 +99,14 @@ class SASingleMonitoringAlgorithmRepo(AbstractSARepo, MonitoringAlgorithmRepo):
             # Получаем все задачи с SingleMonitoringAlgorithm
             query = (
                 select(models.Task, self._model_class)
+                .join(models.TaskGroup,
+                      onclause=eq(models.Task.group_id,
+                                  models.TaskGroup.id))
                 .join(
                     self._model_class,
                     onclause=eq(models.Task.monitoring_algorithm_id, self._model_class.id),
                 )
+                .where(models.TaskGroup.is_active)
             )
             result = await session.execute(query)
             rows = result.all()
