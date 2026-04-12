@@ -200,11 +200,29 @@
   <div class="card shadow-sm border-0">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
       <h6 class="mb-0 small text-uppercase text-muted fw-semibold">Запуски задачи</h6>
-      {% if task_run_status %}
-      <span class="badge bg-secondary-subtle text-secondary-emphasis">
-        Фильтр: {{ task_run_status }}
-      </span>
-      {% endif %}
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        {% if task_run_status %}
+        <span class="badge bg-secondary-subtle text-secondary-emphasis">
+          Фильтр: {{ task_run_status }}
+        </span>
+        <a href="/tasks/{{ task.id }}"
+           class="btn btn-outline-secondary btn-sm">
+          Сбросить
+        </a>
+        {% endif %}
+
+        <select id="runStatusFilter" class="form-select form-select-sm" style="width: auto;">
+          <option value="">— Фильтр по статусу —</option>
+          <option value="WAITING"     {% if task_run_status == 'WAITING'     %}selected{% endif %}>WAITING</option>
+          <option value="QUEUED"      {% if task_run_status == 'QUEUED'      %}selected{% endif %}>QUEUED</option>
+          <option value="EXECUTION"   {% if task_run_status == 'EXECUTION'   %}selected{% endif %}>EXECUTION</option>
+          <option value="SUCCEED"     {% if task_run_status == 'SUCCEED'     %}selected{% endif %}>SUCCEED</option>
+          <option value="INTERRUPTED" {% if task_run_status == 'INTERRUPTED' %}selected{% endif %}>INTERRUPTED</option>
+          <option value="TEMP_ERROR"  {% if task_run_status == 'TEMP_ERROR'  %}selected{% endif %}>TEMP_ERROR</option>
+          <option value="ERROR"       {% if task_run_status == 'ERROR'       %}selected{% endif %}>ERROR</option>
+          <option value="CANCELLED"   {% if task_run_status == 'CANCELLED'   %}selected{% endif %}>CANCELLED</option>
+        </select>
+      </div>
     </div>
     <div class="card-body p-0">
       <table id="taskRunsTable" class="table table-hover align-middle mb-0" style="width:100%">
@@ -552,5 +570,17 @@ $('#taskRunsTable').DataTable({
   ],
 });
 loadAlgorithms();
+
+document.getElementById('runStatusFilter').addEventListener('change', function () {
+    const status = this.value;
+    const url = new URL(window.location.href);
+    if (status) {
+      url.searchParams.set('task_run_status', status);
+    } else {
+      url.searchParams.delete('task_run_status');
+    }
+    window.location.href = url.toString();
+  });
+
 </script>
 {% endblock %}

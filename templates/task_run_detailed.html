@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Запуск задачи #{{ task_run.id }}{% endblock %}
+
+{% block body %}
+{% from 'components/progress_timeline.html' import render_timeline %}
+<div class="container-fluid py-4">
+
+  <!-- Хлебные крошки -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/tasks" class="text-decoration-none">Задачи</a></li>
+      <li class="breadcrumb-item">
+        <a href="/tasks/{{ task_run.task_id }}" class="text-decoration-none">#{{ task_run.task_id }}</a>
+      </li>
+      <li class="breadcrumb-item active">Запуск #{{ task_run.id }}</li>
+    </ol>
+  </nav>
+
+  <!-- Заголовок -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Запуск задачи <span class="text-muted fw-normal">#{{ task_run.id }}</span></h1>
+    <a href="/tasks/{{ task_run.task_id }}" class="btn btn-outline-secondary btn-sm">
+      ← Исходная задача #{{ task_run.task_id }}
+    </a>
+  </div>
+
+  <!-- Верхний блок: основные параметры -->
+  <div class="row g-4 mb-4">
+
+    <div class="col-lg-8">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white">
+          <h6 class="mb-0 small text-uppercase text-muted fw-semibold">Основные параметры</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+
+            <!-- Статус -->
+            <div class="col-6 col-md-3">
+              <div class="p-3 bg-light rounded border h-100">
+                <div class="text-muted mb-2" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Статус</div>
+                {% set s = (task_run.status | string).split('.')[-1] | upper %}
+                {% if s == 'SUCCEED' %}<span class="badge" style="background-color:#28a745;color:#fff;">Успешно</span>
+                {% elif s == 'ERROR' %}<span class="badge" style="background-color:#dc3545;color:#fff;">Ошибка</span>
+                {% elif s == 'EXECUTION' %}<span class="badge" style="background-color:#007bff;color:#fff;">Выполняется</span>
+                {% elif s == 'TEMP_ERROR' %}<span class="badge" style="background-color:#fd7e14;color:#fff;">Врем. ошибка</span>
+                {% elif s == 'INTERRUPTED' %}<span class="badge" style="background-color:#6f42c1;color:#fff;">Прервано</span>
+                {% elif s == 'CANCELLED' %}<span class="badge" style="background-color:#6c757d;color:#fff;">Отменено</span>
+                {% elif s == 'WAITING' %}<span class="badge" style="background-color:#e9ecef;color:#6c757d;">Ожидает</span>
+                {% elif s == 'QUEUED' %}<span class="badge" style="background-color:#adb5bd;color:#fff;">В очереди</span>
+                {% else %}<span class="badge bg-light text-secondary border">{{ s }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Приоритет -->
+            <div class="col-6 col-md-3">
+              <div class="p-3 bg-light rounded border h-100">
+                <div class="text-muted mb-2" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Приоритет</div>
+                {% set p = (task_run.priority | string).split('.')[-1] | upper %}
+                {% if p == 'HIGHEST' %}<span class="badge bg-danger-subtle text-danger-emphasis">Highest</span>
+                {% elif p == 'HIGH' %}<span class="badge bg-warning-subtle text-warning-emphasis">High</span>
+                {% elif p == 'MEDIUM' %}<span class="badge bg-primary-subtle text-primary-emphasis">Medium</span>
+                {% elif p == 'LOW' %}<span class="badge bg-secondary-subtle text-secondary-emphasis">Low</span>
+                {% elif p == 'LOWEST' %}<span class="badge bg-light text-secondary border">Lowest</span>
+                {% else %}<span class="text-muted">—</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Тип прогресса -->
+            <div class="col-6 col-md-3">
+              <div class="p-3 bg-light rounded border h-100">
+                <div class="text-muted mb-2" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Тип прогресса</div>
+                {% set t = (task_run.type | string).split('.')[-1] | upper %}
+                {% if t == 'TIME_INTERVAL' %}
+                  <span class="badge" style="background-color:#f3eeff;color:#6f42c1;">Time interval</span>
+                {% elif t == 'PAGINATION' %}
+                  <span class="badge" style="background-color:#e0f5f5;color:#0d6e6e;">Pagination</span>
+                {% elif t == 'UNDEFINED' %}
+                  <span class="badge bg-light text-secondary border">Undefined</span>
+                {% else %}
+                  <span class="badge bg-light text-secondary border">{{ t }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Группа -->
+            <div class="col-6 col-md-3">
+              <div class="p-3 bg-light rounded border h-100">
+                <div class="text-muted mb-2" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Группа</div>
+                <span class="small fw-medium">{{ task_run.group_name or '—' }}</span>
+              </div>
+            </div>
+
+            <!-- Обновление статуса -->
+            <div class="col-sm-6">
+              <div class="p-3 bg-light rounded border">
+                <div class="text-muted mb-1" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Обновление статуса</div>
+                <span class="small font-monospace">{{ task_run.status_updated_at or '—' }}</span>
+              </div>
+            </div>
+
+            <!-- Описание статуса -->
+            <div class="col-sm-6">
+              <div class="p-3 bg-light rounded border">
+                <div class="text-muted mb-1" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Описание статуса</div>
+                <span class="small">{{ task_run.description or '—' }}</span>
+              </div>
+            </div>
+
+            <!-- Границы выполнения -->
+            {% if task_run.execution_bounds and task_run.execution_bounds.type == 'TIME_INTERVAL' %}
+            <div class="col-sm-6">
+              <div class="p-3 bg-light rounded border">
+                <div class="text-muted mb-2" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Начало выполнения</div>
+                <span class="small font-monospace">{{ task_run.execution_bounds.left_bound_at }}</span>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="p-3 bg-light rounded border">
+                <div class="text-muted mb-2" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Конец выполнения</div>
+                <span class="small font-monospace">{{ task_run.execution_bounds.right_bound_at }}</span>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Аргументы выполнения -->
+            {% if task_run.execution_arguments %}
+            <div class="col-12">
+              <div class="p-3 bg-light rounded border">
+                <div class="text-muted mb-2" style="font-size:0.7em;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Аргументы выполнения</div>
+                <pre class="bg-white p-2 rounded border mb-0" style="max-height:120px;overflow-y:auto;font-size:0.82em;"><code>{{ task_run.execution_arguments | tojson(indent=2) }}</code></pre>
+              </div>
+            </div>
+            {% endif %}
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Полезная нагрузка -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white">
+          <h6 class="mb-0 small text-uppercase text-muted fw-semibold">Полезная нагрузка</h6>
+        </div>
+        <div class="card-body">
+          {% if task_run.payload %}
+          <pre class="bg-light p-2 rounded border mb-0 text-break" style="max-height:300px;overflow-y:auto;font-size:0.82em;"><code>{{ task_run.payload.data | tojson(indent=2) }}</code></pre>
+          {% else %}
+          <span class="text-muted small">Нет данных</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Прогресс выполнения -->
+  {% if progress is defined and progress is not none %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white">
+      <h6 class="mb-0 small text-uppercase text-muted fw-semibold">Прогресс выполнения</h6>
+    </div>
+    <div class="card-body">
+      {{ render_timeline(progress) }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Таблица логов -->
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white">
+      <h6 class="mb-0 small text-uppercase text-muted fw-semibold">История статусов</h6>
+    </div>
+    <div class="card-body p-0">
+      <table id="statusLogsTable" class="table table-hover align-middle mb-0" style="width:100%">
+        <thead class="bg-light text-secondary small text-uppercase">
+          <tr>
+            <th>Время обновления</th>
+            <th>Статус</th>
+            <th>Описание</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const RUN_STYLES = {
+  'succeed':     { bg: '#28a745', text: '#fff',    label: 'Успешно' },
+  'error':       { bg: '#dc3545', text: '#fff',    label: 'Ошибка' },
+  'execution':   { bg: '#007bff', text: '#fff',    label: 'Выполняется' },
+  'temp_error':  { bg: '#fd7e14', text: '#fff',    label: 'Врем. ошибка' },
+  'interrupted': { bg: '#6f42c1', text: '#fff',    label: 'Прервано' },
+  'cancelled':   { bg: '#6c757d', text: '#fff',    label: 'Отменено' },
+  'waiting':     { bg: '#e9ecef', text: '#6c757d', label: 'Ожидает' },
+  'queued':      { bg: '#adb5bd', text: '#fff',    label: 'В очереди' },
+};
+
+function runStatusBadge(status) {
+  if (!status) return '<span class="text-muted">—</span>';
+  const key = String(status).split('.').pop().toLowerCase();
+  const style = RUN_STYLES[key];
+  if (!style) return `<span class="badge bg-light text-secondary border">${status}</span>`;
+  return `<span class="badge" style="background-color:${style.bg};color:${style.text};">${style.label}</span>`;
+}
+
+$('#statusLogsTable').DataTable({
+  serverSide: true,
+  processing: true,
+  pageLength: 25,
+  lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+  order: [[0, 'desc']],
+  language: {
+    search:       'Поиск:',
+    lengthMenu:   'Показывать _MENU_ записей',
+    info:         'Записи с _START_ по _END_ из _TOTAL_',
+    infoEmpty:    'Нет записей',
+    infoFiltered: '(отфильтровано из _MAX_)',
+    zeroRecords:  'Логи не найдены',
+    emptyTable:   'Нет данных',
+    processing:   'Загрузка...',
+    paginate: { first: '«', last: '»', next: '›', previous: '‹' },
+  },
+  ajax: {
+    url: '/task-run-status-logs',
+    type: 'GET',
+    data: function(d) {
+      d.task_run_id = {{ task_run.id }};
+      d.offset   = d.start;
+      d.limit    = d.length;
+      const colMap = ['status_updated_at', 'status', 'description'];
+      d.sort_by  = colMap[d.order?.[0]?.column ?? 0] ?? 'status_updated_at';
+      d.sort_asc = d.order?.[0]?.dir === 'asc';
+      delete d.columns;
+      delete d.order;
+      delete d.search;
+      delete d.start;
+      delete d.length;
+    },
+    dataFilter: function(raw) {
+      const json = JSON.parse(raw);
+      return JSON.stringify({
+        draw:            json.draw,
+        recordsTotal:    json.recordsTotal,
+        recordsFiltered: json.recordsFiltered,
+        data:            json.data,
+      });
+    },
+  },
+  columns: [
+    {
+      data: 'status_updated_at',
+      defaultContent: '<span class="text-muted">—</span>',
+      className: 'small font-monospace text-nowrap',
+    },
+    {
+      data: 'status',
+      render: (status) => runStatusBadge(status),
+    },
+    {
+      data: 'description',
+      orderable: false,
+      defaultContent: '<span class="text-muted">—</span>',
+      render: (desc) => desc
+        ? `<span class="small text-muted" style="word-break:break-word;">${desc}</span>`
+        : '<span class="text-muted">—</span>',
+    },
+  ],
+});
+</script>
+{% endblock %}

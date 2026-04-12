@@ -14,6 +14,7 @@ class GetTaskRunStatusLogsUCRq(UCRequest):
 class GetTaskRunStatusLogsUCRs(UCResponse):
     request: GetTaskRunStatusLogsUCRq
     task_run_status_logs: Optional[List[TaskRunStatusLog]] = None
+    total: int= 0
 
 
 class GetTaskRunStatusLogsUC(UseCase):
@@ -21,13 +22,15 @@ class GetTaskRunStatusLogsUC(UseCase):
         self._task_run_status_log_repo = task_run_status_log_repo
 
     async def apply(self, request: GetTaskRunStatusLogsUCRq) -> GetTaskRunStatusLogsUCRs:
-        filter_fields_dnf = FilterFieldsDNF.single('task_run_id', request.task_id)
+        filter_fields_dnf = FilterFieldsDNF.single('task_run_id', request.task_run_id)
         if request.pagination:
             pagination = request.pagination
             pagination.filter_fields_dnf = filter_fields_dnf
             task_run_status_logs = await self._task_run_status_log_repo.paginated(pagination)
         else:
             task_run_status_logs = await self._task_run_status_log_repo.filter(filter_fields_dnf)
+        total = await self._task_run_status_log_repo.count_by_fields(filter_fields_dnf)
         return GetTaskRunStatusLogsUCRs(success=True,
                                         request=request,
-                                        task_run_status_logs=task_run_status_logs)
+                                        task_run_status_logs=task_run_status_logs,
+                                        total=total)

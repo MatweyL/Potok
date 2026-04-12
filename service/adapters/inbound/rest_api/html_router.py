@@ -20,6 +20,9 @@ from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq
 from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUCRq, GetTaskDetailedUCRs
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUCRq, \
     GetTaskGroupStatisticsUCRq
+from service.domain.use_cases.external.get_task_run_detailed import GetTaskRunDetailedUCRs, GetTaskRunDetailedUCRq
+from service.domain.use_cases.external.get_task_run_status_logs import GetTaskRunStatusLogsUCRq, \
+    GetTaskRunStatusLogsUCRs
 from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq, GetTaskRunsUCRs
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq, \
@@ -410,7 +413,7 @@ async def task_runs_json(request: Request,
         # Если указать TaskRunStatus в запросе, он некорректно конвертируется: сначала преобразуется в перечисление,
         # а затем опять в строку: WAITING (str) -> TaskRunStatus.WAITING (enum) -> TaskRunStatus.WAITING(str)
         try:
-            task_run_status = TaskRunStatus(task_run_status[task_run_status.find('.') + 1:])
+            task_run_status = TaskRunStatus(task_run_status[task_run_status.find('.') + 1:].upper())
         except ValueError as e:
             logger.exception(e)
             raise HTTPException(status_code=400, detail=f'unknown status: {task_run_status}')
@@ -427,4 +430,44 @@ async def task_runs_json(request: Request,
         "recordsTotal": rs.total,
         "recordsFiltered": rs.total,
         "data": [task_run.model_dump() for task_run in rs.task_runs],
+    }
+
+
+@router.get("/task-runs/{task_run_id}")
+async def task_run_detailed_page(request: Request, task_run_id: int):
+    rs: GetTaskRunDetailedUCRs = await request.app.state.use_case_facade.get_task_run_detailed(GetTaskRunDetailedUCRq(task_run_id=task_run_id))
+    return templates.TemplateResponse(
+        request=request,
+        name="task_run_detailed.html",
+        context={
+            "task_run": rs.task_run_detailed.task_run,
+            "progress":  rs.task_run_detailed.progress
+        }
+    )
+
+
+@router.get("/task-run-status-logs/")
+async def task_runs_json(request: Request,
+                      task_run_id: int,
+                      draw: int = 1,
+                      offset: int = 0,
+                      limit: int = 25,
+                      order_by: str = 'status_updated_at',
+                      asc_sort: bool = False,
+                      ):
+
+    pagination = PaginationQuery(offset_page=offset,
+                                 limit_per_page=limit,
+                                 order_by=order_by,
+                                 asc_sort=asc_sort
+                                 )
+    rs: GetTaskRunStatusLogsUCRs = await request.app.state.use_case_facade.get_task_run_status_logs(
+        GetTaskRunStatusLogsUCRq(task_run_id=task_run_id,
+                                                                                                pagination=pagination)
+    )
+    return {
+        "draw": int(draw),
+        "recordsTotal": rs.total,
+        "recordsFiltered": rs.total,
+        "data": [task_run_status_log.model_dump() for task_run_status_log in rs.task_run_status_logs],
     }
