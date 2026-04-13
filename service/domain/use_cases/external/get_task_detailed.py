@@ -39,7 +39,7 @@ class GetTaskDetailedUC(UseCase):
         task = await self._task_repo.get(TaskPK(id=request.task_id))
         if not task:
             return GetTaskDetailedUCRs(success=False, error='Not found', request=request)
-        payload = await self._payload_repo.get(PayloadPK(id=task.id))
+        payload = await self._payload_repo.get(PayloadPK(id=task.payload_id))
         task_group = await self._task_group_repo.get(TaskGroupPK(id=task.group_id))
         monitoring_algorithm_rs = await self._get_monitoring_algorithm_uc.apply(
             GetMonitoringAlgorithmUCRq(monitoring_algorithm_id=task.monitoring_algorithm_id)

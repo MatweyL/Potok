@@ -145,7 +145,9 @@
           <a href="/payloads/{{ payload.id }}" class="text-decoration-none small text-primary">#{{ payload.id }}</a>
         </div>
         <div class="card-body">
-          <pre class="bg-light p-2 rounded border mb-0 text-break" style="max-height: 260px; overflow-y: auto; font-size: 0.82em;"><code>{{ payload.data | tojson(indent=2) }}</code></pre>
+          <pre class="bg-light p-2 rounded border mb-0 text-break" style="max-height: 260px; overflow-y: auto; font-size: 0.82em;">
+            <code>{{ payload.data | tojson(indent=2) }}</code>
+          </pre>
         </div>
       </div>
     </div>
