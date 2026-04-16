@@ -1,6 +1,5 @@
 import json
 import logging
-import random
 from pathlib import Path
 
 from imitation_modelling.schemas import SimulationParams, SystemParams, TaskBatchProviderParams, TaskBatchProviderType
@@ -20,10 +19,20 @@ def main():
     simulation_params = [SimulationParams(task_batch_provider_params=ac,
                                           system_params=simulation_config_by_name[ac.system_config_name]) for ac in
                          algorithm_configs]
-    filtered_simulation_params = ([sp for sp in simulation_params if sp.task_batch_provider_params.system_config_name == 'cfg_087__medium__strict_load__scale_up'
-                        ])
+    filtered_simulation_params = ([
+        sp for sp in simulation_params
+        if sp.task_batch_provider_params.system_config_name == 'cfg_087__medium__strict_load__scale_up'
+           and sp.task_batch_provider_params.type in (
+               TaskBatchProviderType.AIMD,
+               # TaskBatchProviderType.CONSTANT_SIZE,
+               # TaskBatchProviderType.GRADIENT_ASCENT,
+               # TaskBatchProviderType.MOVING_PID,
+           )
+    ]
+    )
     for index, sp in enumerate(filtered_simulation_params):
         sp.system_params.metric_provider_period = 300
+        sp.system_params.max_run_seconds = 30
         system_runner = build_system_runner(sp)
         system_runner.run()
 

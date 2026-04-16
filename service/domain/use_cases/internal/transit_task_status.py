@@ -33,7 +33,7 @@ class TransitTaskStatusUC(UseCase):
         self._task_status_log_repo = task_status_log_repo
         self._transaction_factory = transaction_factory
 
-    async def apply(self, request: TransitTaskStatusUCRq) -> TransitTaskStatusUCRs:
+    async def apply(self, request: TransitTaskStatusUCRq) -> TransitTaskStatusUCRs:  # TODO: optimize by sql
         async with self._transaction_factory.create() as transaction:
             execution_tasks = await self._task_repo.filter(FilterFieldsDNF.single('status', TaskStatus.EXECUTION),
                                                            transaction)

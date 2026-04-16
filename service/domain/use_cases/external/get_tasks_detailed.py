@@ -50,7 +50,7 @@ class GetTasksDetailedUC(UseCase):
         self._task_repo = task_repo
         self._task_run_metrics_provider = task_run_metrics_provider
 
-    async def apply(self, request: GetTasksDetailedUCRq) -> GetTasksDetailedUCRs:
+    async def apply(self, request: GetTasksDetailedUCRq) -> GetTasksDetailedUCRs:  # TODO: Optimize by sql
         if request.task_group_id:
             if not request.pagination.filter_fields_dnf:
                 request.pagination.filter_fields_dnf = FilterFieldsDNF.single("group_id", request.task_group_id)

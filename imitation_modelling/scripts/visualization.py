@@ -51,7 +51,10 @@ def load_runs(input_dir: str):
     for path in sorted(Path(input_dir).glob("*.json")):
         try:
             with open(path, encoding="utf-8") as f:
-                runs.append(json.load(f))
+                data = json.load(f)
+                if data['history'][-1]['completed'] != data['history'][-1]['total']:
+                    raise ValueError("NOT COMPLETED")
+                runs.append(data)
         except Exception as e:
             print(f"  [SKIP] {path.name}: {e}")
     print(f"Загружено файлов: {len(runs)}")
