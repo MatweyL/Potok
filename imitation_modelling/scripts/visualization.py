@@ -23,22 +23,21 @@ from collections import defaultdict
 from pathlib import Path
 
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
 
-INPUT_DIR        = "../simulation_results"     # ← папка с сырыми JSON результатами симуляции
-OUTPUT_DIR       = "./plots_single_system"
-MAX_DURATION_SEC = 60.0            # фильтр: прогон завершился за N реальных секунд
-HEATMAP_METRIC   = "total_time"    # метрика для heatmap: total_time / overload_count / avg_utilization
+INPUT_DIR = "../simulation_results"  # ← папка с сырыми JSON результатами симуляции
+OUTPUT_DIR = "./plots_single_system"
+MAX_DURATION_SEC = 60.0  # фильтр: прогон завершился за N реальных секунд
+HEATMAP_METRIC = "total_time"  # метрика для heatmap: total_time / overload_count / avg_utilization
 
 ALGO_COLORS = {
-    "CONSTANT_SIZE":   "#636EFA",
-    "AIMD":            "#EF553B",
-    "MOVING_PID":      "#00CC96",
-    "MOVING_PID_V2":   "#AB63FA",
+    "CONSTANT_SIZE": "#636EFA",
+    "AIMD": "#EF553B",
+    "MOVING_PID": "#00CC96",
+    "MOVING_PID_V2": "#AB63FA",
     "GRADIENT_ASCENT": "#FFA15A",
-    "ADAPTIVE_MODEL":  "#19D3F3",
+    "ADAPTIVE_MODEL": "#19D3F3",
 }
 ALGO_ORDER = ["CONSTANT_SIZE", "AIMD", "MOVING_PID", "MOVING_PID_V2",
               "GRADIENT_ASCENT", "ADAPTIVE_MODEL"]
@@ -52,8 +51,11 @@ def load_runs(input_dir: str):
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
-                if data['history'][-1]['completed'] != data['history'][-1]['total']:
-                    raise ValueError("NOT COMPLETED")
+                # if data['history'][-1]['completed'] != data['history'][-1]['total']:
+                #     raise ValueError("NOT COMPLETED")
+                if data['params']['task_batch_provider_params']['type'] not in (
+                "AIMD", "CONSTANT_SIZE", "ADAPTIVE_MODEL", "GRADIENT_ASCENT"):
+                    raise ValueError("not target algo")
                 runs.append(data)
         except Exception as e:
             print(f"  [SKIP] {path.name}: {e}")
@@ -80,17 +82,17 @@ def passes_filter(run: dict) -> bool:
 
 def compute_metrics(run: dict) -> dict:
     """Вычисляет метрики из сырого JSON прогона."""
-    history       = run.get("history", [])
-    params        = run["params"]
-    sys_p         = params["system_params"]
-    algo_p        = params["task_batch_provider_params"]
+    history = run.get("history", [])
+    params = run["params"]
+    sys_p = params["system_params"]
+    algo_p = params["task_batch_provider_params"]
     tries_dist_raw = run.get("succeed_tasks_count_by_tries_count", {})
-    tries_dist    = {int(k): v for k, v in tries_dist_raw.items()}
+    tries_dist = {int(k): v for k, v in tries_dist_raw.items()}
 
-    algo_type    = algo_p["type"]
-    description  = algo_p.get("description", "")
-    batch_opt    = algo_p.get("batch_opt", 0)
-    total_tasks  = sys_p.get("tasks_amount", 0)
+    algo_type = algo_p["type"]
+    description = algo_p.get("description", "")
+    batch_opt = algo_p.get("batch_opt", 0)
+    total_tasks = sys_p.get("tasks_amount", 0)
 
     # Завершённость и время
     last = history[-1] if history else {}
@@ -107,30 +109,30 @@ def compute_metrics(run: dict) -> dict:
 
     # Утилизация
     max_cap = sys_p.get("handlers_amount", 1) * sys_p.get("handler_max_tasks", 1)
-    active  = [s for s in history if s.get("executionCount", 0) > 0
-               or s.get("queuedCount", 0) > 0]
+    active = [s for s in history if s.get("executionCount", 0) > 0
+              or s.get("queuedCount", 0) > 0]
     avg_util = (statistics.mean(s["executionCount"] / max_cap for s in active)
                 if active else None)
 
     # Попытки
     total_task_count = sum(tries_dist.values())
-    total_tries      = sum(k * v for k, v in tries_dist.items())
+    total_tries = sum(k * v for k, v in tries_dist.items())
     tries_mean = total_tries / total_task_count if total_task_count else None
-    tries_max  = max(tries_dist.keys()) if tries_dist else None
+    tries_max = max(tries_dist.keys()) if tries_dist else None
 
     return {
-        "run_name":       run.get("run_name", ""),
-        "algo_type":      algo_type,
-        "description":    description,
-        "batch_opt":      batch_opt,
-        "duration":       run.get("duration"),
-        "all_done":       all_done,
-        "total_time":     total_time,
+        "run_name": run.get("run_name", ""),
+        "algo_type": algo_type,
+        "description": description,
+        "batch_opt": batch_opt,
+        "duration": run.get("duration"),
+        "all_done": all_done,
+        "total_time": total_time,
         "overload_count": overload_count,
-        "avg_util":       avg_util,
-        "tries_mean":     tries_mean,
-        "tries_max":      tries_max,
-        "tries_dist":     tries_dist,
+        "avg_util": avg_util,
+        "tries_mean": tries_mean,
+        "tries_max": tries_max,
+        "tries_dist": tries_dist,
     }
 
 
@@ -148,7 +150,7 @@ def algo_color(algo: str) -> str:
 def boxplot(records, field: str, title: str, yaxis_title: str,
             filename: str, output_dir: Path):
     algos = sorted_algos(records)
-    fig   = go.Figure()
+    fig = go.Figure()
 
     for algo in algos:
         values = [r[field] for r in records
@@ -191,8 +193,9 @@ def plot_cdf(records, output_dir: Path):
     CDF количества попыток. CONSTANT_SIZE исключён (ломает масштаб).
     Агрегируем tries_dist по всем прогонам каждого алгоритма.
     """
-    filtered = [r for r in records if r["algo_type"] != "CONSTANT_SIZE"]
-    algos    = sorted_algos(filtered)
+    filtered = [r for r in records if True  # fixme r["algo_type"] != "CONSTANT_SIZE"
+                ]
+    algos = sorted_algos(filtered)
 
     agg: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
     for r in filtered:
@@ -201,7 +204,7 @@ def plot_cdf(records, output_dir: Path):
 
     fig = go.Figure()
     for algo in algos:
-        dist  = agg[algo]
+        dist = agg[algo]
         if not dist:
             continue
         total = sum(dist.values())
@@ -225,7 +228,7 @@ def plot_cdf(records, output_dir: Path):
 
     fig.update_layout(
         title=dict(
-            text="CDF: доля задач, выполненных за ≤ N попыток (без CONSTANT_SIZE)",
+            text="CDF: доля задач, выполненных за ≤ N попыток",
             font=dict(size=18),
         ),
         xaxis=dict(title="Количество попыток", dtick=1),
@@ -277,7 +280,7 @@ def plot_heatmap(records, metric: str, output_dir: Path):
         reverse=higher_is_better,
     )
 
-    z    = []
+    z = []
     text = []
     for algo in algos:
         row_z, row_t = [], []
@@ -289,9 +292,9 @@ def plot_heatmap(records, metric: str, output_dir: Path):
         text.append(row_t)
 
     metric_titles = {
-        "total_time":     "Время выполнения (вирт. сек)",
+        "total_time": "Время выполнения (вирт. сек)",
         "overload_count": "Количество перегрузок",
-        "avg_util":       "Средний utilization",
+        "avg_util": "Средний utilization",
     }
 
     fig = go.Figure(go.Heatmap(
@@ -356,6 +359,7 @@ if __name__ == "__main__":
 
     # Статистика по алгоритмам
     from collections import Counter
+
     algo_counts = Counter(r["params"]["task_batch_provider_params"]["type"]
                           for r in passed)
     print("\nПрошло фильтр по алгоритмам:")
@@ -399,6 +403,6 @@ if __name__ == "__main__":
             output_dir=output_dir)
 
     plot_cdf(records, output_dir)
-    plot_heatmap(records, metric=HEATMAP_METRIC, output_dir=output_dir)
+    # plot_heatmap(records, metric=HEATMAP_METRIC, output_dir=output_dir)
 
     print(f"\nВсе графики → {output_dir.resolve()}")
