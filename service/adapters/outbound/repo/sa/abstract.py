@@ -86,7 +86,7 @@ class AbstractSARepo(Repo, ABC):
                 created_models = result.all()
                 created_domains.extend([self.to_domain(created_model) for created_model in created_models])
 
-        return [self.to_domain(created_model) for created_model in created_models]
+        return created_domains
 
     async def update(self,
                      obj_pk: TPK,

@@ -97,12 +97,19 @@ class ActualTimeIntervalExecutionBoundsProvider(ActualExecutionBoundsProvider):
         self._time_interval_task_progress_repo = time_interval_task_progress_repo
 
     async def provide(self, tasks_ids: List[int]) -> Dict[int, TimeIntervalExecutionBoundsCutter]:
-        time_interval_task_progresses = await self._time_interval_task_progress_repo.filter(
-            FilterFieldsDNF.single('task_id', tasks_ids, ConditionOperation.IN)
-        )
+        time_interval_task_progresses = await self._get_time_interval_task_progresses(tasks_ids)
         titp_list_by_task_id = defaultdict(list)
         for time_interval_task_progress in time_interval_task_progresses:
             titp_list_by_task_id[time_interval_task_progress.task_id].append(time_interval_task_progress)
         cutter_by_task_id = {task_id: TimeIntervalExecutionBoundsCutter(titp_list)
                              for task_id, titp_list in titp_list_by_task_id.items()}
         return cutter_by_task_id
+
+    async def _get_time_interval_task_progresses(self, tasks_ids: List[int]) -> List[TimeIntervalTaskProgress]:
+        if not tasks_ids:
+            return []
+        if hasattr(self._time_interval_task_progress_repo, "get_by_task_ids_ordered"):
+            return await self._time_interval_task_progress_repo.get_by_task_ids_ordered(tasks_ids)
+        return await self._time_interval_task_progress_repo.filter(
+            FilterFieldsDNF.single('task_id', tasks_ids, ConditionOperation.IN)
+        )

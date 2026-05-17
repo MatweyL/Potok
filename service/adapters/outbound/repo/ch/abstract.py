@@ -431,7 +431,7 @@ class AbstractCHRepo(ABC, Generic[TDomain, TPK]):
         client = self._client
         await client.insert(
             table=self.table_name,
-            data=[list(row[c] for c in self.column_names)],
+            data=[list(row.get(c) for c in self.column_names)],
             column_names=self.column_names,
         )
         return obj
