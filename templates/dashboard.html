@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — Поток{% endblock %}
+
+{% block extra_css %}
+
+{% endblock %}
+
+
+{% block body %}
+{# ── Объект stats с полями по умолчанию ── #}
+{% set stats = {
+    "succeed_count": 342,
+    "execution_count": 28,
+    "queued_count": 56,
+    "waiting_count": 24,
+    "error_count": 18,
+    "temp_error_count": 14,
+    "interrupted_count": 8,
+    "cancelled_count": 6
+} %}
+
+{# ── Данные для компонентов (в реальном проекте придут из контекста Jinja) ── #}
+{% set donut_data_example = [
+    {"label": "Успешно",          "value": stats.succeed_count,    "color": "#22c55e"},
+    {"label": "Выполняется",      "value": stats.execution_count,  "color": "#3b82f6"},
+    {"label": "В очереди",        "value": stats.queued_count,     "color": "#93c5fd"},
+    {"label": "Ожидает",          "value": stats.waiting_count,    "color": "#d1d5db"},
+    {"label": "Ошибка",           "value": stats.error_count,      "color": "#ef4444"},
+    {"label": "Временная ошибка", "value": stats.temp_error_count, "color": "#f59e0b"},
+    {"label": "Прервано",         "value": stats.interrupted_count,"color": "#f97316"},
+    {"label": "Отменено",         "value": stats.cancelled_count,  "color": "#9ca3af"}
+] %}
+
+{% set histogram_data_example = [
+  {"label": "0-30s",   "value": 42},
+  {"label": "30-60s",  "value": 78},
+  {"label": "60-90s",  "value": 124},
+  {"label": "90-120s", "value": 89},
+  {"label": "120-150s","value": 58},
+  {"label": "150-180s","value": 35},
+  {"label": "180-210s","value": 22},
+  {"label": "210+s",   "value": 10}
+] %}
+
+{# heatmap_data передаётся из view как переменная контекста #}
+
+<div class="flow-page">
+  <h1 class="flow-page-title">Дашборд</h1>
+
+  {# ── KPI cards ── #}
+  <div class="flow-kpi-grid">
+
+    <div class="flow-kpi-card">
+      <span class="flow-kpi-label">Активных запусков</span>
+      <span class="flow-kpi-value">{{ stats.execution_count | default(28) }}</span>
+      <span class="flow-kpi-delta up">+12% со вчера</span>
+      <div class="flow-kpi-icon" style="background:#eff6ff;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round">
+          <polyline points="1,13 5,8 9,11 13,4 17,7"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="flow-kpi-card">
+      <span class="flow-kpi-label">Выполнено за сегодня</span>
+      <span class="flow-kpi-value">{{ stats.succeed_count | default(342) }}</span>
+      <span class="flow-kpi-delta up">+8% со вчера</span>
+      <div class="flow-kpi-icon" style="background:#f0fdf4;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="9" r="7.5"/>
+          <polyline points="5.5,9.5 7.5,11.5 12.5,6.5"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="flow-kpi-card">
+      <span class="flow-kpi-label">Ошибок</span>
+      <span class="flow-kpi-value">{{ stats.error_count | default(18) }}</span>
+      <span class="flow-kpi-delta down">-5% со вчера</span>
+      <div class="flow-kpi-icon" style="background:#fef2f2;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="9" cy="9" r="7.5" stroke="#ef4444" stroke-width="2"/>
+  <path d="M9 5.5 L9 10.5" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="9" cy="13" r="0.9" fill="#ef4444"/>
+</svg>
+      </div>
+    </div>
+
+    <div class="flow-kpi-card">
+      <span class="flow-kpi-label">Средняя длительность</span>
+      <span class="flow-kpi-value">{{ stats.avg_execution_duration | default("94") }}с</span>
+      <span class="flow-kpi-delta down">-15% со вчера</span>
+      <div class="flow-kpi-icon" style="background:#faf5ff;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="9" cy="9" r="7.5"/>
+          <polyline points="9,5 9,9 11.5,11"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>{# /kpi-grid #}
+
+  {# ── Main charts row ── #}
+  <div class="flow-main-grid">
+    {# Donut #}
+    {% from "components/chart_donut.html" import render_donut %}
+    {{ render_donut(
+        donut_data=donut_data_example,
+        donut_title="Статусы запусков задач",
+        donut_subtitle="Всего запусков (24ч)",
+        donut_id="main_donut"
+    ) }}
+
+    {# Trend placeholder #}
+    <div class="flow-chart-card">
+      <div class="flow-chart-header">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="flow-chart-icon">
+          <polyline points="1,12 5,7 9,9 13,3 15,5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="flow-chart-title">Тренды производительности</span>
+      </div>
+      <div class="flow-trend-empty">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4,36 14,22 22,28 32,12 44,18"/>
+          <polyline points="38,12 44,12 44,18"/>
+        </svg>
+        <p>Аналитика производительности появится здесь</p>
+      </div>
+    </div>
+  </div>
+
+  {# ── Heatmap ── #}
+  {% from "components/chart_heatmap.html" import render_heatmap %}
+  <div style="margin-bottom: 16px;">
+    {{ render_heatmap(
+        heatmap_data=heatmap_data | default(none),
+        heatmap_title="Тепловая карта запусков задач"
+    ) }}
+  </div>
+
+  {# ── Histogram ── #}
+  {% from "components/chart_histogram.html" import render_histogram %}
+  {{ render_histogram(
+      histogram_data=histogram_data | default(histogram_data_example),
+      histogram_title="Распределение длительности запусков",
+      histogram_total=stats.total_count | default(458),
+      histogram_avg=(stats.avg_execution_duration | string + "с") if stats is defined else "94.3с",
+      histogram_id="main_hist"
+  ) }}
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+</script>
+{% endblock %}

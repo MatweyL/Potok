@@ -4,11 +4,22 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from clickhouse_connect import get_async_client
+from clickhouse_connect.driver import AsyncClient
+
 from service.adapters.inbound.consumer.rmq import AioPikaRMQConsumer, AioPikaRMQConsumerConnection, RMQQueueConsumer
 from service.adapters.inbound.rest_api.fast_api_server import FastAPIServer
 from service.adapters.inbound.rest_api.html_auth_middleware import AuthMiddleware
 from service.adapters.outbound.producer.rmq import AioPikaRMQProducerConnection, AioPikaRMQProducer, \
     AioPikaRMQQueueBoundToExchangeCreator
+from service.adapters.outbound.repo.ch.impls.task_run_status_log import CHTaskRunStatusLogRepo, \
+    create_task_run_status_log_repo
+from service.adapters.outbound.repo.ch.impls.task_run_time_interval_execution_bounds import \
+    CHTaskRunTimeIntervalExecutionBoundsRepo, create_task_run_time_interval_execution_bounds_repo
+from service.adapters.outbound.repo.ch.impls.task_run_time_interval_progress import CHTaskRunTimeIntervalProgressRepo, \
+    create_task_run_time_interval_progress_repo
+from service.adapters.outbound.repo.ch.impls.time_interval_task_progress import CHTimeIntervalTaskProgressRepo, \
+    create_time_interval_task_progress_repo
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.database import Database
 from service.adapters.outbound.repo.sa.impls.app_user import SAAppUserRepo
@@ -17,7 +28,7 @@ from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAMonit
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
 from service.adapters.outbound.repo.sa.impls.project import SAProjectRepo
 from service.adapters.outbound.repo.sa.impls.refresh_token import SARefreshTokenRepo
-from service.adapters.outbound.repo.sa.impls.task import SATaskRepo
+from service.adapters.outbound.repo.sa.impls.task import SATaskRepo, SATaskProvider
 from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
 from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
 from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider, \
@@ -104,7 +115,13 @@ async def main():
     set_log_level(logging.INFO)
     settings = ServiceSettings()
     database = Database(settings.database_uri)
-
+    if (settings.use_ch_task_run_time_interval_execution_bounds_repo
+            or settings.use_ch_task_run_time_interval_execution_bounds_repo
+            or settings.use_ch_time_interval_task_progress_repo
+            or settings.use_ch_task_run_status_log_repo):
+        ch_client = await get_async_client(**settings.ch_uri_as_params())
+    else:
+        ch_client = None
     transaction_factory = SATransactionFactory(database)
     monitoring_algorithm_repo = SAMonitoringAlgorithmRepo(database, models.MonitoringAlgorithm)
     periodic_monitoring_algorithm_repo = SAPeriodicMonitoringAlgorithmRepo(database, models.PeriodicMonitoringAlgorithm)
@@ -114,13 +131,30 @@ async def main():
     monitoring_algorithms = [periodic_monitoring_algorithm_repo, single_monitoring_algorithm_repo]
     task_to_execute_provider_registry = TaskToExecuteProviderRegistry(monitoring_algorithms)
     task_status_log_repo = SATaskStatusLogRepo(database, models.TaskStatusLog)
-    task_run_status_log_repo = SATaskRunStatusLogRepo(database, models.TaskRunStatusLog)
 
-    time_interval_task_progress_repo = SATimeIntervalTaskProgressRepo(database, models.TimeIntervalTaskProgress)
-    task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database,
-                                                                                            models.TaskRunTimeIntervalExecutionBounds)
-    task_run_time_interval_progress_repo = SATaskRunTimeIntervalProgressRepo(database,
-                                                                             models.TaskRunTimeIntervalProgress)
+    if settings.use_ch_task_run_status_log_repo:
+        task_run_status_log_repo = await create_task_run_status_log_repo(ch_client)
+    else:
+        task_run_status_log_repo = SATaskRunStatusLogRepo(database, models.TaskRunStatusLog)
+
+    if settings.use_ch_task_run_time_interval_progress_repo:
+        task_run_time_interval_progress_repo = await create_task_run_time_interval_progress_repo(ch_client)
+    else:
+        task_run_time_interval_progress_repo = SATaskRunTimeIntervalProgressRepo(database,
+                                                                                 models.TaskRunTimeIntervalProgress)
+
+    if settings.use_ch_task_run_time_interval_execution_bounds_repo:
+        task_run_time_interval_execution_bounds_repo = await create_task_run_time_interval_execution_bounds_repo(
+            ch_client)
+    else:
+        task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database,
+                                                                                                models.TaskRunTimeIntervalExecutionBounds)
+
+    if settings.use_ch_time_interval_task_progress_repo:
+        time_interval_task_progress_repo = await create_time_interval_task_progress_repo(ch_client)
+    else:
+        time_interval_task_progress_repo = SATimeIntervalTaskProgressRepo(database, models.TimeIntervalTaskProgress)
+
     waiting_task_run_provider = SAWaitingTaskRunProvider(database, task_run_repo)
     payload_repo = SAPayloadRepo(database, models.Payload)
     app_user_repo = SAAppUserRepo(database, models.AppUser)
@@ -130,6 +164,7 @@ async def main():
     project_repo = SAProjectRepo(database, models.Project)
     task_group_by_project_repo = SATaskGroupByProjectRepo(database, models.TaskGroupByProject)
     task_run_metrics_provider = SATaskRunMetricsProvider(database)
+    task_provider = SATaskProvider(database)
 
     rmq_producer_connection = AioPikaRMQProducerConnection.from_settings(settings.rmq_producer_connection)
     rmq_producer = AioPikaRMQProducer.from_settings(settings.rmq_producer_task_run, rmq_producer_connection)
@@ -175,15 +210,16 @@ async def main():
 
     create_task_group_uc = CreateTaskGroupUC(task_group_repo)
     get_task_group_uc = GetTaskGroupUC(task_group_repo)
-    get_task_detailed_uc = GetTaskDetailedUC(task_repo, payload_repo, task_group_repo, get_monitoring_algorithm_uc, get_task_progress_uc, task_run_metrics_provider)
+    get_task_detailed_uc = GetTaskDetailedUC(task_repo, payload_repo, task_group_repo, get_monitoring_algorithm_uc,
+                                             get_task_progress_uc, task_run_metrics_provider)
     get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_task_runs_uc,
-                                               get_monitoring_algorithm_uc,payload_repo,
+                                               get_monitoring_algorithm_uc, payload_repo,
                                                task_group_repo, task_repo, task_run_metrics_provider, )
     get_all_task_group_uc = GetAllTaskGroupUC(task_group_repo)
     get_task_groups_without_project_uc = GetTaskGroupsWithoutProjectUC(project_repo, task_group_repo,
                                                                        task_group_by_project_repo)
 
-    get_payload_uc = GetPayloadUC(payload_repo, task_repo, get_tasks_detailed_uc,)
+    get_payload_uc = GetPayloadUC(payload_repo, task_repo, get_tasks_detailed_uc, )
 
     get_all_projects_uc = GetAllProjectsUC(project_repo)
     create_project_uc = CreateProjectUC(project_repo)
@@ -229,7 +265,7 @@ async def main():
                                     get_monitoring_algorithm_uc,
                                     get_task_run_status_logs_uc,
                                     get_task_run_detailed_uc,
-                                    update_task_uc,)
+                                    update_task_uc, )
     set_use_case_facade(use_case_facade)
 
     # USE CASE: internal
@@ -270,7 +306,7 @@ async def main():
 
     transit_task_status_uc = TransitTaskStatusUC(
         task_repo=task_repo,
-        task_run_repo=task_run_repo,
+        task_provider=task_provider,
         task_status_log_repo=task_status_log_repo,
         transaction_factory=transaction_factory,
     )
@@ -307,17 +343,18 @@ async def main():
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [
-        # rmq_producer_connection,
-        # rmq_producer,
-        # rmq_consumer_connection,
-        # rmq_consumer,
-        # rmq_task_run_execution_status_consumer,
+        rmq_producer_connection,
+        rmq_producer,
+        rmq_consumer_connection,
+        rmq_consumer,
+        rmq_task_run_execution_status_consumer,
 
     ]
     periodic_runners = [
-        PeriodicRunner(create_task_runs_uc.apply, 30, run_name="Create task runs from tasks",
+        PeriodicRunner(create_task_runs_uc.apply, 30, run_name="Create task runs from tasks", verbose_exception=True,
                        method_args=[CreateTaskRunsUCRq()]),
         PeriodicRunner(transit_status_from_queued_to_interrupted_uc.apply, 30, run_name="QUEUED -> INTERRUPTED",
+                       # verbose_exception=True,
                        method_args=[TransitTaskRunStatusUCRq(ttl_seconds=300)]),
         PeriodicRunner(transit_status_from_execution_to_interrupted_uc.apply, 30, run_name="EXECUTION -> INTERRUPTED",
                        method_args=[TransitTaskRunStatusUCRq(ttl_seconds=300)]),

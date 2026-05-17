@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import pprint
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -14,17 +15,15 @@ simulation_results_path = Path("simulation_results")
 if simulation_results_path.exists():
     already_executed_runs = {file.name.replace('.json', '') for file in list(simulation_results_path.iterdir())}
 else:
-    already_executed_runs = {}
-
+    already_executed_runs = set()
+pprint.pprint(already_executed_runs)
 # ====================== НАСТРОЙКИ ======================
 MAX_WORKERS = max(1, os.cpu_count())
 
 print(f"Запускаем симуляции на {MAX_WORKERS} ядрах (всего ядер: {os.cpu_count()})")
 
 
-# ====================== ФУНКЦИЯ ДЛЯ ОДНОЙ СИМУЛЯЦИИ ======================
 def run_single_simulation(sp):
-    """Эта функция будет выполняться в отдельном процессе"""
     try:
         sp.system_params.metric_provider_period = 300
         sp.system_params.max_run_seconds = 30
@@ -39,7 +38,6 @@ def run_single_simulation(sp):
         return None
 
 
-# ====================== ОСНОВНОЙ ПАРАЛЛЕЛЬНЫЙ ЗАПУСК ======================
 def run_all_simulations(filtered_simulation_params):
     results = []
     total = len(filtered_simulation_params)

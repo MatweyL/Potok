@@ -14,8 +14,8 @@ class AdminUseCaseFacade:
         self._get_all_users_uc = get_all_users_uc
         self._activate_user_uc = activate_user_uc
 
-    async def get_all_users(self) -> GetAllUsersUCRs:
-        return await self._get_all_users_uc.apply(GetAllUsersUCRq())
+    async def get_all_users(self, request: GetAllUsersUCRq) -> GetAllUsersUCRs:
+        return await self._get_all_users_uc.apply(request)
 
     async def deactivate_user(self, request: DeactivateUserUCRq) -> DeactivateUserUCRs:
         return await self._deactivate_user_uc.apply(request)

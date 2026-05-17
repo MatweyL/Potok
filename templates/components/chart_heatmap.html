@@ -1,0 +1,192 @@
+{#
+  components/chart_heatmap.html
+  Тепловая карта запусков задач по дням недели и часам.
+
+  Ожидаемые переменные (передаются в include или через вызов макроса):
+    heatmap_data  — список из 7 списков (пн-вс), каждый 24 элемента (часы 0-23),
+                    значение — число запусков или null
+    heatmap_title — строка-заголовок (необязательно, по умолчанию «Тепловая карта запусков задач»)
+
+  Пример данных:
+    heatmap_data = [
+      [12, 5, 0, ...],  # Пн, 24 значения
+      ...               # Вт..Вс
+    ]
+#}
+
+{% macro render_heatmap(heatmap_data, heatmap_title="Тепловая карта запусков задач") %}
+<div class="flow-chart-card">
+  <div class="flow-chart-header">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="flow-chart-icon">
+      <rect x="1" y="1" width="6" height="6" rx="1"/>
+      <rect x="9" y="1" width="6" height="6" rx="1"/>
+      <rect x="1" y="9" width="6" height="6" rx="1"/>
+      <rect x="9" y="9" width="6" height="6" rx="1"/>
+    </svg>
+    <span class="flow-chart-title">{{ heatmap_title }}</span>
+  </div>
+
+  <div class="heatmap-wrap">
+    <div class="heatmap-labels-top">
+      <div class="heatmap-corner"></div>
+      {% set hour_labels = [0, 3, 6, 9, 12, 15, 18, 21] %}
+      {% for h in range(24) %}
+        <div class="heatmap-hour-label {% if h not in hour_labels %}heatmap-hour-hidden{% endif %}">
+          {% if h in hour_labels %}{{ "%d:00" % h }}{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% set days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] %}
+    {% for d in range(7) %}
+    <div class="heatmap-row">
+      <div class="heatmap-day-label">{{ days[d] }}</div>
+      {% for h in range(24) %}
+        {% set val = heatmap_data[d][h] if heatmap_data and heatmap_data[d] is defined else 0 %}
+        <div
+          class="heatmap-cell"
+          data-value="{{ val }}"
+          title="{{ days[d] }} {{ '%02d:00'|format(h) }} — {{ val }} запусков"
+        ></div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    <div class="heatmap-legend">
+      <span class="heatmap-legend-label">Меньше</span>
+      <div class="heatmap-legend-scale">
+        <div class="heatmap-legend-cell" style="--intensity:0.08"></div>
+        <div class="heatmap-legend-cell" style="--intensity:0.3"></div>
+        <div class="heatmap-legend-cell" style="--intensity:0.55"></div>
+        <div class="heatmap-legend-cell" style="--intensity:0.78"></div>
+        <div class="heatmap-legend-cell" style="--intensity:1.0"></div>
+      </div>
+      <span class="heatmap-legend-label">Больше</span>
+    </div>
+  </div>
+</div>
+
+<style>
+.heatmap-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-x: auto;
+}
+.heatmap-labels-top {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 4px;
+  padding-left: 0;
+}
+.heatmap-corner {
+  width: 28px;
+  flex-shrink: 0;
+}
+.heatmap-hour-label {
+  flex: 1 1 0;
+  font-size: 10px;
+  color: var(--flow-text-muted, #9ca3af);
+  text-align: left;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: visible;
+}
+.heatmap-hour-hidden {
+  visibility: hidden;
+}
+.heatmap-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.heatmap-day-label {
+  width: 26px;
+  font-size: 11px;
+  color: var(--flow-text-muted, #9ca3af);
+  text-align: right;
+  padding-right: 4px;
+  flex-shrink: 0;
+}
+.heatmap-cell {
+  flex: 1 1 0;
+  height: 18px;
+  min-width: 0;
+  border-radius: 3px;
+  background-color: var(--flow-heatmap-empty, #e5e7eb);
+  cursor: default;
+  transition: transform 0.1s;
+}
+.heatmap-cell:hover {
+  transform: scale(1.2);
+  z-index: 2;
+  position: relative;
+}
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.heatmap-legend-label {
+  font-size: 11px;
+  color: var(--flow-text-muted, #9ca3af);
+}
+.heatmap-legend-scale {
+  display: flex;
+  gap: 3px;
+}
+.heatmap-legend-cell {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+</style>
+
+<script>
+(function() {
+  function intensityToColor(intensity) {
+    if (intensity <= 0) return 'var(--flow-heatmap-empty, #e5e7eb)';
+    // green → yellow → orange → red gradient
+    const stops = [
+      [52, 211, 153],   // #34d399 green
+      [251, 191, 36],   // #fbbf24 yellow
+      [249, 115, 22],   // #f97316 orange
+      [239, 68, 68],    // #ef4444 red
+    ];
+    const t = Math.min(intensity, 1);
+    const seg = t * (stops.length - 1);
+    const i = Math.floor(seg);
+    const f = seg - i;
+    const c1 = stops[Math.min(i, stops.length - 1)];
+    const c2 = stops[Math.min(i + 1, stops.length - 1)];
+    const r = Math.round(c1[0] + (c2[0] - c1[0]) * f);
+    const g = Math.round(c1[1] + (c2[1] - c1[1]) * f);
+    const b = Math.round(c1[2] + (c2[2] - c1[2]) * f);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  document.querySelectorAll('.heatmap-cell').forEach(cell => {
+    const val = parseFloat(cell.dataset.value) || 0;
+    cell._rawVal = val;
+  });
+
+  // Find max across all cells in same heatmap
+  document.querySelectorAll('.heatmap-wrap').forEach(wrap => {
+    const cells = wrap.querySelectorAll('.heatmap-cell');
+    let maxVal = 0;
+    cells.forEach(c => { if (c._rawVal > maxVal) maxVal = c._rawVal; });
+    cells.forEach(c => {
+      const intensity = maxVal > 0 ? c._rawVal / maxVal : 0;
+      c.style.backgroundColor = intensityToColor(intensity);
+    });
+    // Legend cells
+    wrap.querySelectorAll('.heatmap-legend-cell').forEach(c => {
+      const intensity = parseFloat(c.style.getPropertyValue('--intensity')) || 0;
+      c.style.backgroundColor = intensityToColor(intensity);
+    });
+  });
+})();
+</script>
+{% endmacro %}

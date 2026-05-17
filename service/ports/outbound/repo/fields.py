@@ -50,6 +50,10 @@ class UpdateFields(BaseModel):
 class FilterField(BaseField):
     operation: ConditionOperation = ConditionOperation.EQ
 
+    @classmethod
+    def new(cls, name: str, value: Any, operation: ConditionOperation):
+        return cls(name=name, value=value, operation=operation)
+
 
 class FilterFieldsConjunct(BaseModel):
     group: List[FilterField]

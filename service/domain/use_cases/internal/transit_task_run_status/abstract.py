@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from functools import cached_property
-from typing import Optional
 
 from service.domain.schemas.enums import TaskRunStatus
 from service.domain.schemas.task_run import TaskRun, TaskRunPK, TaskRunStatusLog

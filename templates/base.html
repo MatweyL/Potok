@@ -7,25 +7,315 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
   <link rel="stylesheet" href="https://cdn.datatables.net/2.0.3/css/dataTables.bootstrap5.min.css"/>
+  <style>
+    /* ─── Design tokens ─────────────────────────────────────────── */
+    :root {
+      --flow-bg:           #f3f4f6;
+      --flow-surface:      #ffffff;
+      --flow-border:       #e5e7eb;
+      --flow-text:         #111827;
+      --flow-text-muted:   #6b7280;
+      --flow-primary:      #2563eb;
+      --flow-primary-soft: #eff6ff;
+      --flow-radius:       12px;
+      --flow-shadow:       0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      --flow-heatmap-empty:#e5e7eb;
+    }
 
+    body { background: var(--flow-bg); color: var(--flow-text); font-family: 'Geist', 'Inter', system-ui, sans-serif; }
+
+    /* ─── Navbar ────────────────────────────────────────────────── */
+    .flow-navbar {
+      background: #fff;
+      border-bottom: 1px solid var(--flow-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    /* Верхняя строка: логотип + кнопки */
+    .flow-navbar-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 56px;
+    }
+
+    .flow-navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .flow-navbar-logo {
+      width: 34px; height: 34px;
+      background: var(--flow-primary);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .flow-navbar-logo svg { color: #fff; }
+    .flow-navbar-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--flow-text);
+      line-height: 1.1;
+    }
+    .flow-navbar-name span {
+      display: block;
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--flow-text-muted);
+      letter-spacing: 0.02em;
+    }
+    .flow-navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Нижняя строка: вкладки */
+    .flow-navbar-tabs-wrap {
+      border-top: 1px solid var(--flow-border);
+    }
+    .flow-navbar-tabs {
+      display: flex;
+      align-items: flex-end;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px;
+      gap: 0;
+    }
+    .flow-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      font-size: 13.5px;
+      color: var(--flow-text-muted);
+      text-decoration: none;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+    }
+    .flow-nav-link:hover {
+      color: var(--flow-text);
+      border-bottom-color: var(--flow-border);
+    }
+    .flow-nav-link.active {
+      color: var(--flow-primary);
+      font-weight: 600;
+      border-bottom-color: var(--flow-primary);
+    }
+    .flow-nav-link svg { opacity: .65; flex-shrink: 0; }
+    .flow-nav-link:hover svg  { opacity: .9; }
+    .flow-nav-link.active svg { opacity: 1; }
+
+    /* ─── Page layout ───────────────────────────────────────────── */
+    .flow-page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px 24px 48px;
+    }
+    .flow-page-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--flow-text);
+      margin-bottom: 20px;
+    }
+
+    /* ─── KPI cards ─────────────────────────────────────────────── */
+    .flow-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .flow-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .flow-kpi-grid { grid-template-columns: 1fr; } }
+
+    .flow-kpi-card {
+      background: var(--flow-surface);
+      border: 1px solid var(--flow-border);
+      border-radius: var(--flow-radius);
+      padding: 20px 20px 16px;
+      box-shadow: var(--flow-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      position: relative;
+    }
+    .flow-kpi-label {
+      font-size: 12.5px;
+      color: var(--flow-text-muted);
+      font-weight: 500;
+    }
+    .flow-kpi-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--flow-text);
+      line-height: 1.1;
+      margin: 4px 0;
+    }
+    .flow-kpi-delta { font-size: 12px; font-weight: 500; }
+    .flow-kpi-delta.up   { color: #16a34a; }
+    .flow-kpi-delta.down { color: #dc2626; }
+    .flow-kpi-icon {
+      position: absolute;
+      top: 18px; right: 18px;
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ─── Chart cards ───────────────────────────────────────────── */
+    .flow-chart-card {
+      background: var(--flow-surface);
+      border: 1px solid var(--flow-border);
+      border-radius: var(--flow-radius);
+      padding: 20px;
+      box-shadow: var(--flow-shadow);
+    }
+    .flow-chart-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .flow-chart-icon { color: var(--flow-text-muted); flex-shrink: 0; }
+    .flow-chart-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--flow-text);
+    }
+
+    /* ─── Charts grid ───────────────────────────────────────────── */
+    .flow-main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 860px) { .flow-main-grid { grid-template-columns: 1fr; } }
+
+    /* ─── Trend placeholder ─────────────────────────────────────── */
+    .flow-trend-empty {
+      height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--flow-text-muted);
+    }
+    .flow-trend-empty svg { opacity: .35; }
+    .flow-trend-empty p { font-size: 13px; }
+
+    /* ─── Buttons ───────────────────────────────────────────────── */
+    .flow-btn-primary {
+      background: var(--flow-primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s;
+    }
+    .flow-btn-primary:hover { background: #1d4ed8; color: #fff; }
+    .flow-btn-outline {
+      background: transparent;
+      color: var(--flow-text-muted);
+      border: 1px solid var(--flow-border);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .flow-btn-outline:hover { border-color: #9ca3af; color: var(--flow-text); }
+  </style>
   {% block extra_css %}{% endblock %}
 </head>
 <body class="bg-light">
 
 {% block navbar %}
-<nav class="navbar navbar-light bg-white border-bottom px-4 py-3">
-  <a class="navbar-brand fw-bold" href="/tasks">Поток</a>
-  <div class="d-flex align-items-center gap-3">
-    <a href="/projects" class="nav-link text-secondary small">Проекты</a>
-    <a href="/task-groups" class="nav-link text-secondary small">Группы задач</a>
-    <a href="/payloads" class="nav-link text-secondary small">Данные для сбора</a>
-    <a href="/monitoring-algorithms" class="nav-link text-secondary small">Алгоритмы сбора</a>
-    <a href="/tasks/create" class="nav-link text-secondary small">Создать задачи</a>
-    {% if request.state.user and request.state.user.roles and 'ADMIN' in request.state.user.roles %}
-    <a href="/users" class="nav-link text-secondary small">Пользователи системы</a>
-    {% endif %}
-    <button class="btn btn-outline-secondary btn-sm" id="logoutBtn">Выйти</button>
+<nav class="flow-navbar">
+
+  {# ── Верхняя строка: логотип + кнопки ── #}
+  <div class="flow-navbar-top">
+    <a class="flow-navbar-brand" href="/dashboard">
+      <div class="flow-navbar-logo">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M3 10C3 6.13 6.13 3 10 3s7 3.13 7 7-3.13 7-7 7-7-3.13-7-7z" stroke="white" stroke-width="1.8"/>
+          <path d="M7 10h6M10 7v6" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="flow-navbar-name">
+        Поток
+        <span>Система управления задачами</span>
+      </div>
+    </a>
+
+    <div class="flow-navbar-right">
+      <button class="flow-btn-outline" id="logoutBtn">Выйти</button>
+    </div>
   </div>
+
+  {# ── Нижняя строка: вкладки ── #}
+  <div class="flow-navbar-tabs-wrap">
+    <div class="flow-navbar-tabs">
+
+      <a href="/dashboard" class="flow-nav-link {% if active_nav == 'dashboard' %}active{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>
+        Дашборд
+      </a>
+
+      <a href="/projects" class="flow-nav-link {% if active_nav == 'projects' %}active{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="3" width="12" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 3V2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="1.4"/></svg>
+        Проекты
+      </a>
+
+      <a href="/task-groups" class="flow-nav-link {% if active_nav == 'task_groups' %}active{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="4" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="4" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6 7h1.5M8.1 4.9l-1.5.7M8.1 9.1l-1.5-.7" stroke="currentColor" stroke-width="1.2"/></svg>
+        Группы задач
+      </a>
+
+      <a href="/payloads" class="flow-nav-link {% if active_nav == 'payloads' %}active{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="1" y="4" width="12" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="1.4"/></svg>
+        Полезные нагрузки
+      </a>
+
+      <a href="/monitoring-algorithms" class="flow-nav-link {% if active_nav == 'monitoring_algorithms' %}active{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 4v3l2 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Алгоритмы сбора
+      </a>
+
+      <a href="/tasks/create" class="flow-nav-link {% if active_nav == 'create_tasks' %}active{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 4.5v5M4.5 7h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Создать задачи
+      </a>
+
+      {% if request.state.user and request.state.user.roles and 'ADMIN' in request.state.user.roles %}
+      <a href="/users" class="flow-nav-link {% if active_nav == 'users' %}active{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="4.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>
+        Пользователи системы
+      </a>
+      {% endif %}
+
+    </div>
+  </div>
+
 </nav>
 {% endblock %}
 

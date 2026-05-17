@@ -9,7 +9,7 @@ from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAPerio
     SAMonitoringAlgorithmRepo, SASingleMonitoringAlgorithmRepo
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
 from service.adapters.outbound.repo.sa.impls.project import SAProjectRepo
-from service.adapters.outbound.repo.sa.impls.task import SATaskRepo
+from service.adapters.outbound.repo.sa.impls.task import SATaskRepo, SATaskProvider
 from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
 from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
 from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider, \
@@ -143,7 +143,6 @@ def sa_task_group_repo(database):
 def sa_project_repo(database):
     return SAProjectRepo(database, models.Project)
 
-
 @pytest.fixture
 def sa_task_group_by_project_repo(database):
     return SATaskGroupByProjectRepo(database, models.TaskGroupByProject)
@@ -155,6 +154,10 @@ def sa_waiting_task_run_provider(database, sa_task_run_repo):
 @pytest.fixture
 def sa_task_run_metrics_provider(database):
     return SATaskRunMetricsProvider(database)
+
+@pytest.fixture
+def sa_task_provider(database):
+    return SATaskProvider(database)
 @pytest.fixture
 def actual_execution_bounds_provider(sa_time_interval_task_progress_repo):
     return ActualTimeIntervalExecutionBoundsProvider(sa_time_interval_task_progress_repo)
@@ -217,13 +220,13 @@ def create_tasks_uc(
 @pytest.fixture
 def transit_task_status_uc(
         sa_task_repo,
-        sa_task_run_repo,
+        sa_task_provider,
         sa_task_status_log_repo,
         sa_transaction_factory,
 ) -> TransitTaskStatusUC:
     return TransitTaskStatusUC(
         task_repo=sa_task_repo,
-        task_run_repo=sa_task_run_repo,
+        task_provider=sa_task_provider,
         task_status_log_repo=sa_task_status_log_repo,
         transaction_factory=sa_transaction_factory,
     )

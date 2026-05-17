@@ -1,0 +1,273 @@
+{#
+  components/chart_donut.html
+  Кольцевая диаграмма статусов запусков задач.
+
+  Параметры макроса:
+    donut_data     — список dict: { label: str, value: int, color: str }
+    donut_title    — заголовок карточки
+    donut_total    — число в центре (если не указано — сумма всех value)
+    donut_subtitle — подпись под числом в центре (напр. «Всего запусков (24ч)»)
+    donut_id       — уникальный id (если на странице несколько диаграмм)
+#}
+
+{% macro render_donut(donut_data, donut_title="Статусы запусков задач", donut_total=none, donut_subtitle="Всего запусков (24ч)", donut_id="donut1") %}
+
+{% set total_sum = namespace(v=0) %}
+{% for item in donut_data %}{% set total_sum.v = total_sum.v + item.value %}{% endfor %}
+{% set center_val = donut_total if donut_total is not none else total_sum.v %}
+
+<div class="flow-chart-card">
+  <div class="flow-chart-header">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="flow-chart-icon">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="8" cy="8" r="3"   stroke="currentColor" stroke-width="1.5"/>
+    </svg>
+    <span class="flow-chart-title">{{ donut_title }}</span>
+  </div>
+
+  <div class="dn-layout">
+    {# ── SVG donut ── #}
+    <div class="dn-svg-wrap">
+      <svg
+        id="{{ donut_id }}_svg"
+        viewBox="0 0 220 220"
+        width="220" height="220"
+        style="overflow: visible;"
+      >
+        <g id="{{ donut_id }}_arcs"></g>
+        <text
+          x="110" y="100"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          class="dn-center-val"
+          id="{{ donut_id }}_cval"
+        >{{ center_val }}</text>
+        <text
+          x="110" y="124"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          class="dn-center-sub"
+          id="{{ donut_id }}_csub"
+        >{{ donut_subtitle }}</text>
+      </svg>
+
+      {# Tooltip overlay #}
+      <div class="dn-tooltip" id="{{ donut_id }}_tip"></div>
+    </div>
+
+    {# ── Legend ── #}
+    <div class="dn-legend">
+      {% for item in donut_data %}
+        {% if total_sum.v > 0 %}
+          {% set pct = ((item.value / total_sum.v * 100) | round(1)) %}
+        {% else %}
+          {% set pct = 0 %}
+        {% endif %}
+        <div class="dn-legend-row" data-idx="{{ loop.index0 }}" id="{{ donut_id }}_leg{{ loop.index0 }}">
+          <span class="dn-legend-dot" style="background: {{ item.color }};"></span>
+          <span class="dn-legend-name">{{ item.label }}:</span>
+          <span class="dn-legend-val">{{ item.value }}</span>
+          <span class="dn-legend-pct">({{ pct }}%)</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const DATA  = {{ donut_data | tojson }};
+  const TOTAL = {{ center_val }};
+  const ID    = {{ donut_id | tojson }};
+
+  const svg   = document.getElementById(ID + '_svg');
+  const arcs  = document.getElementById(ID + '_arcs');
+  const tip   = document.getElementById(ID + '_tip');
+  const cval  = document.getElementById(ID + '_cval');
+  const csub  = document.getElementById(ID + '_csub');
+
+  const cx = 110, cy = 110, R = 96, r = 62;
+  const GAP_DEG = 1.2; // градусов между сегментами
+  const sum = DATA.reduce((s, d) => s + d.value, 0);
+
+  function polar(cx, cy, radius, angleDeg) {
+    const a = (angleDeg - 90) * Math.PI / 180;
+    return [cx + radius * Math.cos(a), cy + radius * Math.sin(a)];
+  }
+
+  function arcPath(startDeg, endDeg) {
+    const [ox1, oy1] = polar(cx, cy, R, startDeg);
+    const [ox2, oy2] = polar(cx, cy, R, endDeg);
+    const [ix1, iy1] = polar(cx, cy, r, endDeg);
+    const [ix2, iy2] = polar(cx, cy, r, startDeg);
+    const large = (endDeg - startDeg) > 180 ? 1 : 0;
+    return [
+      `M ${ox1} ${oy1}`,
+      `A ${R} ${R} 0 ${large} 1 ${ox2} ${oy2}`,
+      `L ${ix1} ${iy1}`,
+      `A ${r} ${r} 0 ${large} 0 ${ix2} ${iy2}`,
+      'Z'
+    ].join(' ');
+  }
+
+  let angle = 0;
+  const paths = [];
+
+  DATA.forEach((item, i) => {
+    const sweep = (item.value / sum) * 360;
+    if (sweep < 0.1) { paths.push(null); angle += sweep; return; }
+
+    const startDeg = angle + GAP_DEG / 2;
+    const endDeg   = angle + sweep - GAP_DEG / 2;
+    angle += sweep;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', arcPath(startDeg, endDeg));
+    path.setAttribute('fill', item.color);
+    path.setAttribute('data-idx', i);
+    path.style.cssText = 'cursor:pointer; transition: transform .18s, filter .18s; transform-origin: 110px 110px;';
+    arcs.appendChild(path);
+    paths.push(path);
+
+    // Midpoint для tooltip
+    const midDeg = (startDeg + endDeg) / 2;
+    path._midDeg = midDeg;
+    path._item   = item;
+
+    path.addEventListener('mouseenter', () => {
+      path.style.transform = 'scale(1.07)';
+      path.style.filter    = 'brightness(1.1)';
+
+      // подсветить строку легенды
+      document.querySelectorAll(`#${ID}_svg`).forEach(() => {});
+      highlightLegend(i);
+
+      // tooltip
+      const svgRect = svg.getBoundingClientRect();
+      const [tx, ty] = polar(cx, cy, (R + r) / 2 + 16, midDeg);
+      // показываем просто как overlay поверх SVG
+      const pct = sum > 0 ? (item.value / sum * 100).toFixed(1) : '0';
+      tip.innerHTML = `<strong>${item.label}</strong>: ${item.value} (${pct}%)`;
+      tip.style.display = 'block';
+
+      // позиция в координатах SVG viewBox → перевести в px
+      const scaleX = svgRect.width  / 160;
+      const scaleY = svgRect.height / 160;
+      let left = tx * scaleX;
+      let top  = ty * scaleY;
+      // не вылезать за края
+      tip.style.left = left + 'px';
+      tip.style.top  = top  + 'px';
+    });
+
+    path.addEventListener('mouseleave', () => {
+      path.style.transform = '';
+      path.style.filter    = '';
+      tip.style.display = 'none';
+      highlightLegend(-1);
+    });
+  });
+
+  function highlightLegend(activeIdx) {
+    DATA.forEach((_, i) => {
+      const row = document.getElementById(ID + '_leg' + i);
+      if (!row) return;
+      row.style.opacity = (activeIdx === -1 || activeIdx === i) ? '1' : '0.4';
+    });
+  }
+})();
+</script>
+
+<style>
+.dn-layout {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.dn-svg-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.dn-tooltip {
+  display: none;
+  position: absolute;
+  background: #1f2937;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+
+.dn-center-val {
+  font-size: 32px;
+  font-weight: 700;
+  fill: var(--flow-text, #111827);
+}
+.dn-center-sub {
+  font-size: 11px;
+  fill: var(--flow-text-muted, #9ca3af);
+}
+
+/* Legend */
+.dn-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.dn-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  transition: opacity .15s;
+  cursor: default;
+}
+.dn-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dn-legend-name {
+  color: var(--flow-text-muted, #6b7280);
+  white-space: nowrap;
+}
+.dn-legend-val {
+  font-weight: 600;
+  color: var(--flow-text, #111827);
+}
+.dn-legend-pct {
+  color: var(--flow-text-muted, #9ca3af);
+  font-size: 12px;
+}
+
+/* Центральный текст — total + subtitle сверху легенды */
+.dn-total-block {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--flow-border, #e5e7eb);
+}
+.dn-total-val {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--flow-text, #111827);
+  line-height: 1;
+}
+.dn-total-sub {
+  font-size: 11px;
+  color: var(--flow-text-muted, #9ca3af);
+  margin-top: 2px;
+}
+</style>
+{% endmacro %}

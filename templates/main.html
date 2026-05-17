@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Поток{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block body %}
+<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
+  <div style="max-width: 640px; width: 100%; padding: 2rem 1rem;">
+
+    <div class="text-center mb-5">
+      <h1 class="fw-bold display-6">Поток</h1>
+      <p class="text-muted">Система управления задачами</p>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">
+        Поддерживает
+        <span class="badge bg-success ms-2">✓ готово</span>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">Создание разных <strong>алгоритмов мониторинга</strong></li>
+        <li class="list-group-item">Приоритезацию задач <span class="text-muted small">(каждый приоритет отправляется в свою очередь)</span></li>
+        <li class="list-group-item">Два типа задач: <code>«Без типа»</code> и <code>«Временной интервал»</code></li>
+        <li class="list-group-item">Отслеживание прогресса для задач типа <code>«Временной интервал»</code></li>
+        <li class="list-group-item">Историзм статусов задач</li>
+        <li class="list-group-item">Балансировка нагрузки</li>
+      </ul>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-white fw-semibold">
+        В дальнейшем будет
+        <span class="badge bg-warning text-dark ms-2">◦ в планах</span>
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">Тип задачи <code>«Пагинация»</code> с отслеживанием прогресса</li>
+      </ul>
+    </div>
+
+    <div class="text-center">
+      <a href="/login" class="btn btn-primary px-5">Войти</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

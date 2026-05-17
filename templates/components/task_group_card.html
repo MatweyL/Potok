@@ -1,80 +1,228 @@
-{# components/task_group_card.html #}
-{# Ожидаемые переменные в контексте: group, stats, project (опционально), show_project (опционально, по умолчанию True) #}
+{#
+  components/task_group_card.html
+  Карточка группы задач.
 
-{% set show_proj = show_project is not defined or show_project == true %}
-{% set verbose = show_verbose is defined and show_verbose == true %}
+  Параметры макроса render_task_group_card:
+    group   — объект группы задач со следующими полями:
+                id, title, name, is_active, description (опц.)
+    stats   — dict со статистикой (или none):
+                total_count, execution_count, succeed_count,
+                error_count, avg_execution_duration, throughput, ...
+    project — объект проекта (опц.): { id, title }
+    show_project — показывать привязку к проекту (по умолчанию false)
+#}
 
-<div class="card shadow-sm border-0 h-100">
-    <!-- Шапка карточки -->
-    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h5 class="card-title mb-0">
-            <a href="/task-groups/{{ group.id }}" class="text-decoration-none fw-semibold text-dark">
-                {{ group.title }}
-            </a>
-        </h5>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <code class="bg-light px-2 py-1 rounded small text-muted">{{ group.name }}</code>
-            {% if group.is_active %}
-                <span class="badge bg-success-subtle text-success-emphasis">Активна</span>
-            {% else %}
-                <span class="badge bg-secondary-subtle text-secondary-emphasis">Не активна</span>
-            {% endif %}
+{% macro render_task_group_card(group, stats=none, project=none, show_project=false) %}
+
+{# Вычисляем процент успеха #}
+{% set success_rate = none %}
+{% if stats and stats.completed_count and stats.completed_count > 0 and stats.succeed_count is not none %}
+  {% set success_rate = (stats.succeed_count / stats.completed_count * 100) %}
+{% endif %}
+
+<div>
+  <div class="tgc-card">
+
+    {# ── Шапка ── #}
+    <a href="/task-groups/{{ group.id }}" class="tgc-card-link">
+      <div class="tgc-header">
+        <div class="tgc-header-text">
+          <div class="tgc-title">{{ group.title }}</div>
+          <div class="tgc-name">{{ group.name }}</div>
         </div>
-    </div>
-
-    <div class="card-body">
-        <!-- Блок информации о проекте -->
-        {% if show_proj %}
-            {% if project %}
-                <div class="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l4.992-5.99a.75.75 0 0 0-.01-1.05z"/>
-                    </svg>
-                    <span>Привязана к проекту:</span>
-                    <a href="/projects/{{ project.id }}" class="fw-medium text-decoration-none text-reset">{{ project.title }}</a>
-                </div>
-            {% else %}
-                <div class="alert alert-light border py-2 px-3 mb-3 small d-flex align-items-center gap-2 text-muted">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M8 0a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm0 3.5a1 1 0 1 1-1 1 1 1 0 0 1 1-1Zm1 8.5H7V6h2Z"/>
-                    </svg>
-                    <span>Не привязана ни к какому проекту</span>
-                </div>
-            {% endif %}
-        {% endif %}
-<!-- Расширенные параметры (только при show_verbose=true) -->
-        {% if verbose %}
-        <div class="mb-3 p-3 bg-light rounded border">
-            <h6 class="text-primary fw-semibold mb-3 small text-uppercase">Расширенные параметры</h6>
-            <div class="row g-3 small">
-                <div class="col-md-6">
-                    <div class="fw-medium text-muted mb-1">Аргументы выполнения</div>
-                    {% if group.execution_arguments %}
-                    <pre class="bg-white p-2 rounded border mb-0 text-break" style="max-height: 130px; overflow-y: auto; font-size: 0.85em;"><code>{{ group.execution_arguments | tojson(indent=2) }}</code></pre>
-                    {% else %}
-                    <div class="text-muted fst-italic">Не заданы</div>
-                    {% endif %}
-                </div>
-                <div class="col-md-6">
-                    <div class="fw-medium text-muted mb-1">Стратегия очередей</div>
-                    {% if group.queue_per_priority is not none %}
-                        {% if group.queue_per_priority %}
-                        <span class="badge bg-primary-subtle text-primary-emphasis">Отдельные очереди на приоритет</span>
-                        {% else %}
-                        <span class="badge bg-secondary-subtle text-secondary-emphasis">Общая очередь для всех приоритетов</span>
-                        {% endif %}
-                    {% else %}
-                    <div class="text-muted fst-italic">Не определено</div>
-                    {% endif %}
-                </div>
-            </div>
+        <div class="tgc-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M3 7.5C3 6.12 4.12 5 5.5 5h11C17.88 5 19 6.12 19 7.5S17.88 10 16.5 10h-11C4.12 10 3 8.88 3 7.5z"
+                  fill="currentColor" opacity=".3"/>
+            <path d="M3 11c0-1.38 1.12-2.5 2.5-2.5h11c1.38 0 2.5 1.12 2.5 2.5S17.88 13.5 16.5 13.5h-11C4.12 13.5 3 12.38 3 11z"
+                  fill="currentColor" opacity=".6"/>
+            <path d="M3 14.5C3 13.12 4.12 12 5.5 12h11c1.38 0 2.5 1.12 2.5 2.5S17.88 17 16.5 17h-11C4.12 17 3 15.88 3 14.5z"
+                  fill="currentColor"/>
+          </svg>
         </div>
-        {% endif %}
+      </div>
+    </a>
 
-        <!-- Описание -->
-        <p class="card-text text-muted mb-4">{{ group.description or "Описание отсутствует" }}</p>
+    {# ── Привязка к проекту (опц.) ── #}
+    {% if show_project %}
+      {% if project %}
+      <a href="/projects/{{ project.id }}" class="tgc-card-link">
+        <div class="tgc-project-badge tgc-project-badge--linked">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M10 6A4 4 0 1 1 2 6a4 4 0 0 1 8 0zm-1.5 0a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0z"/>
+          </svg>
+          {{ project.title }}
+        </div>
+      </a>
+      {% else %}
+      <div class="tgc-project-badge tgc-project-badge--none">Без проекта</div>
+      {% endif %}
+    {% endif %}
 
-        <!-- Метрики -->
-        {% include 'components/task_group_metrics.html' %}
-    </div>
+    {# ── Метрики 2×2 ── #}
+    <div class="tgc-metrics">
+
+      <div class="tgc-metric">
+        <div class="tgc-metric-label">Задач</div>
+        <div class="tgc-metric-value">
+          {{ stats.total_count if stats and stats.total_count is not none else '—' }}
+        </div>
+      </div>
+
+      <div class="tgc-metric">
+        <div class="tgc-metric-label">Активных</div>
+        <div class="tgc-metric-value tgc-metric-value--accent">
+          {{ stats.execution_count if stats and stats.execution_count is not none else '—' }}
+        </div>
+      </div>
+
+      <div class="tgc-metric">
+        <div class="tgc-metric-label">Успешность</div>
+        <div class="tgc-metric-value tgc-metric-value--success">
+          {% if success_rate is not none %}
+            {{ "%.1f"|format(success_rate) }}%
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="tgc-metric">
+        <div class="tgc-metric-label">Ср. длительность</div>
+        <div class="tgc-metric-value">
+          {% if stats and stats.avg_execution_duration is not none %}
+            {{ "%.0f"|format(stats.avg_execution_duration) }}с
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+
+    </div>{# /metrics #}
+
+    {# ── Статус-бейдж (опц., если нужен) ── #}
+    {% if not group.is_active %}
+    <div class="tgc-inactive-badge">Не активна</div>
+    {% endif %}
+
+  </div>
 </div>
+
+
+<style>
+/* ── Task Group Card ─────────────────────────────────────────── */
+.tgc-card-link {
+  text-decoration: none;
+}
+
+.tgc-card {
+  background: var(--flow-surface, #fff);
+  border: 1px solid var(--flow-border, #e5e7eb);
+  border-radius: var(--flow-radius, 12px);
+  padding: 20px;
+  box-shadow: var(--flow-shadow, 0 1px 3px rgba(0,0,0,.06));
+  transition: box-shadow .18s, border-color .18s, transform .18s;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tgc-card-link:hover .tgc-card {
+  box-shadow: 0 4px 16px rgba(0,0,0,.09);
+  border-color: #c7d2fe;
+  transform: translateY(-1px);
+}
+
+/* Header */
+.tgc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tgc-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.tgc-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--flow-text, #111827);
+  line-height: 1.2;
+}
+.tgc-name {
+  font-size: 12.5px;
+  color: var(--flow-text-muted, #6b7280);
+}
+.tgc-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--flow-primary-soft, #eff6ff);
+  color: var(--flow-primary, #2563eb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Project badge */
+.tgc-project-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  align-self: flex-start;
+}
+.tgc-project-badge--linked {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.tgc-project-badge--none {
+  background: var(--flow-bg, #f3f4f6);
+  color: var(--flow-text-muted, #9ca3af);
+}
+
+/* Metrics 2×2 grid */
+.tgc-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 12px;
+  flex: 1;
+}
+.tgc-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tgc-metric-label {
+  font-size: 11.5px;
+  color: var(--flow-text-muted, #6b7280);
+}
+.tgc-metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--flow-text, #111827);
+  line-height: 1.1;
+}
+.tgc-metric-value--accent  { color: var(--flow-primary, #2563eb); }
+.tgc-metric-value--success { color: #16a34a; }
+
+/* Inactive badge */
+.tgc-inactive-badge {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+</style>
+
+{% endmacro %}

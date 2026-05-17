@@ -1,0 +1,308 @@
+{#
+  components/chart_line.html
+  Линейный график с опциональными подписями снизу.
+
+  Параметры макроса render_line_chart:
+    points        — список dict { label: str, value: float }
+                    label — подпись по оси X (напр. "10:00"), value — числовое значение
+    chart_id      — уникальный id (обязательно, если несколько на странице)
+    subtitle      — подпись над графиком (напр. "Задач в секунду"), необязательно
+    color         — цвет линии и точек, CSS-цвет (по умолчанию #10b981 — зелёный)
+    fill          — заливка под кривой: true / false (по умолчанию false)
+    fill_color    — цвет заливки (по умолчанию — color с прозрачностью, задаётся в JS)
+    height        — высота области графика в px (по умолчанию 160)
+    show_dots     — показывать точки: true / false (по умолчанию true)
+    y_min         — минимум Y (по умолчанию 0)
+    y_max         — максимум Y (по умолчанию — авто от данных)
+    stats         — список dict { label: str, value: str, unit: str } — плашки под графиком
+                    напр. [{ label: "Текущая", value: "4.1", unit: "задач/сек" }, ...]
+                    value может быть выделен цветом color если highlight: true
+#}
+
+{% macro render_line_chart(
+    points,
+    chart_id      = "line1",
+    subtitle      = none,
+    color         = "#10b981",
+    fill          = false,
+    fill_color    = none,
+    height        = 160,
+    show_dots     = true,
+    y_min         = 0,
+    y_max         = none,
+    stats         = none
+) %}
+<div class="lc-wrap" id="{{ chart_id }}_wrap">
+  {% if subtitle %}
+  <div class="lc-subtitle">{{ subtitle }}</div>
+  {% endif %}
+
+  <div class="lc-canvas-wrap" style="height: {{ height }}px;">
+    <canvas id="{{ chart_id }}_canvas"></canvas>
+  </div>
+
+  {% if stats %}
+  <div class="lc-stats">
+    {% for s in stats %}
+    <div class="lc-stat-item">
+      <span class="lc-stat-label">{{ s.label }}</span>
+      <span class="lc-stat-value" {% if s.highlight is defined and s.highlight %}style="color: {{ color }}"{% endif %}>
+        {{ s.value }}
+      </span>
+      {% if s.unit is defined and s.unit %}
+      <span class="lc-stat-unit">{{ s.unit }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  const POINTS    = {{ points | tojson }};
+  const COLOR     = {{ color | tojson }};
+  const FILL      = {{ 'true' if fill else 'false' }};
+  const FILL_CLR  = {{ fill_color | tojson if fill_color else 'null' }};
+  const SHOW_DOTS = {{ 'true' if show_dots else 'false' }};
+  const Y_MIN_CFG = {{ y_min }};
+  const Y_MAX_CFG = {{ y_max if y_max is not none else 'null' }};
+  const H         = {{ height }};
+  const ID        = {{ chart_id | tojson }};
+
+  const canvas = document.getElementById(ID + '_canvas');
+  if (!canvas || !POINTS.length) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const PAD = { top: 12, right: 12, bottom: 28, left: 40 };
+
+  /* ── вычисляем границы Y ─────────────────────────────────── */
+  const vals   = POINTS.map(p => p.value);
+  const dataMax = Math.max(...vals);
+  const dataMin = Math.min(...vals);
+  const yMin   = Y_MIN_CFG;
+  const yMax   = Y_MAX_CFG !== null ? Y_MAX_CFG : Math.ceil(dataMax * 1.15 / 2) * 2 || 10;
+
+  /* ── «красивый» шаг сетки ────────────────────────────────── */
+  function niceStep(range, ticks) {
+    const raw = range / ticks;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const norm = raw / mag;
+    if (norm <= 1)  return mag;
+    if (norm <= 2)  return 2 * mag;
+    if (norm <= 5)  return 5 * mag;
+    return 10 * mag;
+  }
+  const step = niceStep(yMax - yMin, 4);
+
+  /* ── сглаживание (cardinal spline) ──────────────────────── */
+  function catmullRom(ctx, pts, tension) {
+    if (pts.length < 2) return;
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(i - 1, 0)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(i + 2, pts.length - 1)];
+      const cp1x = p1.x + (p2.x - p0.x) / 6 * tension;
+      const cp1y = p1.y + (p2.y - p0.y) / 6 * tension;
+      const cp2x = p2.x - (p3.x - p1.x) / 6 * tension;
+      const cp2y = p2.y - (p3.y - p1.y) / 6 * tension;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+  }
+
+  /* ── рисование ───────────────────────────────────────────── */
+  function draw() {
+    const wrap = document.getElementById(ID + '_wrap');
+    const W = wrap.clientWidth;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top  - PAD.bottom;
+
+    const toX = i  => PAD.left + (i / (POINTS.length - 1)) * cW;
+    const toY = v  => PAD.top  + cH - ((v - yMin) / (yMax - yMin)) * cH;
+
+    /* сетка Y */
+    ctx.strokeStyle = 'rgba(156,163,175,0.18)';
+    ctx.lineWidth   = 1;
+    ctx.fillStyle   = '#9ca3af';
+    ctx.font        = `${10}px Inter,system-ui,sans-serif`;
+    ctx.textAlign   = 'right';
+
+    for (let v = yMin; v <= yMax + step * 0.01; v += step) {
+      const y = toY(v);
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, y);
+      ctx.lineTo(PAD.left + cW, y);
+      ctx.stroke();
+      ctx.fillText(
+        Number.isInteger(step) ? Math.round(v) : v.toFixed(1),
+        PAD.left - 6, y + 3.5
+      );
+    }
+
+    /* метки X — показываем не больше 8 */
+    ctx.textAlign = 'center';
+    const xStep = Math.max(1, Math.ceil(POINTS.length / 8));
+    POINTS.forEach((p, i) => {
+      if (i % xStep !== 0 && i !== POINTS.length - 1) return;
+      ctx.fillText(p.label, toX(i), H - 4);
+    });
+
+    /* координаты точек */
+    const pts = POINTS.map((p, i) => ({ x: toX(i), y: toY(p.value) }));
+
+    /* заливка */
+    if (FILL) {
+      const fillColor = FILL_CLR || COLOR;
+      const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+      grad.addColorStop(0, fillColor + '33');   // ~20% opacity
+      grad.addColorStop(1, fillColor + '05');
+      ctx.beginPath();
+      catmullRom(ctx, pts, 1);
+      ctx.lineTo(pts[pts.length - 1].x, PAD.top + cH);
+      ctx.lineTo(pts[0].x, PAD.top + cH);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    /* линия */
+    ctx.beginPath();
+    catmullRom(ctx, pts, 1);
+    ctx.strokeStyle = COLOR;
+    ctx.lineWidth   = 2;
+    ctx.lineJoin    = 'round';
+    ctx.stroke();
+
+    /* точки */
+    if (SHOW_DOTS) {
+      pts.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle   = COLOR;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth   = 1.5;
+        ctx.stroke();
+      });
+    }
+
+    /* tooltip-слой (hover) */
+    attachHover(canvas, ctx, pts, W);
+  }
+
+  /* ── hover / tooltip ─────────────────────────────────────── */
+  function attachHover(canvas, ctx, pts, W) {
+    let tipEl = document.getElementById(ID + '_tooltip');
+    if (!tipEl) {
+      tipEl = document.createElement('div');
+      tipEl.id = ID + '_tooltip';
+      tipEl.className = 'lc-tooltip';
+      document.getElementById(ID + '_wrap').appendChild(tipEl);
+    }
+
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const mx   = e.clientX - rect.left;
+
+      let closest = null, minD = Infinity;
+      pts.forEach((p, i) => {
+        const d = Math.abs(p.x - mx);
+        if (d < minD) { minD = d; closest = i; }
+      });
+      if (closest === null || minD > 40) { tipEl.style.display = 'none'; return; }
+
+      const pt   = pts[closest];
+      const item = POINTS[closest];
+      tipEl.innerHTML = `<strong>${item.label}</strong>: ${item.value}`;
+      tipEl.style.display = 'block';
+      tipEl.style.left = Math.min(pt.x, W - 120) + 'px';
+      tipEl.style.top  = (pt.y - 36) + 'px';
+    });
+    canvas.addEventListener('mouseleave', () => { tipEl.style.display = 'none'; });
+  }
+
+  draw();
+  window.addEventListener('resize', draw);
+})();
+</script>
+{% endmacro %}
+
+<style>
+/* ── Line chart ─────────────────────────────────────────────── */
+.lc-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.lc-subtitle {
+  font-size: 12px;
+  color: var(--flow-text-muted, #6b7280);
+  margin-bottom: 8px;
+}
+
+.lc-canvas-wrap {
+  position: relative;
+  width: 100%;
+}
+.lc-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+}
+
+/* Tooltip */
+.lc-tooltip {
+  display: none;
+  position: absolute;
+  background: #1f2937;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  transform: translateX(-50%);
+}
+
+/* Stat pills под графиком */
+.lc-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--flow-border, #e5e7eb);
+}
+.lc-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.lc-stat-label {
+  font-size: 11.5px;
+  color: var(--flow-text-muted, #6b7280);
+}
+.lc-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--flow-text, #111827);
+  line-height: 1.1;
+}
+.lc-stat-unit {
+  font-size: 11px;
+  color: var(--flow-text-muted, #9ca3af);
+}
+</style>

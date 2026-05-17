@@ -3,7 +3,7 @@ from typing import List, Iterator
 
 from imitation_modelling.broker import Broker
 from imitation_modelling.repo import TaskRunMetricProvider, TaskRunStatusRepo
-from imitation_modelling.schemas import SystemTime, TaskRunStatusLog, TaskRunStatus, TaskBatchProviderType
+from imitation_modelling.schemas import SystemTime, TaskRunStatusLog, TaskRunStatus
 
 
 class TaskBatchProvider(ABC):

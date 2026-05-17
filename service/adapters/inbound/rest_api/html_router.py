@@ -10,6 +10,7 @@ from starlette.templating import Jinja2Templates
 from service.domain.schemas.enums import AppUserRole, TaskRunStatus
 from service.domain.use_cases.external.admin.activate_user import ActivateUserUCRq
 from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUCRq
+from service.domain.use_cases.external.admin.get_all_users import GetAllUsersUCRq
 from service.domain.use_cases.external.auth.create_user import CreateUserUCRq
 from service.domain.use_cases.external.auth.login import LoginUCRq
 from service.domain.use_cases.external.auth.logout import LogoutUCRq
@@ -51,6 +52,11 @@ def index(request: Request):
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html")
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page(request: Request):
+    return templates.TemplateResponse(request=request, name="dashboard.html")
 
 
 @router.post("/auth/login")
@@ -111,15 +117,39 @@ async def users_page(request: Request):
     current_user = request.state.user
     is_admin = AppUserRole.ADMIN in current_user.roles
 
-    users = []
     if is_admin:
-        rs = await request.app.state.admin_use_case_facade.get_all_users()
-        users = rs.users
+        return templates.TemplateResponse(
+            request=request, name="users.html",
+            context={"is_admin": is_admin}
+        )
+    else:
+        raise 403
 
-    return templates.TemplateResponse(
-        request=request, name="users.html",
-        context={"users": users, "is_admin": is_admin}
-    )
+
+@router.get("/users/json")
+async def users_json(request: Request, page: int = 1, per_page: int = 25, search: str | None = None):
+    current_user = request.state.user
+    is_admin = AppUserRole.ADMIN in current_user.roles
+
+
+    if is_admin:
+        if search:
+            filter_fields_dnf=FilterFieldsDNF.single('username', search, ConditionOperation.IN)
+        else:
+            filter_fields_dnf = FilterFieldsDNF.empty()
+        rq = GetAllUsersUCRq(pagination=PaginationQuery(
+            offset_page=per_page * (max(page - 1, 0)),
+            limit_per_page=per_page,
+            order_by='created_at',
+            asc_sort=False,
+            filter_fields_dnf=filter_fields_dnf,
+        ))
+        rs = await request.app.state.admin_use_case_facade.get_all_users(rq)
+        users = rs.users
+        return {'items': users}
+    else:
+        raise 403  # Not enough privileges
+
 
 
 @router.post("/users")
@@ -246,7 +276,7 @@ async def task_groups_page(request: Request):
 
     return templates.TemplateResponse(
         request=request, name="task_groups.html",
-        context={"task_groups": task_groups_rs.task_groups,
+        context={"groups": task_groups_rs.task_groups,
                  "task_group_statistics_by_name": all_task_group_statistics_rs.task_group_statistics_by_name,
                  "project_by_task_group_name": all_task_group_by_project_detailed_rs.project_by_task_group_name, }
     )
@@ -401,14 +431,14 @@ async def update_task(request: Request, task_id: int, rq: UpdateTaskUCRq):
 
 @router.get("/task-runs/")
 async def task_runs_json(request: Request,
-                      task_id: int,
-                      draw: int = 1,
-                      offset: int = 0,
-                      limit: int = 25,
-                      order_by: str = 'id',
-                      asc_sort: bool = False,
-                      task_run_status: Optional[str] = None
-                      ):
+                         task_id: int,
+                         draw: int = 1,
+                         offset: int = 0,
+                         limit: int = 25,
+                         order_by: str = 'id',
+                         asc_sort: bool = False,
+                         task_run_status: Optional[str] = None
+                         ):
     if task_run_status:
         # Если указать TaskRunStatus в запросе, он некорректно конвертируется: сначала преобразуется в перечисление,
         # а затем опять в строку: WAITING (str) -> TaskRunStatus.WAITING (enum) -> TaskRunStatus.WAITING(str)
@@ -435,27 +465,27 @@ async def task_runs_json(request: Request,
 
 @router.get("/task-runs/{task_run_id}")
 async def task_run_detailed_page(request: Request, task_run_id: int):
-    rs: GetTaskRunDetailedUCRs = await request.app.state.use_case_facade.get_task_run_detailed(GetTaskRunDetailedUCRq(task_run_id=task_run_id))
+    rs: GetTaskRunDetailedUCRs = await request.app.state.use_case_facade.get_task_run_detailed(
+        GetTaskRunDetailedUCRq(task_run_id=task_run_id))
     return templates.TemplateResponse(
         request=request,
         name="task_run_detailed.html",
         context={
             "task_run": rs.task_run_detailed.task_run,
-            "progress":  rs.task_run_detailed.progress
+            "progress": rs.task_run_detailed.progress
         }
     )
 
 
 @router.get("/task-run-status-logs/")
 async def task_runs_json(request: Request,
-                      task_run_id: int,
-                      draw: int = 1,
-                      offset: int = 0,
-                      limit: int = 25,
-                      order_by: str = 'status_updated_at',
-                      asc_sort: bool = False,
-                      ):
-
+                         task_run_id: int,
+                         draw: int = 1,
+                         offset: int = 0,
+                         limit: int = 25,
+                         order_by: str = 'status_updated_at',
+                         asc_sort: bool = False,
+                         ):
     pagination = PaginationQuery(offset_page=offset,
                                  limit_per_page=limit,
                                  order_by=order_by,
@@ -463,7 +493,7 @@ async def task_runs_json(request: Request,
                                  )
     rs: GetTaskRunStatusLogsUCRs = await request.app.state.use_case_facade.get_task_run_status_logs(
         GetTaskRunStatusLogsUCRq(task_run_id=task_run_id,
-                                                                                                pagination=pagination)
+                                 pagination=pagination)
     )
     return {
         "draw": int(draw),

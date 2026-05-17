@@ -1,0 +1,227 @@
+{#
+  components/chart_histogram.html
+  Гистограмма распределения длительности запусков задач.
+
+  Параметры макроса:
+    histogram_data  — список dict: { label: str, value: int }
+                      напр. [{"label": "0-30s", "value": 42}, ...]
+    histogram_title — заголовок карточки (необязательно)
+    histogram_total — общее число запусков, int (необязательно)
+    histogram_avg   — средняя длительность, строка напр. "94.3с" (необязательно)
+    histogram_color — цвет столбцов, CSS-цвет (необязательно, по умолчанию #3b82f6)
+    histogram_id    — уникальный id, если несколько на странице (необязательно)
+#}
+
+{% macro render_histogram(histogram_data, histogram_title="Распределение длительности запусков", histogram_total=none, histogram_avg=none, histogram_color="#3b82f6", histogram_id="hist1") %}
+
+{% set max_val = namespace(v=1) %}
+{% for item in histogram_data %}
+  {% if item.value > max_val.v %}{% set max_val.v = item.value %}{% endif %}
+{% endfor %}
+
+<div class="flow-chart-card">
+  <div class="flow-chart-header">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="flow-chart-icon">
+      <rect x="1" y="8" width="3" height="7" rx="0.5"/>
+      <rect x="5" y="5" width="3" height="10" rx="0.5"/>
+      <rect x="9" y="2" width="3" height="13" rx="0.5"/>
+      <rect x="13" y="6" width="2" height="9" rx="0.5"/>
+    </svg>
+    <span class="flow-chart-title">{{ histogram_title }}</span>
+  </div>
+
+  <div class="hist-root" id="{{ histogram_id }}">
+
+    {% set y_max = max_val.v %}
+    {# Считаем шаг сетки: делим на 4 и округляем до красивого числа #}
+    {% set raw_step = (y_max / 4) | int %}
+    {% set step = [raw_step, 1] | max %}
+
+    <div class="hist-inner">
+      <div class="hist-chart-area">
+
+        {# Горизонтальные линии сетки (снизу вверх: 0, step, 2*step, 3*step, 4*step) #}
+        {% for i in range(4, -1, -1) %}
+          {% set line_val = step * i %}
+          {% if line_val <= y_max or i == 0 %}
+            {% set pct = ((line_val / y_max) * 100) | round(1) %}
+            <div class="hist-gridline" style="bottom: {{ pct }}%">
+              <span class="hist-y-label">{{ line_val }}</span>
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        {# Столбцы #}
+        <div class="hist-bars-row">
+          {% for item in histogram_data %}
+            {% set height_pct = ((item.value / y_max) * 100) | round(1) %}
+            <div class="hist-bar-col">
+              <div class="hist-bar-wrap">
+                <div
+                  class="hist-bar"
+                  style="height: {{ height_pct }}%; background: {{ histogram_color }};"
+                >
+                  <div class="hist-tooltip">{{ item.label }}: <strong>{{ item.value }}</strong></div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# X-axis labels #}
+      <div class="hist-x-axis">
+        {% for item in histogram_data %}
+        <div class="hist-x-label">{{ item.label }}</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if histogram_total is not none or histogram_avg is not none %}
+    <div class="hist-footer">
+      {% if histogram_total is not none %}
+      <span>Всего проанализировано запусков: <strong>{{ histogram_total }}</strong></span>
+      {% endif %}
+      {% if histogram_avg is not none %}
+      <span>Средняя длительность: <strong>{{ histogram_avg }}</strong></span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<style>
+.hist-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.hist-chart-area {
+  position: relative;
+  height: 180px;
+  margin-left: 44px;
+  margin-right: 4px;
+}
+
+.hist-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--flow-border, #e5e7eb);
+  pointer-events: none;
+}
+
+.hist-y-label {
+  position: absolute;
+  right: 100%;
+  top: -9px;
+  padding-right: 8px;
+  font-size: 11px;
+  color: var(--flow-text-muted, #9ca3af);
+  white-space: nowrap;
+  text-align: right;
+  width: 36px;
+}
+
+.hist-bars-row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.hist-bar-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.hist-bar-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  position: relative;
+}
+
+.hist-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  transition: filter .15s, transform .15s;
+  cursor: default;
+  min-height: 2px;
+  transform-origin: bottom center;
+}
+
+.hist-bar:hover {
+  filter: brightness(1.15);
+  transform: scaleY(1.04);
+}
+
+.hist-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+.hist-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1f2937;
+}
+.hist-bar:hover .hist-tooltip {
+  display: block;
+}
+
+.hist-x-axis {
+  display: flex;
+  gap: 6px;
+  margin-left: 44px;
+  margin-right: 4px;
+  margin-top: 6px;
+  border-top: 1px solid var(--flow-border, #e5e7eb);
+  padding-top: 6px;
+}
+
+.hist-x-label {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--flow-text-muted, #9ca3af);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hist-footer {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--flow-text-muted, #6b7280);
+}
+.hist-footer strong {
+  color: var(--flow-text, #111827);
+  font-weight: 600;
+}
+</style>
+{% endmacro %}

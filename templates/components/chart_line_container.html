@@ -1,0 +1,79 @@
+{#
+  components/chart_line_container.html
+  Контейнер-карточка для одного или нескольких линейных графиков.
+  Графики внутри разделяются горизонтальным разделителем и
+  отображаются вертикально стопкой.
+
+  Параметры макроса render_line_container:
+    title    — заголовок карточки (строка)
+    caller() — содержимое (вызовы render_line_chart внутри call-блока)
+
+  Пример использования:
+  ──────────────────────────────────────────────────────────────
+  {% from "components/chart_line_container.html" import render_line_container %}
+  {% from "components/chart_line.html"           import render_line_chart %}
+
+  {% call render_line_container(title="Тренды производительности") %}
+    {{ render_line_chart(
+        points   = throughput_points,
+        chart_id = "tp1",
+        subtitle = "Количество выполненных задач",
+        color    = "#6366f1",
+        fill     = true
+    ) }}
+    {{ render_line_chart(
+        points   = duration_points,
+        chart_id = "tp2",
+        subtitle = "Средняя длительность (сек)",
+        color    = "#a855f7"
+    ) }}
+  {% endcall %}
+  ──────────────────────────────────────────────────────────────
+#}
+
+{% macro render_line_container(title) %}
+<div class="flow-chart-card lcc-card">
+
+  {% if title %}
+  <div class="flow-chart-header">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="flow-chart-icon">
+      <polyline
+        points="1,13 4,8 7,10 11,3 15,6"
+        fill="none" stroke="currentColor"
+        stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+      />
+    </svg>
+    <span class="flow-chart-title">{{ title }}</span>
+  </div>
+  {% endif %}
+
+  <div class="lcc-body">
+    {{ caller() }}
+  </div>
+
+</div>
+{% endmacro %}
+
+<style>
+/* ── Container card ─────────────────────────────────────────── */
+.lcc-card {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+  Все .lc-wrap внутри контейнера разделяются чертой.
+  Первый — без верхней черты.
+*/
+.lcc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.lcc-body .lc-wrap + .lc-wrap {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--flow-border, #e5e7eb);
+}
+</style>

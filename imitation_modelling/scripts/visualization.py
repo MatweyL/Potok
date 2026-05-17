@@ -26,9 +26,9 @@ import plotly.graph_objects as go
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
 
-INPUT_DIR = "../simulation_results"  # ← папка с сырыми JSON результатами симуляции
-OUTPUT_DIR = "./plots_single_system"
-MAX_DURATION_SEC = 60.0  # фильтр: прогон завершился за N реальных секунд
+INPUT_DIR = r"D:\University\MAG\Diploma\simulation_results.tar\simulation_results"  # ← папка с сырыми JSON результатами симуляции
+OUTPUT_DIR = "./plots_v1_2026_05_16_filtered"
+MAX_DURATION_SEC = 30.0  # фильтр: прогон завершился за N реальных секунд
 HEATMAP_METRIC = "total_time"  # метрика для heatmap: total_time / overload_count / avg_utilization
 
 ALGO_COLORS = {
@@ -54,13 +54,32 @@ def load_runs(input_dir: str):
                 # if data['history'][-1]['completed'] != data['history'][-1]['total']:
                 #     raise ValueError("NOT COMPLETED")
                 if data['params']['task_batch_provider_params']['type'] not in (
-                "AIMD", "CONSTANT_SIZE", "ADAPTIVE_MODEL", "GRADIENT_ASCENT"):
+                        "AIMD", "CONSTANT_SIZE", "ADAPTIVE_MODEL", "GRADIENT_ASCENT"):
                     raise ValueError("not target algo")
                 runs.append(data)
         except Exception as e:
             print(f"  [SKIP] {path.name}: {e}")
     print(f"Загружено файлов: {len(runs)}")
     return runs
+
+
+def load_runs_via_yield(input_dir: str):
+    for path in sorted(Path(input_dir).glob("*.json")):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+                # if data['history'][-1]['completed'] != data['history'][-1]['total']:
+                #     raise ValueError("NOT COMPLETED")
+                if data['params']['task_batch_provider_params']['type'] not in (
+                        "AIMD",
+                        "CONSTANT_SIZE",
+                        "ADAPTIVE_MODEL",
+                        "GRADIENT_ASCENT"
+                ):
+                    raise ValueError("not target algo")
+                yield data
+        except Exception as e:
+            print(f"  [SKIP] {path.name}: {e}")
 
 
 def passes_filter(run: dict) -> bool:
@@ -120,6 +139,20 @@ def compute_metrics(run: dict) -> dict:
     tries_mean = total_tries / total_task_count if total_task_count else None
     tries_max = max(tries_dist.keys()) if tries_dist else None
 
+    # Доля задач, выполненных с первой попытки
+    first_try_rate = (tries_dist.get(1, 0) / total_task_count
+                      if total_task_count else None)
+
+    # Медиана попыток — корректный перебор CDF
+    tries_median = None
+    if tries_dist and total_task_count:
+        cumulative = 0
+        half = total_task_count / 2
+        for t in sorted(tries_dist.keys()):
+            cumulative += tries_dist[t]
+            if cumulative >= half:
+                tries_median = t
+                break
     return {
         "run_name": run.get("run_name", ""),
         "algo_type": algo_type,
@@ -131,8 +164,11 @@ def compute_metrics(run: dict) -> dict:
         "overload_count": overload_count,
         "avg_util": avg_util,
         "tries_mean": tries_mean,
+        "tries_median": tries_median,
         "tries_max": tries_max,
         "tries_dist": tries_dist,
+        "first_try_rate": first_try_rate,
+        "total_task_count": total_task_count,
     }
 
 
@@ -231,7 +267,7 @@ def plot_cdf(records, output_dir: Path):
             text="CDF: доля задач, выполненных за ≤ N попыток",
             font=dict(size=18),
         ),
-        xaxis=dict(title="Количество попыток", dtick=1),
+        xaxis=dict(title="Количество попыток", dtick=10),
         yaxis=dict(title="Доля задач", tickformat=".0%", range=[0, 1.05]),
         legend=dict(title="Алгоритм"),
         template="plotly_white",
@@ -336,9 +372,138 @@ def plot_heatmap(records, metric: str, output_dir: Path):
     print(f"  ✓ {out.name}")
 
 
+# ── Сводная таблица метрик ────────────────────────────────────────────────────
+
+def print_metrics_summary(records):
+    """
+    Выводит сводную таблицу агрегированных метрик по алгоритмам.
+    Для каждой метрики: median (p25–p75) и min/max.
+    """
+    algos = sorted_algos(records)
+
+    metrics = [
+        ("tries_mean", "Среднее попыток/задача"),
+        ("tries_median", "Медиана попыток"),
+        ("tries_max", "Макс. попыток"),
+        ("first_try_rate", "Доля с 1-й попытки, %"),
+        ("overload_count", "Перегрузок (шт.)"),
+        ("avg_util", "Утилизация (0–1)"),
+        ("total_time", "Вирт. время (сек)"),
+    ]
+
+    SEP = "─" * 110
+    print("\n" + "═" * 110)
+    print("  СВОДНАЯ ТАБЛИЦА МЕТРИК ПО АЛГОРИТМАМ")
+    print("  Формат: median  [p25 – p75]  |  min / max  |  N прогонов")
+    print("═" * 110)
+
+    for metric_key, metric_label in metrics:
+        print(f"\n  ▶ {metric_label}")
+        print(SEP)
+        header = f"  {'Алгоритм':<22} {'Median':>10}  {'[P25 – P75]':>20}  {'Min':>10}  {'Max':>10}  {'N':>5}"
+        print(header)
+        print(SEP)
+
+        for algo in algos:
+            vals = [r[metric_key] for r in records
+                    if r["algo_type"] == algo and r.get(metric_key) is not None]
+            if not vals:
+                print(f"  {algo:<22} {'—':>10}  {'—':>20}  {'—':>10}  {'—':>10}  {'0':>5}")
+                continue
+
+            # Для first_try_rate переводим в проценты
+            if metric_key == "first_try_rate":
+                vals = [v * 100 for v in vals]
+
+            vals_sorted = sorted(vals)
+            n = len(vals_sorted)
+            median = statistics.median(vals_sorted)
+            p25 = vals_sorted[max(0, int(n * 0.25))]
+            p75 = vals_sorted[min(n - 1, int(n * 0.75))]
+            vmin = vals_sorted[0]
+            vmax = vals_sorted[-1]
+
+            if metric_key in ("tries_mean", "avg_util", "total_time", "first_try_rate"):
+                fmt = ".2f"
+            else:
+                fmt = ".0f"
+            width = 10
+            print(
+                f"  {algo:<22} "
+                f"{median:>{width}{fmt}}  "
+                f"[{p25:{fmt}} – {p75:{fmt}}]  "
+                f"{vmin:>{width}{fmt}}  "
+                f"{vmax:>{width}{fmt}}  "
+                f"{n:>5}"
+            )
+
+        print(SEP)
+
+    # ── Рейтинг алгоритмов (по минимуму перегрузок и ретраев) ────────────────
+    print("\n" + "═" * 110)
+    print("  РЕЙТИНГ ПО КЛЮЧЕВЫМ МЕТРИКАМ (меньше = лучше, кроме утилизации)")
+    print("═" * 110)
+
+    ranking_metrics = [
+        ("tries_mean", False, 3.0),  # (ключ, higher_is_better, вес)
+        ("overload_count", False, 2.0),
+        ("avg_util", True, 1.0),
+        ("total_time", False, 1.0),
+    ]
+
+    # Нормализуем каждую метрику и считаем взвешенный score
+    algo_scores = {a: 0.0 for a in algos}
+    total_weight = sum(w for _, _, w in ranking_metrics)
+
+    for metric_key, higher_is_better, weight in ranking_metrics:
+        algo_medians = {}
+        for algo in algos:
+            vals = [r[metric_key] for r in records
+                    if r["algo_type"] == algo and r[metric_key] is not None]
+            if vals:
+                algo_medians[algo] = statistics.median(vals)
+
+        if not algo_medians:
+            continue
+
+        vmin = min(algo_medians.values())
+        vmax = max(algo_medians.values())
+        rng = vmax - vmin if vmax != vmin else 1.0
+
+        for algo, v in algo_medians.items():
+            norm = (v - vmin) / rng  # 0 = лучший (меньший), 1 = худший
+            if higher_is_better:
+                norm = 1.0 - norm
+            algo_scores[algo] += norm * weight
+
+    ranked = sorted(algos, key=lambda a: algo_scores[a])
+
+    print(f"\n  {'#':<4} {'Алгоритм':<22} {'Score (меньше = лучше)':>25}")
+    print(SEP)
+    for rank, algo in enumerate(ranked, 1):
+        score = algo_scores[algo]
+        bar = "█" * int((1 - score / total_weight) * 20) if total_weight else ""
+        print(f"  {rank:<4} {algo:<22} {score:>8.3f} / {total_weight:.1f}  {bar}")
+    print(SEP)
+    print(f"\n  ★  Рекомендуемый алгоритм: {ranked[0]}")
+    print("     (минимальные перегрузки и ретраи, взвешенный рейтинг)")
+    print("═" * 110 + "\n")
+
+
+
+
+
+def compute_metrics_via_yield():
+    runs = load_runs_via_yield(INPUT_DIR)
+    passed = (r for r in runs if passes_filter(r))
+    records = (compute_metrics(r) for r in passed)
+    print_metrics_summary(records)
+
+
 # ── Точка входа ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+
     try:
         import plotly
     except ImportError:
@@ -406,3 +571,6 @@ if __name__ == "__main__":
     # plot_heatmap(records, metric=HEATMAP_METRIC, output_dir=output_dir)
 
     print(f"\nВсе графики → {output_dir.resolve()}")
+
+    # ── Вывод сводной таблицы метрик ──────────────────────────────────────────
+    print_metrics_summary(records)

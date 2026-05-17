@@ -1,0 +1,484 @@
+{#
+  components/flow_table.html
+  Универсальная таблица с поиском, пагинацией и асинхронной подгрузкой данных.
+
+  Параметры макроса render_flow_table:
+    table_id      — уникальный id таблицы (обязательно)
+    columns       — список dict:
+                      { key: str, label: str, sortable: bool (опц.), width: str (опц.) }
+                    key используется для обращения к полям строки в row_template
+    api_url       — URL для GET-запроса данных (обязательно)
+                    Ожидает JSON: { items: [...], total: int }
+                    Параметры запроса: ?page=1&per_page=25&search=...&sort=key&order=asc|desc
+    row_template  — имя JS-функции (string) для рендера строки:
+                      function(row) { return '<tr>...</tr>'; }
+                    Функция должна быть определена до вызова таблицы.
+    per_page_opts — список вариантов кол-ва записей (по умолчанию [10, 25, 50])
+    search_placeholder — плейсхолдер поиска (по умолчанию 'Что ищете?')
+    initial_data  — начальные данные (Jinja, список dict) — рендерятся сразу,
+                    без запроса к API (опционально, для SSR)
+
+  Пример:
+  ──────────────────────────────────────────────────────────────
+  {% from "components/flow_table.html" import render_flow_table %}
+
+  <script>
+  function renderUserRow(row) {
+    return `<tr>
+      <td class="ft-cell ft-cell--muted ft-cell--mono">#${row.id}</td>
+      <td class="ft-cell ft-cell--bold">${row.username}</td>
+      ...
+    </tr>`;
+  }
+  </script>
+
+  {{ render_flow_table(
+      table_id   = "users_table",
+      columns    = [
+        { "key": "id",         "label": "ID",      "sortable": true,  "width": "60px" },
+        { "key": "username",   "label": "Логин",   "sortable": true },
+        { "key": "roles",      "label": "Роли" },
+        { "key": "is_active",  "label": "Статус" },
+        { "key": "created_at", "label": "Создан",  "sortable": true },
+        { "key": "actions",    "label": "Действия","width": "220px" },
+      ],
+      api_url      = "/api/users",
+      row_template = "renderUserRow"
+  ) }}
+  ──────────────────────────────────────────────────────────────
+#}
+
+{% macro render_flow_table(
+    table_id,
+    columns,
+    api_url,
+    row_template,
+    per_page_opts     = [10, 25, 50],
+    search_placeholder = "Что ищете?",
+    initial_data      = none
+) %}
+
+<div class="ft-root" id="{{ table_id }}_root">
+
+  {# ── Toolbar: per_page + поиск ── #}
+  <div class="ft-toolbar">
+    <div class="ft-toolbar-left">
+      <span class="ft-toolbar-label">Показать</span>
+      <select class="ft-select" id="{{ table_id }}_per_page">
+        {% for opt in per_page_opts %}
+        <option value="{{ opt }}" {% if loop.index == 2 %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+      <span class="ft-toolbar-label">записей</span>
+    </div>
+    <div class="ft-toolbar-right">
+      <span class="ft-toolbar-label">Поиск:</span>
+      <div class="ft-search-wrap">
+        <svg class="ft-search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <input
+          type="text"
+          class="ft-search"
+          id="{{ table_id }}_search"
+          placeholder="{{ search_placeholder }}"
+          autocomplete="off"
+        />
+      </div>
+    </div>
+  </div>
+
+  {# ── Таблица ── #}
+  <div class="ft-table-wrap">
+    <table class="ft-table" id="{{ table_id }}_table">
+      <thead>
+        <tr>
+          {% for col in columns %}
+          <th
+            class="ft-th {% if col.sortable is defined and col.sortable %}ft-th--sortable{% endif %}"
+            data-key="{{ col.key }}"
+            {% if col.width is defined %}style="width: {{ col.width }}"{% endif %}
+          >
+            <span>{{ col.label }}</span>
+            {% if col.sortable is defined and col.sortable %}
+            <svg class="ft-sort-icon" width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+              <path d="M5 1L8 4H2L5 1z" opacity=".4" class="ft-sort-asc"/>
+              <path d="M5 9L2 6h6L5 9z" opacity=".4" class="ft-sort-desc"/>
+            </svg>
+            {% endif %}
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody id="{{ table_id }}_tbody">
+        {% if initial_data %}
+          {# SSR-строки — будут заменены при первой загрузке JS #}
+          <tr><td colspan="{{ columns | length }}" class="ft-loading">Загрузка…</td></tr>
+        {% else %}
+          <tr><td colspan="{{ columns | length }}" class="ft-loading">Загрузка…</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Footer: инфо + пагинация ── #}
+  <div class="ft-footer">
+    <div class="ft-info" id="{{ table_id }}_info">—</div>
+    <div class="ft-pagination" id="{{ table_id }}_pagination"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const ROOT      = document.getElementById('{{ table_id }}_root');
+  const TBODY     = document.getElementById('{{ table_id }}_tbody');
+  const INFO      = document.getElementById('{{ table_id }}_info');
+  const PAGER     = document.getElementById('{{ table_id }}_pagination');
+  const SEARCH    = document.getElementById('{{ table_id }}_search');
+  const PER_PAGE  = document.getElementById('{{ table_id }}_per_page');
+  const API_URL   = {{ api_url | tojson }};
+  const ROW_FN    = {{ row_template | tojson }};
+  const TABLE_ID  = {{ table_id | tojson }};
+
+  let state = { page: 1, per_page: parseInt(PER_PAGE.value), search: '', sort: '', order: 'asc', total: 0, loading: false };
+  let searchTimer = null;
+
+  /* ── fetch ───────────────────────────────────────────────── */
+  async function load() {
+    if (state.loading) return;
+    state.loading = true;
+    setLoading(true);
+
+    const params = new URLSearchParams({
+      page:     state.page,
+      per_page: state.per_page,
+      search:   state.search,
+      ...(state.sort ? { sort: state.sort, order: state.order } : {}),
+    });
+
+    try {
+      const res  = await fetch(`${API_URL}?${params}`);
+      const data = await res.json();
+      state.total = data.total || 0;
+      renderRows(data.items || []);
+      renderInfo();
+      renderPager();
+    } catch (e) {
+      TBODY.innerHTML = `<tr><td colspan="99" class="ft-error">Ошибка загрузки данных</td></tr>`;
+    } finally {
+      state.loading = false;
+      setLoading(false);
+    }
+  }
+
+  /* ── render rows ─────────────────────────────────────────── */
+  function renderRows(items) {
+    if (!items.length) {
+      TBODY.innerHTML = `<tr><td colspan="99" class="ft-empty">Записей не найдено</td></tr>`;
+      return;
+    }
+    const fn = window[ROW_FN];
+    if (typeof fn !== 'function') {
+      console.error('[flow_table] row_template function not found:', ROW_FN);
+      return;
+    }
+    TBODY.innerHTML = items.map(fn).join('');
+    // Вызываем событие, чтобы страница могла навесить обработчики на кнопки в строках
+    ROOT.dispatchEvent(new CustomEvent('ft:rendered', { detail: { items }, bubbles: true }));
+  }
+
+  /* ── info ────────────────────────────────────────────────── */
+  function renderInfo() {
+    const from = state.total === 0 ? 0 : (state.page - 1) * state.per_page + 1;
+    const to   = Math.min(state.page * state.per_page, state.total);
+    INFO.textContent = `Записи с ${from} до ${to} из ${state.total} записей`;
+  }
+
+  /* ── pagination ──────────────────────────────────────────── */
+  function renderPager() {
+    const pages = Math.ceil(state.total / state.per_page) || 1;
+    if (pages <= 1) { PAGER.innerHTML = ''; return; }
+
+    const cur = state.page;
+    let btns = [];
+
+    // Первая / пред
+    btns.push(pageBtn('Первая', 1, cur === 1));
+    btns.push(pageBtn('‹', cur - 1, cur === 1, true));
+
+    // Окно страниц
+    const window_size = 5;
+    let start = Math.max(1, cur - Math.floor(window_size / 2));
+    let end   = Math.min(pages, start + window_size - 1);
+    if (end - start < window_size - 1) start = Math.max(1, end - window_size + 1);
+
+    if (start > 1) btns.push('<span class="ft-page-ellipsis">…</span>');
+    for (let p = start; p <= end; p++) {
+      btns.push(`<button class="ft-page-btn ${p === cur ? 'ft-page-btn--active' : ''}" data-page="${p}">${p}</button>`);
+    }
+    if (end < pages) btns.push('<span class="ft-page-ellipsis">…</span>');
+
+    // След / последняя
+    btns.push(pageBtn('›', cur + 1, cur === pages, true));
+    btns.push(pageBtn('Последняя', pages, cur === pages));
+
+    PAGER.innerHTML = btns.join('');
+    PAGER.querySelectorAll('[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = parseInt(btn.dataset.page);
+        if (p >= 1 && p <= pages && p !== state.page) { state.page = p; load(); }
+      });
+    });
+  }
+
+  function pageBtn(label, page, disabled, isArrow = false) {
+    return `<button class="ft-page-btn ${isArrow ? 'ft-page-btn--arrow' : ''}" data-page="${page}" ${disabled ? 'disabled' : ''}>${label}</button>`;
+  }
+
+  /* ── loading overlay ─────────────────────────────────────── */
+  function setLoading(on) {
+    ROOT.classList.toggle('ft-root--loading', on);
+  }
+
+  /* ── sort ────────────────────────────────────────────────── */
+  ROOT.querySelectorAll('.ft-th--sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (state.sort === key) {
+        state.order = state.order === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sort = key; state.order = 'asc';
+      }
+      state.page = 1;
+      // Обновляем иконки
+      ROOT.querySelectorAll('.ft-th--sortable').forEach(t => t.removeAttribute('data-sort'));
+      th.dataset.sort = state.order;
+      load();
+    });
+  });
+
+  /* ── search ──────────────────────────────────────────────── */
+  SEARCH.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { state.search = SEARCH.value.trim(); state.page = 1; load(); }, 350);
+  });
+
+  /* ── per_page ────────────────────────────────────────────── */
+  PER_PAGE.addEventListener('change', () => {
+    state.per_page = parseInt(PER_PAGE.value); state.page = 1; load();
+  });
+
+  /* ── init ────────────────────────────────────────────────── */
+  load();
+
+  /* ── публичный API: TABLE_ID_table.reload() ──────────────── */
+  window[TABLE_ID + '_reload'] = load;
+})();
+</script>
+
+<style>
+/* ── Flow Table ─────────────────────────────────────────────── */
+.ft-root {
+  background: var(--flow-surface, #fff);
+  border: 1px solid var(--flow-border, #e5e7eb);
+  border-radius: var(--flow-radius, 12px);
+  box-shadow: var(--flow-shadow);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Loading overlay */
+.ft-root--loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,.5);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Toolbar */
+.ft-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--flow-border, #e5e7eb);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ft-toolbar-left,
+.ft-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ft-toolbar-label {
+  font-size: 13px;
+  color: var(--flow-text-muted, #6b7280);
+  white-space: nowrap;
+}
+
+.ft-select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--flow-border, #e5e7eb);
+  border-radius: 7px;
+  font-size: 13px;
+  background: #fff;
+  color: var(--flow-text, #111827);
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s;
+}
+.ft-select:focus { border-color: var(--flow-primary, #2563eb); }
+
+.ft-search-wrap {
+  position: relative;
+}
+.ft-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--flow-text-muted, #9ca3af);
+  pointer-events: none;
+}
+.ft-search {
+  height: 32px;
+  padding: 0 10px 0 30px;
+  border: 1px solid var(--flow-border, #e5e7eb);
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--flow-text, #111827);
+  outline: none;
+  transition: border-color .15s;
+  min-width: 180px;
+}
+.ft-search:focus { border-color: var(--flow-primary, #2563eb); }
+.ft-search::placeholder { color: var(--flow-text-muted, #9ca3af); }
+
+/* Table */
+.ft-table-wrap {
+  overflow-x: auto;
+}
+.ft-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ft-th {
+  padding: 10px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--flow-text-muted, #6b7280);
+  background: var(--flow-bg, #f3f4f6);
+  border-bottom: 1px solid var(--flow-border, #e5e7eb);
+  white-space: nowrap;
+  user-select: none;
+}
+.ft-th--sortable {
+  cursor: pointer;
+}
+.ft-th--sortable:hover { color: var(--flow-text, #111827); }
+.ft-th span { vertical-align: middle; }
+.ft-sort-icon { margin-left: 4px; vertical-align: middle; }
+.ft-th[data-sort="asc"]  .ft-sort-asc  { opacity: 1; }
+.ft-th[data-sort="desc"] .ft-sort-desc { opacity: 1; }
+
+/* Rows */
+.ft-table tbody tr {
+  border-bottom: 1px solid var(--flow-border, #e5e7eb);
+  transition: background .12s;
+}
+.ft-table tbody tr:last-child { border-bottom: none; }
+.ft-table tbody tr:hover { background: var(--flow-bg, #f9fafb); }
+
+/* Cell helpers — используй в row_template */
+.ft-cell {
+  padding: 14px 20px;
+  font-size: 13.5px;
+  color: var(--flow-text, #111827);
+  vertical-align: middle;
+}
+.ft-cell--muted  { color: var(--flow-text-muted, #6b7280); }
+.ft-cell--mono   { font-family: ui-monospace, monospace; font-size: 12.5px; }
+.ft-cell--bold   { font-weight: 600; }
+.ft-cell--actions { white-space: nowrap; }
+
+/* Special states */
+.ft-loading,
+.ft-empty,
+.ft-error {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 13px;
+  color: var(--flow-text-muted, #9ca3af);
+}
+.ft-error { color: #dc2626; }
+
+/* Footer */
+.ft-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid var(--flow-border, #e5e7eb);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ft-info {
+  font-size: 12.5px;
+  color: var(--flow-text-muted, #6b7280);
+}
+
+/* Pagination */
+.ft-pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ft-page-btn {
+  height: 30px;
+  min-width: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--flow-border, #e5e7eb);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--flow-text, #374151);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+  white-space: nowrap;
+}
+.ft-page-btn:hover:not(:disabled):not(.ft-page-btn--active) {
+  background: var(--flow-bg, #f3f4f6);
+  border-color: #9ca3af;
+}
+.ft-page-btn--active {
+  background: var(--flow-primary, #2563eb);
+  border-color: var(--flow-primary, #2563eb);
+  color: #fff;
+  font-weight: 600;
+  pointer-events: none;
+}
+.ft-page-btn:disabled {
+  opacity: .4;
+  cursor: default;
+}
+.ft-page-btn--arrow {
+  font-size: 15px;
+  line-height: 1;
+}
+.ft-page-ellipsis {
+  padding: 0 4px;
+  color: var(--flow-text-muted, #9ca3af);
+  font-size: 13px;
+}
+</style>
+{% endmacro %}
