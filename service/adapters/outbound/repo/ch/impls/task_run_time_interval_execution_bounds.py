@@ -1,4 +1,5 @@
-from typing import Any, Dict
+from datetime import datetime
+from typing import Any, Dict, List
 
 from clickhouse_connect.driver.asyncclient import AsyncClient
 
@@ -54,6 +55,20 @@ class CHTaskRunTimeIntervalExecutionBoundsRepo(
             "task_run_id = {task_run_id:Int64}",
             {"task_run_id": pk.task_run_id},
         )
+
+    async def get_latest_right_bound_by_task_ids(self, task_ids: List[int]) -> Dict[int, datetime]:
+        if not task_ids:
+            return {}
+        query = f"""
+            SELECT
+                task_id,
+                max(right_bound_at) AS right_bound_at
+            FROM {self.table_name}
+            WHERE task_id IN {{task_ids:Array(Int64)}}
+            GROUP BY task_id
+        """
+        result = await self._client.query(query, parameters={"task_ids": task_ids})
+        return {row["task_id"]: row["right_bound_at"] for row in result.named_results() if row["right_bound_at"]}
 
 
 async def create_task_run_time_interval_execution_bounds_repo(

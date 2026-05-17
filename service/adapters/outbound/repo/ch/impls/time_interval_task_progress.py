@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from clickhouse_connect.driver.asyncclient import AsyncClient
 
@@ -55,6 +55,18 @@ class CHTimeIntervalTaskProgressRepo(AbstractCHRepo[TimeIntervalTaskProgress, Ti
                 "right_bound_at": pk.right_bound_at,
             },
         )
+
+    async def get_by_task_ids_ordered(self, task_ids: List[int]) -> List[TimeIntervalTaskProgress]:
+        if not task_ids:
+            return []
+        query = f"""
+            SELECT *
+            FROM {self.table_name}
+            WHERE task_id IN {{task_ids:Array(Int64)}}
+            ORDER BY task_id, right_bound_at DESC
+        """
+        result = await self._client.query(query, parameters={"task_ids": task_ids})
+        return [self.to_domain(row) for row in result.named_results()]
 
 
 async def create_time_interval_task_progress_repo(

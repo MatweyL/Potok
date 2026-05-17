@@ -80,52 +80,62 @@ class DefaultExecutionBoundsProvider:
         """
 
         task_ids = [task.id for task in tasks]
-        progress_records: List[
-            TaskRunTimeIntervalExecutionBounds] = await self._task_run_time_interval_execution_bounds_repo.filter(
-            FilterFieldsDNF.single("task_id", task_ids, ConditionOperation.IN)
-        )
-        # Группируем прогресс по task_id
-        progress_by_task_id: Dict[int, List[TaskRunTimeIntervalExecutionBounds]] = {}
-        for record in progress_records:
-            progress_by_task_id.setdefault(record.task_id, []).append(record)
+        latest_right_bound_by_task_id = await self._latest_right_bound_by_task_ids(task_ids)
 
         result: Dict[Task, List[ExecutionBounds]] = {}
 
         now = datetime.now()
 
         for task in tasks:
-            task_progress = progress_by_task_id.get(task.id, [])
+            latest_right_bound = latest_right_bound_by_task_id.get(task.id)
 
-            if not task_progress:
-                # Нет прогресса — нужно создать первый интервал.
-                # Здесь ты можешь задать стартовую точку из конфига задачи (execution_arguments?)
-                # Для примера — начинаем с None (т.е. с самого начала)
-                separate_monitoring_and_retro_datetime = now - timedelta(days=self._default_first_interval_days)
-                if separate_monitoring_and_retro_datetime <= self._default_left_date:
-                    separate_monitoring_and_retro_datetime = self._default_left_date
-                bounds = [TimeIntervalBounds(right_bound_at=now,
-                                             left_bound_at=separate_monitoring_and_retro_datetime),]
-                left_date = separate_monitoring_and_retro_datetime
-                while left_date > self._default_left_date:
-                    right_bound_at = left_date
-                    left_date = right_bound_at - timedelta(days=30 * self._default_month_step_to_left_date)
-                    if left_date < self._default_left_date:
-                        left_date = self._default_left_date
-                    time_interval_bounds = TimeIntervalBounds(right_bound_at=right_bound_at,
-                                                              left_bound_at=left_date)
-                    bounds.append(time_interval_bounds)
-
-                result[task] = bounds
+            if not latest_right_bound:
+                result[task] = self._build_initial_time_interval_bounds(now)
                 continue
 
-            # Находим последний завершённый интервал
-            latest_progress = max(task_progress,
-                                  key=lambda p: p.execution_bounds.right_bound_at
-                                  if p.execution_bounds.right_bound_at
-                                  else datetime.min)
-            next_left = latest_progress.execution_bounds.right_bound_at
+            if latest_right_bound >= now:
+                result[task] = []
+                continue
 
-            bounds = [TimeIntervalBounds(right_bound_at=now, left_bound_at=next_left)]
-            result[task] = bounds
+            result[task] = [TimeIntervalBounds(right_bound_at=now, left_bound_at=latest_right_bound)]
 
         return result
+
+    def _build_initial_time_interval_bounds(self, now: datetime) -> List[TimeIntervalBounds]:
+        if self._default_left_date >= now:
+            return []
+
+        separate_monitoring_and_retro_datetime = now - timedelta(days=self._default_first_interval_days)
+        if separate_monitoring_and_retro_datetime <= self._default_left_date:
+            separate_monitoring_and_retro_datetime = self._default_left_date
+
+        bounds = [TimeIntervalBounds(right_bound_at=now,
+                                     left_bound_at=separate_monitoring_and_retro_datetime)]
+        left_date = separate_monitoring_and_retro_datetime
+        while left_date > self._default_left_date:
+            right_bound_at = left_date
+            left_date = right_bound_at - timedelta(days=30 * self._default_month_step_to_left_date)
+            if left_date < self._default_left_date:
+                left_date = self._default_left_date
+            if right_bound_at <= left_date:
+                break
+            bounds.append(TimeIntervalBounds(right_bound_at=right_bound_at,
+                                             left_bound_at=left_date))
+        return bounds
+
+    async def _latest_right_bound_by_task_ids(self, task_ids: List[int]) -> Dict[int, datetime]:
+        if not task_ids:
+            return {}
+        if hasattr(self._task_run_time_interval_execution_bounds_repo, "get_latest_right_bound_by_task_ids"):
+            return await self._task_run_time_interval_execution_bounds_repo.get_latest_right_bound_by_task_ids(task_ids)
+
+        progress_records: List[TaskRunTimeIntervalExecutionBounds] = await self._task_run_time_interval_execution_bounds_repo.filter(
+            FilterFieldsDNF.single("task_id", task_ids, ConditionOperation.IN)
+        )
+        latest_right_bound_by_task_id: Dict[int, datetime] = {}
+        for record in progress_records:
+            right_bound_at = record.execution_bounds.right_bound_at
+            latest_right_bound = latest_right_bound_by_task_id.get(record.task_id, datetime.min)
+            if right_bound_at and right_bound_at > latest_right_bound:
+                latest_right_bound_by_task_id[record.task_id] = right_bound_at
+        return latest_right_bound_by_task_id

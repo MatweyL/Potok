@@ -1,4 +1,7 @@
-from typing import Dict
+from datetime import datetime
+from typing import Dict, List
+
+from sqlalchemy import func, select
 
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.abstract import AbstractSARepo
@@ -26,3 +29,19 @@ class SATaskRunTimeIntervalExecutionBoundsRepo(AbstractSARepo):
         return {
             "task_run_id": pk.task_run_id,
         }
+
+
+    async def get_latest_right_bound_by_task_ids(self, task_ids: List[int]) -> Dict[int, datetime]:
+        if not task_ids:
+            return {}
+        query = (
+            select(
+                self._model_class.task_id,
+                func.max(self._model_class.right_bound_at).label("right_bound_at"),
+            )
+            .where(self._model_class.task_id.in_(task_ids))
+            .group_by(self._model_class.task_id)
+        )
+        async with self._database.session as session:
+            result = await session.execute(query)
+            return {task_id: right_bound_at for task_id, right_bound_at in result.all() if right_bound_at}
