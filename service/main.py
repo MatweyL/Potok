@@ -22,6 +22,7 @@ from service.adapters.outbound.repo.ch.impls.time_interval_task_progress import 
     create_time_interval_task_progress_repo
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.database import Database
+from service.adapters.outbound.repo.sa.impls.analytical_metrics import SAAnalyticalMetricsProvider
 from service.adapters.outbound.repo.sa.impls.app_user import SAAppUserRepo
 from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAMonitoringAlgorithmRepo, \
     SAPeriodicMonitoringAlgorithmRepo, SASingleMonitoringAlgorithmRepo
@@ -41,6 +42,7 @@ from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatus
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.di import set_use_case_facade
+from service.domain.services.analytical_metrics import AnalyticalMetricsService
 from service.domain.services.balancing_algorithm.aimd import AIMDBalancingAlgorithm
 from service.domain.services.balancing_algorithm.constant import ConstantBalancingAlgorithm
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
@@ -165,6 +167,8 @@ async def main():
     task_group_by_project_repo = SATaskGroupByProjectRepo(database, models.TaskGroupByProject)
     task_run_metrics_provider = SATaskRunMetricsProvider(database)
     task_provider = SATaskProvider(database)
+    analytical_metrics_provider = SAAnalyticalMetricsProvider(database)
+    analytical_metrics_service = AnalyticalMetricsService(analytical_metrics_provider)
 
     rmq_producer_connection = AioPikaRMQProducerConnection.from_settings(settings.rmq_producer_connection)
     rmq_producer = AioPikaRMQProducer.from_settings(settings.rmq_producer_task_run, rmq_producer_connection)
@@ -340,6 +344,7 @@ async def main():
     fastapi_server.app.state.use_case_facade = use_case_facade
     fastapi_server.app.state.token_service = token_service
     fastapi_server.app.state.admin_use_case_facade = admin_use_case_facade
+    fastapi_server.app.state.analytical_metrics_service = analytical_metrics_service
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [

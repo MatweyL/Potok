@@ -25,7 +25,7 @@
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">Информация о полезной нагрузке</h5>
             <span class="badge bg-secondary-subtle text-secondary-emphasis font-monospace">ID: {{ payload.id }}</span>
-            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editPayloadModal">
+            <button class="btn btn-outline-primary btn-sm" data-flow-open="editPayloadModal">
                 Редактировать
             </button>
         </div>
@@ -221,7 +221,7 @@
                     Редактировать полезную нагрузку
                     <span class="text-muted fw-normal">#{{ payload.id }}</span>
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <label for="editPayloadData" class="form-label fw-medium">
@@ -238,7 +238,7 @@
                 <div id="editPayloadDataError" class="invalid-feedback"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
                 <button type="button" class="btn btn-primary" id="savePayloadBtn">Сохранить</button>
             </div>
         </div>
@@ -307,7 +307,7 @@ document.getElementById('savePayloadBtn')?.addEventListener('click', async funct
     textarea.classList.remove('is-invalid');
     errorEl.textContent = '';
     saveBtn.disabled = true;
-    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Сохранение...';
+    saveBtn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span> Сохранение...';
 
     try {
         const response = await fetch(`/payloads/{{ payload.id }}`, {
@@ -329,7 +329,7 @@ document.getElementById('savePayloadBtn')?.addEventListener('click', async funct
             document.getElementById('payloadChecksum').textContent = updated.checksum;
         }
 
-        bootstrap.Modal.getInstance(editPayloadModal).hide();
+        editPayloadModal?.classList.remove('is-open');
     } catch (error) {
         textarea.classList.add('is-invalid');
         errorEl.textContent = 'Не удалось сохранить: ' + error.message;

@@ -1,6 +1,7 @@
 {# components/task_group_metrics.html #}
-{# Ожидается переменная: stats (dict или None) в текущем контексте #}
+{# Параметр: stats (dict или None) #}
 
+{% macro render_task_group_metrics(stats) %}
 {% if stats %}
 <div>
 <div class="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
@@ -105,3 +106,4 @@
 </div>
 </div>
 {% endif %}
+{% endmacro %}

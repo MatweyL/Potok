@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'components/task_group_card.html' import render_task_group_card %}
 
 {% block title %}{{ task_group.title }} - Группа задач{% endblock %}
 
@@ -7,7 +8,7 @@
     <!-- Заголовок и кнопка редактирования -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 class="h3 mb-0">Детали группы задач</h1>
-        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTaskGroupModal">
+        <button class="btn btn-outline-primary" data-flow-open="editTaskGroupModal">
             Редактировать группу
         </button>
     </div>
@@ -18,7 +19,7 @@
     {% set show_verbose = true %}
     {% set show_project = true %}
     <div id="taskGroupCard">
-        {% include 'components/task_group_card.html' %}
+        {{ render_task_group_card(group, stats, project, show_project) }}
     </div>
 
     <!-- Таблица задач -->
@@ -56,7 +57,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Редактировать группу задач</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <form id="editTaskGroupForm">
@@ -89,7 +90,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
                 <button type="button" class="btn btn-primary" id="saveTaskGroupBtn">Сохранить</button>
             </div>
         </div>
@@ -351,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const isActive = document.getElementById('editIsActive').checked;
 
         saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Сохранение...';
+        saveBtn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span> Сохранение...';
 
         try {
             const response = await fetch(`/task-groups/${groupId}`, {
@@ -389,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 isActiveBadge.textContent = isActive ? 'Активна' : 'Не активна';
             }
 
-            bootstrap.Modal.getInstance(document.getElementById('editTaskGroupModal')).hide();
+            document.getElementById('editTaskGroupModal')?.classList.remove('is-open');
         } catch (error) {
             console.error('Ошибка обновления группы:', error);
             alert('Не удалось сохранить изменения: ' + error.message);

@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{% block title %}Поток{% endblock %}</title>
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
-  <link rel="stylesheet" href="https://cdn.datatables.net/2.0.3/css/dataTables.bootstrap5.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.0.3/css/dataTables.dataTables.min.css"/>
   <style>
     /* ─── Design tokens ─────────────────────────────────────────── */
     :root {
@@ -172,6 +171,55 @@
       display: flex; align-items: center; justify-content: center;
     }
 
+
+    /* ─── Flow controls and legacy utility compatibility ───────── */
+    .flow-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .flow-btn, .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      border:1px solid var(--flow-border); border-radius:10px; padding:8px 12px;
+      background:#fff; color:var(--flow-text); text-decoration:none; font-weight:600;
+      font-size:13px; line-height:1.2; cursor:pointer; transition:.15s ease;
+    }
+    .flow-btn:hover, .btn:hover { border-color:#bfdbfe; color:var(--flow-primary); }
+    .flow-btn--primary, .btn-primary { background:var(--flow-primary); border-color:var(--flow-primary); color:#fff; }
+    .flow-btn--primary:hover, .btn-primary:hover { background:#1d4ed8; color:#fff; }
+    .flow-btn--secondary, .btn-secondary { background:#f9fafb; color:var(--flow-text-muted); }
+    .flow-btn--danger { background:#dc2626; border-color:#dc2626; color:#fff; }
+    .flow-btn--sm, .btn-sm { padding:6px 10px; font-size:12px; border-radius:8px; }
+    .flow-card, .card { background:var(--flow-surface); border:1px solid var(--flow-border); border-radius:var(--flow-radius); box-shadow:var(--flow-shadow); }
+    .flow-card-body, .card-body { padding:20px; }
+    .flow-table-wrap { overflow:auto; border-radius:var(--flow-radius); border:1px solid var(--flow-border); background:#fff; }
+    table.flow-table, table.table { width:100%; border-collapse:collapse; font-size:13px; }
+    table.flow-table th, table.flow-table td, table.table th, table.table td { padding:12px 14px; border-bottom:1px solid var(--flow-border); text-align:left; vertical-align:middle; }
+    table.flow-table th, table.table th { background:#f9fafb; color:var(--flow-text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+    table.flow-table tr:hover td, table.table tr:hover td { background:#f8fafc; }
+    .flow-badge, .badge { display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border-radius:999px; background:#f3f4f6; color:var(--flow-text-muted); font-size:12px; font-weight:600; }
+    .flow-empty, .alert { padding:24px; text-align:center; color:var(--flow-text-muted); background:#fff; border:1px solid var(--flow-border); border-radius:var(--flow-radius); }
+    .flow-form { display:grid; gap:14px; }
+    .flow-field { display:grid; gap:6px; }
+    .flow-label, .form-label { color:var(--flow-text-muted); font-size:13px; font-weight:600; }
+    .flow-input, .flow-select, .flow-textarea, .form-control, .form-select { width:100%; border:1px solid var(--flow-border); border-radius:10px; padding:10px 12px; background:#fff; color:var(--flow-text); font:inherit; }
+    .flow-input:focus, .flow-select:focus, .flow-textarea:focus, .form-control:focus, .form-select:focus { outline:2px solid #bfdbfe; border-color:var(--flow-primary); }
+    .flow-help, .form-text { color:var(--flow-text-muted); font-size:12px; }
+    .flow-modal { border:0; border-radius:16px; padding:0; width:min(720px, calc(100vw - 32px)); box-shadow:0 24px 70px rgba(15,23,42,.25); }
+    .modal { display:none; position:fixed; inset:0; z-index:200; padding:32px 16px; overflow:auto; background:rgba(15,23,42,.45); }
+    .modal.is-open { display:block; }
+    .modal-dialog { width:min(720px, calc(100vw - 32px)); margin:5vh auto; }
+    .modal-content { background:#fff; border-radius:16px; box-shadow:0 24px 70px rgba(15,23,42,.25); overflow:hidden; }
+    .flow-spinner { display:inline-block; width:1em; height:1em; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:flow-spin .7s linear infinite; }
+    @keyframes flow-spin { to { transform:rotate(360deg); } }
+    .flow-modal::backdrop { background:rgba(15,23,42,.45); }
+    .flow-modal-header, .modal-header { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; border-bottom:1px solid var(--flow-border); }
+    .flow-modal-body, .modal-body { padding:20px; }
+    .flow-modal-footer, .modal-footer { display:flex; justify-content:flex-end; gap:10px; padding:16px 20px; border-top:1px solid var(--flow-border); }
+    .flow-modal-close, .btn-close { border:0; background:transparent; font-size:22px; cursor:pointer; color:var(--flow-text-muted); }
+    .flow-grid { display:grid; gap:16px; }
+    .flow-grid--2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .flow-grid--3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+    .flow-muted, .text-muted { color:var(--flow-text-muted); }
+    .flow-mono, .font-monospace { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    @media (max-width: 760px) { .flow-grid--2, .flow-grid--3 { grid-template-columns:1fr; } }
+
     /* ─── Chart cards ───────────────────────────────────────────── */
     .flow-chart-card {
       background: var(--flow-surface);
@@ -322,11 +370,33 @@
 {% block body %}{% endblock %}
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/2.0.3/js/dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/2.0.3/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
+  document.querySelectorAll('[data-flow-open]').forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      const target = document.getElementById(trigger.dataset.flowOpen);
+      if (!target) return;
+      if (typeof target.showModal === 'function') target.showModal();
+      else { target.hidden = false; target.classList.add('is-open'); }
+      target.classList.add('is-open');
+    });
+  });
+  document.querySelectorAll('[data-flow-close]').forEach((trigger) => {
+    trigger.addEventListener('click', () => {
+      const target = trigger.closest('dialog') || trigger.closest('.modal');
+      if (!target) return;
+      if (typeof target.close === 'function') target.close();
+      target.classList.remove('is-open');
+      if (!target.matches('dialog')) target.hidden = true;
+    });
+  });
+  document.querySelectorAll('dialog.flow-modal').forEach((dialog) => {
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  });
+
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     await fetch('/auth/logout', { method: 'POST' });
     window.location.href = '/login';
