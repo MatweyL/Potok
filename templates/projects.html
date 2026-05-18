@@ -6,7 +6,7 @@
 <div class="flow-page">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">Проекты</h1>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+        <button class="btn btn-primary" data-flow-open="createProjectModal">
             Создать проект
         </button>
     </div>
@@ -28,14 +28,13 @@
 
                     <h6 class="mt-3 mb-2">Группы задач:</h6>
                     <div class="task-groups-list" data-project-id="{{ project.id }}">
-                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <div class="flow-spinner flow-spinner--sm text-primary" role="status">
                             <span class="visually-hidden">Загрузка...</span>
                         </div>
                     </div>
 
                     <button class="btn btn-outline-primary btn-sm mt-3 w-100"
-                            data-bs-toggle="modal"
-                            data-bs-target="#attachTaskGroupModal"
+                            data-flow-open="attachTaskGroupModal"
                             data-project-id="{{ project.id }}"
                             data-project-title="{{ project.title }}">
                         + Привязать группу задач
@@ -53,7 +52,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Создать проект</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <form id="createProjectForm">
@@ -68,7 +67,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
                 <button type="button" class="btn btn-primary" id="createProjectBtn">Создать</button>
             </div>
         </div>
@@ -81,7 +80,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Привязать группу задач</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="attachProjectId">
@@ -94,7 +93,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
                 <button type="button" class="btn btn-primary" id="attachTaskGroupBtn">Привязать</button>
             </div>
         </div>
@@ -173,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!confirm('Отвязать группу задач от проекта?')) return;
 
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+        btn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span>';
 
         fetch(API.unbind, {
             method: 'POST',
@@ -244,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const btn = this;
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Привязываю...';
+        btn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span> Привязываю...';
 
         fetch(API.bind, {
             method: 'POST',
@@ -256,8 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(res => res.json())
         .then(() => {
-            const modal = bootstrap.Modal.getInstance(attachModal);
-            modal.hide();
+            const modal = attachModal?.classList.remove('is-open');
             const container = document.querySelector(`.task-groups-list[data-project-id="${projectId}"]`);
             if (container) fetchTaskGroups(projectId, container);
         })
@@ -283,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const btn = this;
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Создаю...';
+        btn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span> Создаю...';
 
         fetch(API.create, {
             method: 'POST',
@@ -292,8 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(res => res.json())
         .then(data => {
-            const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
-            modal.hide();
+            const modal = document.getElementById('createProjectModal')?.classList.remove('is-open');
             addProjectToDOM(data.id, title, description);
             document.getElementById('createProjectForm').reset();
         })
@@ -329,8 +326,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
 
                     <button class="btn btn-outline-primary btn-sm mt-3 w-100"
-                            data-bs-toggle="modal"
-                            data-bs-target="#attachTaskGroupModal"
+                            data-flow-open="attachTaskGroupModal"
                             data-project-id="${id}"
                             data-project-title="${escapeHtml(title)}">
                         + Привязать группу задач
@@ -341,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
         container.insertBefore(newCard, container.firstChild);
 
         // Навешиваем обработчик для новой кнопки привязки
-        newCard.querySelector('[data-bs-target="#attachTaskGroupModal"]')?.addEventListener('click', function() {
+        newCard.querySelector('[data-flow-open="attachTaskGroupModal"]')?.addEventListener('click', function() {
             document.getElementById('attachProjectId').value = id;
             loadAvailableGroupsToSelect();
         });

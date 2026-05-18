@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
@@ -57,6 +57,52 @@ def login_page(request: Request):
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page(request: Request):
     return templates.TemplateResponse(request=request, name="dashboard.html")
+
+
+
+@router.get("/api/dashboard/summary")
+async def dashboard_summary(request: Request):
+    return await request.app.state.analytical_metrics_service.get_dashboard_summary()
+
+
+@router.get("/api/dashboard/run-statuses")
+async def dashboard_run_statuses(request: Request, group_id: Optional[int] = None):
+    return await request.app.state.analytical_metrics_service.get_run_status_distribution(group_id=group_id)
+
+
+@router.get("/api/dashboard/performance-trends")
+async def dashboard_performance_trends(request: Request, period: str = Query("day", pattern="^(day|week)$")):
+    return await request.app.state.analytical_metrics_service.get_performance_trends(period=period)
+
+
+@router.get("/api/dashboard/run-heatmap")
+async def dashboard_run_heatmap(request: Request):
+    return await request.app.state.analytical_metrics_service.get_run_heatmap()
+
+
+@router.get("/api/dashboard/duration-distribution")
+async def dashboard_duration_distribution(request: Request, group_id: Optional[int] = None):
+    return await request.app.state.analytical_metrics_service.get_duration_distribution(group_id=group_id)
+
+
+@router.get("/api/task-groups/{task_group_id}/processing-speed")
+async def task_group_processing_speed(request: Request, task_group_id: int):
+    return await request.app.state.analytical_metrics_service.get_task_group_processing_speed(group_id=task_group_id)
+
+
+@router.get("/api/task-groups/{task_group_id}/run-statuses")
+async def task_group_run_statuses(request: Request, task_group_id: int):
+    return await request.app.state.analytical_metrics_service.get_run_status_distribution(group_id=task_group_id)
+
+
+@router.get("/api/task-groups/{task_group_id}/duration-distribution")
+async def task_group_duration_distribution(request: Request, task_group_id: int):
+    return await request.app.state.analytical_metrics_service.get_duration_distribution(group_id=task_group_id)
+
+
+@router.get("/api/tasks/{task_id}/run-statistics")
+async def task_run_statistics(request: Request, task_id: int):
+    return await request.app.state.analytical_metrics_service.get_task_run_statistics(task_id=task_id)
 
 
 @router.post("/auth/login")
@@ -312,6 +358,12 @@ async def update_group(request: Request, task_group_id: int, rq: UpdateTaskGroup
     return update_rs
 
 
+@router.get("/tasks", response_class=HTMLResponse)
+def tasks_page(request: Request):
+    return templates.TemplateResponse(request=request, name="tasks.html")
+
+
+@router.get("/tasks/json")
 @router.get("/tasks/")
 async def tasks_json(
         request: Request,
@@ -477,8 +529,9 @@ async def task_run_detailed_page(request: Request, task_run_id: int):
     )
 
 
+@router.get("/task-run-status-logs")
 @router.get("/task-run-status-logs/")
-async def task_runs_json(request: Request,
+async def task_run_status_logs_json(request: Request,
                          task_run_id: int,
                          draw: int = 1,
                          offset: int = 0,
