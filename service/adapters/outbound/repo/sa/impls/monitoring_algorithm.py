@@ -17,10 +17,10 @@ from service.ports.outbound.repo.monitoring_algorithm import MonitoringAlgorithm
 
 class SAMonitoringAlgorithmRepo(AbstractSARepo):
     def to_model(self, obj: MonitoringAlgorithm) -> models.MonitoringAlgorithm:
-        return models.MonitoringAlgorithm(id=obj.id, type=obj.type)
+        return models.MonitoringAlgorithm(id=obj.id, type=obj.type, name=obj.title, description=obj.description)
 
     def to_domain(self, obj: models.MonitoringAlgorithm) -> MonitoringAlgorithm:
-        return MonitoringAlgorithm(id=obj.id, type=obj.type)
+        return MonitoringAlgorithm(id=obj.id, type=obj.type, title=obj.name, description=obj.description)
 
     def pk_to_model_pk(self, pk: MonitoringAlgorithmPK) -> Dict:
         return {'id': pk.id}

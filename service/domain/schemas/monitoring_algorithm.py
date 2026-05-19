@@ -3,7 +3,6 @@ from typing import List, Union
 from pydantic import BaseModel, Field
 
 from service.domain.schemas.enums import MonitoringAlgorithmType
-from service.ports.common.json_schema_pretty_print import print_json_schema
 
 
 class MonitoringAlgorithmPK(BaseModel):
@@ -13,6 +12,9 @@ class MonitoringAlgorithmPK(BaseModel):
 class MonitoringAlgorithm(MonitoringAlgorithmPK):
     """ Для каждого алгоритма мониторинга свой провайдер задач, готовых к выполнению """
     type: MonitoringAlgorithmType
+    title: str | None = None
+    description: str | None = None
+
 
 
 class PeriodicMonitoringAlgorithm(MonitoringAlgorithm):

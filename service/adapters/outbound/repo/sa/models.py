@@ -29,6 +29,8 @@ class Task(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
 
 class MonitoringAlgorithm(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
     type: Mapped[MonitoringAlgorithmType] = mapped_column(Enum(MonitoringAlgorithmType))
+    description: Mapped[str] = mapped_column(TEXT, nullable=True, )
+    name: Mapped[str] = mapped_column(TEXT, nullable=True, )
 
 
 class PeriodicMonitoringAlgorithm(Base, TablenameMixin, LoadTimestampMixin):

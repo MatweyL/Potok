@@ -131,10 +131,6 @@ async def logout(request: Request, response: Response):
     return redirect
 
 
-@router.get("/monitoring-algorithms/json")
-async def get_algorithms_json(request: Request):
-    rs = await request.app.state.use_case_facade.get_all_monitoring_algorithms()
-    return rs
 
 
 @router.get("/tasks/create", response_class=HTMLResponse)
@@ -156,20 +152,6 @@ async def update_payload(request: Request, payload_id: int, rq: UpdatePayloadUCR
 
 # -- КОД ВЫШЕ ПОДЛЕЖИТ РЕФАКТОРИНГУ --
 
-
-
-@router.get("/monitoring-algorithms", response_class=HTMLResponse)
-async def monitoring_algorithms_page(request: Request):
-    rs = await request.app.state.use_case_facade.get_all_monitoring_algorithms()
-    return templates.TemplateResponse(
-        request=request, name="monitoring_algorithms.html",
-        context={"algorithms": rs.monitoring_algorithms}
-    )
-
-
-@router.post("/monitoring-algorithms")
-async def create_monitoring_algorithm(request: Request, rq: CreateMonitoringAlgorithmUCRq):
-    return await request.app.state.use_case_facade.create_monitoring_algorithm(rq)
 
 
 @router.get("/projects")
@@ -314,18 +296,6 @@ async def tasks_json(
         "data": [item.model_dump() for item in rs.tasks],
     }
 
-
-@router.get("/monitoring-algorithms/{monitoring_algorithm_id}")
-async def monitoring_algorithm_page(request: Request, monitoring_algorithm_id: int):
-    monitoring_algorithm_rs = await request.app.state.use_case_facade.get_monitoring_algorithm(
-        GetMonitoringAlgorithmUCRq(monitoring_algorithm_id=monitoring_algorithm_id))
-
-    return templates.TemplateResponse(
-        request=request, name="monitoring_algorithm.html",
-        context={
-            "algorithm": monitoring_algorithm_rs.monitoring_algorithm
-        }
-    )
 
 
 @router.get("/payloads", response_class=HTMLResponse)

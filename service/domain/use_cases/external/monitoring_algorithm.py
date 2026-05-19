@@ -66,6 +66,8 @@ class CreateMonitoringAlgorithmUC(UseCase):
         except BaseException as e:
             return CreateMonitoringAlgorithmUCRs(success=False, error=str(e), request=request, created_algorithm=None)
         else:
+            created.title = created_ma.title
+            created.description = created_ma.description
             return CreateMonitoringAlgorithmUCRs(
                 success=True,
                 request=request,
@@ -94,10 +96,14 @@ class GetAllMonitoringAlgorithmsUC(UseCase):
 
     def __init__(
             self,
+            monitoring_algorithm_repo: Repo[
+                MonitoringAlgorithm, MonitoringAlgorithm, MonitoringAlgorithmPK
+            ],
             monitoring_algorithm_repos: List[Repo[
                                                  MonitoringAlgorithm, MonitoringAlgorithm, MonitoringAlgorithmPK
                                              ],]
     ):
+        self._monitoring_algorithm_repo = monitoring_algorithm_repo
         self._monitoring_algorithm_repos = monitoring_algorithm_repos
 
     async def apply(
@@ -107,6 +113,12 @@ class GetAllMonitoringAlgorithmsUC(UseCase):
         for monitoring_algorithm_repo in self._monitoring_algorithm_repos:
             algorithms = await monitoring_algorithm_repo.get_all()
             algorithms_total.extend(algorithms)
+        base_algos = await self._monitoring_algorithm_repo.get_all()
+        base_algo_by_id = {base_algo.id: base_algo for base_algo in base_algos}
+        for algorithm in algorithms_total:
+            base_algo = base_algo_by_id[algorithm.id]
+            algorithm.title = base_algo.title
+            algorithm.description = base_algo.description
         return GetAllMonitoringAlgorithmsUCRs(
             success=True,
             request=request,
@@ -158,5 +170,7 @@ class GetMonitoringAlgorithmUC(UseCase):
             monitoring_algorithm = await self._single_monitoring_algorithm_repo.get(monitoring_algorithm_pk)
         else:
             raise RuntimeError(f"Unknown algorithm: {monitoring_algorithm_pk}")
+        monitoring_algorithm.title = base_algorithm.title
+        monitoring_algorithm.description = base_algorithm.description
         return GetMonitoringAlgorithmUCRs(success=True,request=request,
                                           monitoring_algorithm=monitoring_algorithm)

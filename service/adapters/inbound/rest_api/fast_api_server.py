@@ -15,6 +15,7 @@ from service.ports.common.interfaces import Startable
 from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
 from .annotations import HTTPMethod, EveryType
+from .html.monitoring_algorithms import monitoring_algorithms_router
 from .html.users import users_router
 from .html_router import router as html_router
 from .router import router as api_router
@@ -64,6 +65,7 @@ class FastAPIServer(Startable):
         self._app.include_router(api_router)
         self._app.include_router(html_router)
         self._app.include_router(users_router)
+        self._app.include_router(monitoring_algorithms_router)
         self._app.mount("/static", StaticFiles(directory=get_project_root().joinpath('static')), name="static")
         handle_422_exceptions(self._app)
 
@@ -84,7 +86,7 @@ class FastAPIServer(Startable):
                    allow_headers=settings.allow_headers if settings.allow_headers else DEFAULT_ALLOW_HEADERS,
                    use_https=settings.use_https,
                    ssl_keyfile=settings.ssl_keyfile,
-                   ssl_certfile=settings.ssl_certfile,)
+                   ssl_certfile=settings.ssl_certfile, )
 
     async def start(self):
         if self._server_task:

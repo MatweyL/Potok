@@ -196,7 +196,7 @@ async def main():
                                                                  periodic_monitoring_algorithm_repo,
                                                                  single_monitoring_algorithm_repo,
                                                                  transaction_factory)
-    get_all_monitoring_algorithms_uc = GetAllMonitoringAlgorithmsUC(monitoring_algorithms)
+    get_all_monitoring_algorithms_uc = GetAllMonitoringAlgorithmsUC(monitoring_algorithm_repo, monitoring_algorithms)
     create_tasks_uc = CreateTasksUC(transaction_factory, uniqueness_payload_checker, payload_repo, task_repo,
                                     task_status_log_repo)
     get_tasks_uc = GetTasksUC(task_repo)
