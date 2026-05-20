@@ -168,6 +168,8 @@ class GetMonitoringAlgorithmUC(UseCase):
     ) -> GetMonitoringAlgorithmUCRs:
         monitoring_algorithm_pk = MonitoringAlgorithmPK(id=request.monitoring_algorithm_id)
         base_algorithm = await self._monitoring_algorithm_repo.get(monitoring_algorithm_pk)
+        if not base_algorithm:
+            return GetMonitoringAlgorithmUCRs(success=False, request=request, error="Monitoring algorithm not found")
         if base_algorithm.type == MonitoringAlgorithmType.PERIODIC:
             monitoring_algorithm = await self._periodic_monitoring_algorithm_repo.get(monitoring_algorithm_pk)
         elif base_algorithm.type == MonitoringAlgorithmType.SINGLE:

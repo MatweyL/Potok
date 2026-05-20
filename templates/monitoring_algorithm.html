@@ -236,7 +236,6 @@
 
 {% block body %}
 <div class="flow-page">
-
   {# ── Заголовок страницы ── #}
   <div class="mb-4">
     <h1 class="h3 mb-1 fw-bold text-dark">
@@ -504,7 +503,7 @@ function buildTimeline() {
   /* Размеры */
   const W       = Math.max(svgEl.parentElement.clientWidth || 700, 400);
   const PAD_L   = 24, PAD_R = 24;
-  const H       = NOISE ? 106 : 84;
+  const H       = NOISE ? 120 : 100;
   const AXIS_Y  = 58;
   const UW      = W - PAD_L - PAD_R;
   const spanSec = Math.max(totalSec * 1.08, unitSec);

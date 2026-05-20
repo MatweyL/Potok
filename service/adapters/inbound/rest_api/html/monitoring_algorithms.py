@@ -87,7 +87,8 @@ async def create_monitoring_algorithm(request: Request, rq: CreateMonitoringAlgo
 async def monitoring_algorithm_page(request: Request, monitoring_algorithm_id: int):
     monitoring_algorithm_rs = await request.app.state.use_case_facade.get_monitoring_algorithm(
         GetMonitoringAlgorithmUCRq(monitoring_algorithm_id=monitoring_algorithm_id))
-
+    if not monitoring_algorithm_rs.success:
+        return templates.TemplateResponse(request=request, name="404.html",)
     return templates.TemplateResponse(
         request=request, name="monitoring_algorithm.html",
         context={
