@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Поток — Алгоритмы мониторинга{% endblock %}
 
+{% block extra_links %}
+  <script src="/static/js/seconds_formatter.js"></script>
+
+{% endblock %}
 {% block body %}
 <div class="flow-page">
 
@@ -10,115 +14,74 @@
 
   <!-- Создать алгоритм -->
   <div class="card shadow-sm mb-4">
-    <div class="card-header bg-white fw-semibold">Новый алгоритм</div>
-    <div class="card-body">
-      <div class="row g-3 align-items-start">
+      <div class="card-header bg-white fw-semibold">Новый алгоритм</div>
+      <div class="card-body">
 
-        <div class="col-sm-3">
-          <label class="form-label">Название</label>
-          <input
-              type="text"
-              id="newTitle"
-              class="form-control"
-              placeholder="Название"
-              autocomplete="off"
-            />
-        </div>
-       <div class="col-sm-3">
-          <label class="form-label">Описание</label>
-          <textarea
-              type="text"
-              id="newDescription"
-              class="form-control"
-              placeholder="Описание"
-              autocomplete="off"
-            ></textarea>
-        </div>
-
-
-        <div class="col-sm-3">
-          <label class="form-label">Тип <span class="text-danger">*</span></label>
-          <select id="newType" class="form-select">
-            <option value="PERIODIC">Periodic</option>
-            <option value="SINGLE">Single</option>
-          </select>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Название</label>
+            <input type="text" id="newTitle" class="form-control"
+                   placeholder="Название" autocomplete="off"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Описание</label>
+            <textarea id="newDescription" class="form-control"
+                      placeholder="Описание" rows="1"
+                      style="resize:vertical;"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Тип <span class="text-danger">*</span></label>
+            <select id="newType" class="form-select">
+              <option value="PERIODIC">Periodic</option>
+              <option value="SINGLE">Single</option>
+            </select>
+          </div>
         </div>
 
         <!-- PERIODIC fields -->
-        <div id="periodicFields" class="col-sm-6">
-          <div class="row g-3">
-            <div class="col-sm-6">
-              <label class="form-label">Период (сек) <span class="text-danger">*</span></label>
-              <input type="number" id="timeout" class="form-control" placeholder="86400" min="1"/>
-            </div>
-            <div class="col-sm-6">
-              <label class="form-label">Шум (сек)</label>
-              <input type="number" id="timeoutNoize" class="form-control" placeholder="0" min="0"/>
-            </div>
+        <div id="periodicFields" class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Период (сек) <span class="text-danger">*</span></label>
+            <input type="number" id="timeout" class="form-control"
+                   placeholder="86400" min="1"/>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Шум (сек)</label>
+            <input type="number" id="timeoutNoize" class="form-control"
+                   placeholder="0" min="0"/>
           </div>
         </div>
 
         <!-- SINGLE fields -->
-        <div id="singleFields" class="col-sm-6 d-none">
-          <label class="form-label">
-            Таймауты между запусками (сек)
-            <span class="text-muted small fw-normal">— JSON-массив чисел</span>
-          </label>
-          <input type="text" id="timeouts" class="form-control font-monospace"
-            placeholder="[3600, 7200, 86400]"/>
-          <div class="form-text">
-            Задача выполнится <span id="runsCount" class="fw-semibold">1</span> раз.
-            Пустой массив — один запуск немедленно.
+        <div id="singleFields" class="row g-3 mb-3 d-none">
+          <div class="col-md-8">
+            <label class="form-label">
+              Таймауты между запусками (сек)
+              <span class="text-muted fw-normal small">— JSON-массив чисел</span>
+            </label>
+            <input type="text" id="timeouts" class="form-control font-monospace"
+                   placeholder="[3600, 7200, 86400]"/>
+            <div class="form-text">
+              Задача выполнится <span id="runsCount" class="fw-semibold">1</span> раз.
+              Пустой массив — один запуск немедленно.
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Шум (сек)</label>
+            <input type="number" id="timeoutNoize" class="form-control"
+                   placeholder="0" min="0"/>
           </div>
         </div>
 
-        <div class="col-sm-3 d-flex align-items-end">
-          <button class="btn btn-primary w-100" id="createAlgoBtn">Создать</button>
-        </div>
+        <button class="btn btn-primary px-4" id="createAlgoBtn">Создать</button>
 
       </div>
     </div>
-  </div>
-
   <!-- Таблица -->
   {# ── Таблица пользователей ── #}
 
   {# row-функция определена до вызова макроса #}
   <script>
-      const formatDuration = (totalSeconds) => {
-  if (totalSeconds < 0) return '0 секунд';
-  if (totalSeconds === 0) return '0 секунд';
-
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  const parts = [];
-
-  if (days > 0) {
-    parts.push(formatPart(days, ['день', 'дня', 'дней']));
-  }
-  if (hours > 0) {
-    parts.push(formatPart(hours, ['час', 'часа', 'часов']));
-  }
-  if (minutes > 0) {
-    parts.push(formatPart(minutes, ['минута', 'минуты', 'минут']));
-  }
-  if (seconds > 0 || parts.length === 0) {
-    parts.push(formatPart(seconds, ['секунда', 'секунды', 'секунд']));
-  }
-
-  return parts.join(' ');
-};
-
-const formatPart = (number, words) => {
-  const cases = [2, 0, 1, 1, 1, 2];
-  const index = (number % 100 > 4 && number % 100 < 20)
-    ? 2
-    : cases[Math.min(number % 10, 5)];
-  return `${number} ${words[index]}`;
-};
 
   function renderRow(row) {
     const config = row.type === "PERIODIC"
@@ -128,9 +91,9 @@ const formatPart = (number, words) => {
       : `<span>
             ${row.timeouts} ± ${row.timeout_noize} сек.
          </span>`;
-
+    const algoId = `<a href="/monitoring-algorithms/${row.id}" class="text-decoration-none fw-medium">#${row.id}</a>`
     return `<tr>
-      <td class="ft-cell ft-cell--muted ft-cell--mono">#${row.id}</td>
+      <td class="ft-cell ft-cell--muted ft-cell--mono">${algoId}</td>
       <td class="ft-cell ft-cell--muted ft-cell--mono">${row.type}</td>
       <td class="ft-cell ft-cell--bold">${config}</td>
       <td class="ft-cell">${row.title}</td>
@@ -145,8 +108,8 @@ const formatPart = (number, words) => {
       table_id   = "algo_table",
       columns    = [
         { "key": "id",         "label": "ID",       "sortable": true,  "width": "72px" },
-        { "key": "type",   "label": "Тип",    "sortable": true,  "width": "72px"  },
-        { "key": "config", "label": "Запуск раз в",  "width": "160px" },
+        { "key": "type",   "label": "Тип",  "width": "72px"  },
+        { "key": "config", "label": "Настройки запуска",  "width": "160px" },
         { "key": "title",      "label": "Название",                        "width": "130px" },
         { "key": "description",  "label": "Описание",                      "width": "130px" },
       ],
@@ -161,162 +124,83 @@ const formatPart = (number, words) => {
 
 {% block extra_js %}
 <script>
-$(document).ready(function () {
-
-  // ── Переключение полей по типу ────────────────────
-  $('#newType').on('change', function () {
-    const isPeriodic = $(this).val() === 'PERIODIC';
-    $('#periodicFields').toggleClass('d-none', !isPeriodic);
-    $('#singleFields').toggleClass('d-none', isPeriodic);
-  });
-
-  // ── Счётчик запусков для SINGLE ───────────────────
-  $('#timeouts').on('input', function () {
-    const raw = $(this).val().trim();
-    if (!raw) { $('#runsCount').text(1); return; }
-    try {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) $('#runsCount').text(arr.length + 1);
-    } catch {}
-  });
-
-  // ── Создать алгоритм ──────────────────────────────
-  $('#createAlgoBtn').on('click', async function () {
-    const type = $('#newType').val();
-    let algorithm = { type };
-
-    if (type === 'PERIODIC') {
-      const timeout = parseFloat($('#timeout').val());
-      if (!timeout || timeout <= 0) return showAlert('Укажите период', 'danger');
-      algorithm.timeout = timeout;
-      algorithm.timeout_noize = parseFloat($('#timeoutNoize').val()) || 0;
-
-    } else if (type === 'SINGLE') {
-      const raw = $('#timeouts').val().trim();
-      let timeouts = [];
-      if (raw) {
-        try {
-          timeouts = JSON.parse(raw);
-          if (!Array.isArray(timeouts)) throw new Error();
-        } catch {
-          return showAlert('Таймауты должны быть JSON-массивом чисел', 'danger');
-        }
-      }
-      algorithm.timeouts = timeouts;
-      algorithm.timeout_noize = 0;
-    }
-
-    const btn = $(this);
-    btn.prop('disabled', true).text('...');
-
-    try {
-      const res = await fetch('/monitoring-algorithms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ algorithm }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        showAlert('Алгоритм создан', 'success');
-        // setTimeout(() => location.reload(), 1000);
-      } else {
-        showAlert(data.error || 'Ошибка', 'danger');
-      }
-    } catch {
-      showAlert('Сетевая ошибка', 'danger');
-    } finally {
-      btn.prop('disabled', false).text('Создать');
-    }
-  });
-
-});
-
-function showAlert(msg, type) {
+    function showAlert(msg, type) {
   const el = document.getElementById('alertBox');
   el.className = `alert alert-${type} mb-3`;
   el.textContent = msg;
   if (type === 'success') setTimeout(() => el.classList.add('d-none'), 2500);
 }
 
+// Переключение полей
+document.getElementById('newType').addEventListener('change', function (e) {
+  const isPeriodic = e.target.value === 'PERIODIC';
+  document.getElementById('periodicFields')?.classList.toggle('d-none', !isPeriodic);
+  document.getElementById('singleFields')?.classList.toggle('d-none', isPeriodic);
+});
 
-/* ── Создать пользователя ────────────────────────────────────── */
-document.getElementById('createAlgoBtn')?.addEventListener('click', async function () {
-  const title = document.getElementById('newTitle').value.trim();
+// Счётчик запусков
+document.getElementById('timeouts').addEventListener('input', function (e) {
+  const runsSpan = document.getElementById('runsCount');
+  if (!runsSpan) return;
+  try {
+    const arr = JSON.parse(e.target.value.trim());
+    runsSpan.textContent = Array.isArray(arr) ? arr.length + 1 : 1;
+  } catch {
+    runsSpan.textContent = 1;
+  }
+});
+
+// Создать алгоритм
+document.getElementById('createAlgoBtn').addEventListener('click', async function () {
+  const title       = document.getElementById('newTitle').value.trim();
   const description = document.getElementById('newDescription').value.trim();
-  const type     = document.getElementById('newType').value;
-  let algorithm = { type, title, description};
+  const type        = document.getElementById('newType').value;
+  const algorithm   = { type, title, description };
+
   if (type === 'PERIODIC') {
-      const timeout = parseFloat(document.getElementById('timeout').value);
-      if (!timeout || timeout <= 0) return showAlert('Укажите период', 'danger');
-      algorithm.timeout = timeout;
+    const timeout = parseFloat(document.getElementById('timeout').value);
+    if (!timeout || timeout <= 0) return showAlert('Укажите период', 'danger');
+    algorithm.timeout      = timeout;
+    algorithm.timeout_noize = parseFloat(document.getElementById('timeoutNoize').value) || 0;
 
   } else if (type === 'SINGLE') {
-      const raw = document.getElementById('timeouts').value.trim();
-      let timeouts = [];
-      if (raw) {
-        try {
-          timeouts = JSON.parse(raw);
-          if (!Array.isArray(timeouts)) throw new Error();
-        } catch {
-          return showAlert('Таймауты должны быть JSON-массивом чисел', 'danger');
-        }
+    const raw = document.getElementById('timeouts').value.trim();
+    let timeouts = [];
+    if (raw) {
+      try {
+        timeouts = JSON.parse(raw);
+        if (!Array.isArray(timeouts)) throw new Error();
+      } catch {
+        return showAlert('Таймауты должны быть JSON-массивом чисел', 'danger');
       }
-      algorithm.timeouts = timeouts;
+    }
+    algorithm.timeouts      = timeouts;
+    algorithm.timeout_noize = 0;
   }
-  algorithm.timeout_noize = parseFloat(document.getElementById('timeoutNoize').value) || 0;
-  this.disabled = true;
-  const orig = this.innerHTML;
+
+  this.disabled  = true;
+  const orig     = this.innerHTML;
   this.textContent = 'Создание…';
-console.log(algorithm)
 
   try {
     const res  = await fetch('/monitoring-algorithms', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({algorithm}),
+      body:    JSON.stringify({ algorithm }),
     });
     const data = await res.json();
     if (data.success) {
-      showAlert(`Алгоритм создан`, 'success');
-      document.getElementById('newTitle').value = '';
+      showAlert('Алгоритм создан', 'success');
+      document.getElementById('newTitle').value       = '';
       document.getElementById('newDescription').value = '';
-      // window['algo_table_reload']?.();   // перезагрузить таблицу
     } else {
-      showAlert(data.error || 'Ошибка создания', 'error');
+      showAlert(data.error || 'Ошибка создания', 'danger');
     }
-  } catch { showAlert('Сетевая ошибка', 'error'); }
-  finally { this.disabled = false; this.innerHTML = orig; }
-});
-
-// ── Переключение полей по типу ────────────────────
-document.getElementById('newType').addEventListener('change', function (e) {
-  const isPeriodic = e.target.value === 'PERIODIC';
-  const periodicFields = document.getElementById('periodicFields');
-  const singleFields = document.getElementById('singleFields');
-
-  if (periodicFields) periodicFields.classList.toggle('d-none', !isPeriodic);
-  if (singleFields) singleFields.classList.toggle('d-none', isPeriodic);
-});
-
-// ── Счётчик запусков для SINGLE ───────────────────
-document.getElementById('timeouts').addEventListener('input', function (e) {
-  const raw = e.target.value.trim();
-  const runsSpan = document.getElementById('runsCount');
-
-  if (!runsSpan) return;
-  if (!raw) {
-    runsSpan.textContent = '1';
-    return;
-  }
-
-  try {
-    const arr = JSON.parse(raw);
-    if (Array.isArray(arr)) {
-      runsSpan.textContent = arr.length + 1;
-    }
-  } catch (error) {
-    // Ошибка парсинга — ничего не делаем
+  } catch {
+    showAlert('Сетевая ошибка', 'danger');
+  } finally {
+    this.disabled    = false;
+    this.innerHTML   = orig;
   }
 });
 </script>

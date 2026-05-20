@@ -78,7 +78,7 @@ from service.domain.use_cases.external.get_task_runs import GetTaskRunsUC, GetTa
 from service.domain.use_cases.external.get_tasks import GetTasksUC
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
-    GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC
+    GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC, UpdateMonitoringAlgorithmUC
 from service.domain.use_cases.external.project import GetAllProjectsUC, CreateProjectUC, GetProjectTaskGroupsUC, \
     GetTaskGroupsWithoutProjectUC, AddTaskGroupToProjectUC, RemoveTaskGroupFromProjectUC, UpdateProjectUC, \
     GetAllTaskGroupByProjectDetailedUC, GetProjectByTaskGroupUC
@@ -209,6 +209,7 @@ async def main():
     get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                            periodic_monitoring_algorithm_repo,
                                                            single_monitoring_algorithm_repo, transaction_factory)
+    update_monitoring_algorithm_uc = UpdateMonitoringAlgorithmUC(monitoring_algorithm_repo, periodic_monitoring_algorithm_repo, single_monitoring_algorithm_repo, transaction_factory)
     get_task_run_status_logs_uc = GetTaskRunStatusLogsUC(task_run_status_log_repo)
     get_task_run_detailed_uc = GetTaskRunDetailedUC(task_run_repo, task_run_time_interval_progress_repo)
 
@@ -269,7 +270,8 @@ async def main():
                                     get_monitoring_algorithm_uc,
                                     get_task_run_status_logs_uc,
                                     get_task_run_detailed_uc,
-                                    update_task_uc, )
+                                    update_task_uc,
+                                    update_monitoring_algorithm_uc,)
     set_use_case_facade(use_case_facade)
 
     # USE CASE: internal

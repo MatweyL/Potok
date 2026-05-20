@@ -19,7 +19,8 @@ from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetaile
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq, \
     CreateMonitoringAlgorithmUCRs, GetAllMonitoringAlgorithmsUCRq, GetAllMonitoringAlgorithmsUCRs, \
     CreateMonitoringAlgorithmUC, GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC, GetMonitoringAlgorithmUCRq, \
-    GetMonitoringAlgorithmUCRs
+    GetMonitoringAlgorithmUCRs, UpdateMonitoringAlgorithmUC, UpdateMonitoringAlgorithmUCRq, \
+    UpdateMonitoringAlgorithmUCRs
 from service.domain.use_cases.external.project import GetAllProjectsUCRs, GetAllProjectsUCRq, CreateProjectUCRs, \
     CreateProjectUCRq, GetProjectTaskGroupsUCRq, GetProjectTaskGroupsUCRs, GetAllProjectsUC, CreateProjectUC, \
     GetProjectTaskGroupsUC, GetTaskGroupsWithoutProjectUCRs, GetTaskGroupsWithoutProjectUCRq, \
@@ -67,6 +68,7 @@ class UseCaseFacade:
                  get_task_run_status_logs_uc: GetTaskRunStatusLogsUC,
                  get_task_run_detailed_uc: GetTaskRunDetailedUC,
                  update_task_uc: UpdateTaskUC,
+                 update_monitoring_algorithm_uc: UpdateMonitoringAlgorithmUC,
                  ):
         self._create_tasks_uc = create_tasks_uc
         self._create_monitoring_algorithm_uc = create_monitoring_algorithm_uc
@@ -99,6 +101,7 @@ class UseCaseFacade:
         self._get_task_run_status_logs_uc = get_task_run_status_logs_uc
         self._get_task_run_detailed_uc = get_task_run_detailed_uc
         self._update_task_uc = update_task_uc
+        self._update_monitoring_algorithm_uc = update_monitoring_algorithm_uc
 
     async def create_tasks(self, request: CreateTasksUCRq) -> CreateTasksUCRs:
         return await self._create_tasks_uc.apply(request)
@@ -128,8 +131,8 @@ class UseCaseFacade:
                                           request: CreateMonitoringAlgorithmUCRq) -> CreateMonitoringAlgorithmUCRs:
         return await self._create_monitoring_algorithm_uc.apply(request)
 
-    async def get_all_monitoring_algorithms(self, ) -> GetAllMonitoringAlgorithmsUCRs:
-        return await self._get_all_monitoring_algorithms_uc.apply(GetAllMonitoringAlgorithmsUCRq())
+    async def get_all_monitoring_algorithms(self, rq: GetAllMonitoringAlgorithmsUCRq) -> GetAllMonitoringAlgorithmsUCRs:
+        return await self._get_all_monitoring_algorithms_uc.apply(rq)
 
     async def get_tasks_detailed(self, request: GetTasksDetailedUCRq) -> GetTasksDetailedUCRs:
         return await self._get_tasks_detailed_uc.apply(request)
@@ -195,3 +198,6 @@ class UseCaseFacade:
 
     async def update_task(self, request: UpdateTaskUCRq) -> UpdateTaskUCRs:
         return await self._update_task_uc.apply(request)
+
+    async def update_monitoring_algorithm(self, request: UpdateMonitoringAlgorithmUCRq) -> UpdateMonitoringAlgorithmUCRs:
+        return await self._update_monitoring_algorithm_uc.apply(request)
