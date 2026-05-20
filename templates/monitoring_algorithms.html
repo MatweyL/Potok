@@ -40,17 +40,17 @@
           </div>
         </div>
 
+        <div class="col-md-4">
+            <label class="form-label">Шум (сек)</label>
+            <input type="number" id="timeoutNoize" class="form-control"
+                   placeholder="0" min="0"/>
+        </div>
         <!-- PERIODIC fields -->
         <div id="periodicFields" class="row g-3 mb-3">
           <div class="col-md-4">
             <label class="form-label">Период (сек) <span class="text-danger">*</span></label>
             <input type="number" id="timeout" class="form-control"
                    placeholder="86400" min="1"/>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Шум (сек)</label>
-            <input type="number" id="timeoutNoize" class="form-control"
-                   placeholder="0" min="0"/>
           </div>
         </div>
 
@@ -68,13 +68,8 @@
               Пустой массив — один запуск немедленно.
             </div>
           </div>
-          <div class="col-md-4">
-            <label class="form-label">Шум (сек)</label>
-            <input type="number" id="timeoutNoize" class="form-control"
-                   placeholder="0" min="0"/>
-          </div>
-        </div>
 
+        </div>
         <button class="btn btn-primary px-4" id="createAlgoBtn">Создать</button>
 
       </div>
@@ -162,7 +157,6 @@ document.getElementById('createAlgoBtn').addEventListener('click', async functio
     const timeout = parseFloat(document.getElementById('timeout').value);
     if (!timeout || timeout <= 0) return showAlert('Укажите период', 'danger');
     algorithm.timeout      = timeout;
-    algorithm.timeout_noize = parseFloat(document.getElementById('timeoutNoize').value) || 0;
 
   } else if (type === 'SINGLE') {
     const raw = document.getElementById('timeouts').value.trim();
@@ -176,9 +170,9 @@ document.getElementById('createAlgoBtn').addEventListener('click', async functio
       }
     }
     algorithm.timeouts      = timeouts;
-    algorithm.timeout_noize = 0;
   }
-
+  algorithm.timeout_noize = parseFloat(document.getElementById('timeoutNoize').value) || 0;
+  console.log(algorithm.timeout_noize)
   this.disabled  = true;
   const orig     = this.innerHTML;
   this.textContent = 'Создание…';

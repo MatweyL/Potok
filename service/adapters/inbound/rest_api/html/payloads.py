@@ -60,6 +60,18 @@ async def payload_page(request: Request, payload_id: int):
         }
     )
 
+@router.get("/payloads/{payload_id}/tasks/json")
+async def get_payload_tasks_json(request: Request, payload_id:int,page: int = 1, per_page: int = 25, search: str | None = None,
+                              order: Literal["asc", "desc"] = "desc"):
+    rs = await request.app.state.use_case_facade.get_payload(
+        GetPayloadUCRq(payload_id=payload_id, )
+    )
+    if not rs.success:
+        return templates.TemplateResponse(request=request, name="404.html")
+
+    return {"items": rs.tasks_detailed_linked}
+
+
 
 @router.patch("/payloads/{payload_id}")
 async def update_payload(request: Request, payload_id: int, rq: UpdatePayloadUCRq):

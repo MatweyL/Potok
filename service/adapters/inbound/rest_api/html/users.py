@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
@@ -31,7 +31,7 @@ async def users_page(request: Request):
             context={"is_admin": is_admin}
         )
     else:
-        raise 403
+        return templates.TemplateResponse(request=request, name="404.html")
 
 
 @router.get("/users/json")
@@ -55,13 +55,17 @@ async def users_json(request: Request, page: int = 1, per_page: int = 25, search
         users = rs.users
         return {'items': users}
     else:
-        raise 403  # Not enough privileges
+        return HTTPException(status_code=403)
 
 
 @router.post("/users")
 async def create_user(request: Request, rq: CreateUserUCRq):
-    return await request.app.state.auth_facade.create_user(rq)
-
+    current_user = request.state.user
+    is_admin = AppUserRole.ADMIN in current_user.roles
+    
+    if is_admin:
+        return await request.app.state.auth_facade.create_user(rq)
+    return HTTPException(status_code=403)
 
 class ResetPasswordUCRqDTO(BaseModel):
     target_user_id: int
@@ -71,26 +75,36 @@ class ResetPasswordUCRqDTO(BaseModel):
 @router.post("/users/{user_id}/reset-password")
 async def reset_password(request: Request, user_id: int, rq: ResetPasswordUCRqDTO):
     current_user = request.state.user
-    requestor_roles = current_user.roles
-    target_rq = ResetPasswordUCRq(requestor_roles=requestor_roles,
-                                  target_user_id=rq.target_user_id,
-                                  new_password=rq.new_password)
-    return await request.app.state.auth_facade.reset_password(target_rq)
+    is_admin = AppUserRole.ADMIN in current_user.roles
 
+    if is_admin:
+        requestor_roles = current_user.roles
+        target_rq = ResetPasswordUCRq(requestor_roles=requestor_roles,
+                                      target_user_id=rq.target_user_id,
+                                      new_password=rq.new_password)
+        return await request.app.state.auth_facade.reset_password(target_rq)
+    return HTTPException(status_code=403)
 
 @router.post("/users/{user_id}/deactivate")
 async def deactivate_user(request: Request, user_id: int):
     current_user = request.state.user
-    return await request.app.state.admin_use_case_facade.deactivate_user(
-        DeactivateUserUCRq(target_user_id=user_id,
-                           current_user_id=current_user.id)
-    )
+    is_admin = AppUserRole.ADMIN in current_user.roles
 
+    if is_admin:
+        return await request.app.state.admin_use_case_facade.deactivate_user(
+            DeactivateUserUCRq(target_user_id=user_id,
+                               current_user_id=current_user.id)
+        )
+    return HTTPException(status_code=403)
 
 @router.post("/users/{user_id}/activate")
 async def activate_user(request: Request, user_id: int):
     current_user = request.state.user
-    return await request.app.state.admin_use_case_facade.activate_user(
-        ActivateUserUCRq(target_user_id=user_id,
-                         current_user_id=current_user.id)
-    )
+    is_admin = AppUserRole.ADMIN in current_user.roles
+
+    if is_admin:
+        return await request.app.state.admin_use_case_facade.activate_user(
+            ActivateUserUCRq(target_user_id=user_id,
+                             current_user_id=current_user.id)
+        )
+    return HTTPException(status_code=403)
