@@ -1,22 +1,191 @@
 {% extends "base.html" %}
 {% set active_nav = 'monitoring_algorithms' %}
-{% block title %}{{ algorithm.type.value }} #{{ algorithm.id }} — Поток{% endblock %}
+{% block title %}Алгоритм #{{ algorithm.id }} — Поток{% endblock %}
 
 {% block extra_css %}
 <style>
-.bg-purple-subtle  { background-color: #f3e8ff !important; }
-.text-purple-emphasis { color: #6a0dad !important; }
-.text-purple       { color: #6a0dad; }
-.border-purple-subtle { border-color: #d8b4fe !important; }
-
-/* Timeline */
-.algo-timeline-wrap {
-  overflow-x: auto;
-  padding: 8px 0 12px;
+/* ── Цвета типов ─────────────────────────────── */
+:root {
+  --algo-periodic-bg:     #eff6ff;
+  --algo-periodic-border: #bfdbfe;
+  --algo-periodic-text:   #1d4ed8;
+  --algo-periodic-soft:   #dbeafe;
+  --algo-single-bg:       #f5f3ff;
+  --algo-single-border:   #ddd6fe;
+  --algo-single-text:     #6d28d9;
+  --algo-single-soft:     #ede9fe;
 }
-.algo-timeline-svg { display: block; min-width: 100%; }
 
-/* Edit modal */
+/* ── Основная карточка ───────────────────────── */
+.algo-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+/* ── Шапка карточки: тип алгоритма ──────────── */
+.algo-type-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.algo-type-left  { display: flex; align-items: center; gap: 14px; }
+.algo-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 10px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.algo-type-badge--periodic {
+  background: var(--algo-periodic-bg);
+  border: 1px solid var(--algo-periodic-border);
+  color: var(--algo-periodic-text);
+}
+.algo-type-badge--single {
+  background: var(--algo-single-bg);
+  border: 1px solid var(--algo-single-border);
+  color: var(--algo-single-text);
+}
+.algo-type-icon {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; line-height: 1;
+}
+.algo-type-icon--periodic { background: var(--algo-periodic-text); color: #fff; }
+.algo-type-icon--single   { background: var(--algo-single-text);   color: #fff; }
+.algo-type-desc {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ── Мета-строка (название / описание / кнопка) */
+.algo-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.algo-meta-fields { display: flex; gap: 40px; flex-wrap: wrap; }
+.algo-meta-field  { display: flex; flex-direction: column; gap: 3px; }
+.algo-meta-label  { font-size: 11.5px; font-weight: 500; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em; }
+.algo-meta-value  { font-size: 14.5px; font-weight: 600; color: #111827; }
+
+/* ── Параметры ───────────────────────────────── */
+.algo-params {
+  display: grid;
+  gap: 1px;
+  background: #f1f5f9;
+}
+.algo-params--2 { grid-template-columns: 2fr 1fr; }
+.algo-params--1 { grid-template-columns: 1fr; }
+
+.algo-param {
+  background: #fff;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.algo-param-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.algo-param-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.1;
+}
+.algo-param-value--accent { color: var(--algo-periodic-text); }
+.algo-param-value--purple { color: var(--algo-single-text); }
+.algo-param-hint {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* ── Бейджи таймаутов (SINGLE) ───────────────── */
+.algo-timeout-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.algo-timeout-badge {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--algo-single-soft);
+  color: var(--algo-single-text);
+  border: 1px solid var(--algo-single-border);
+}
+
+/* ── Подсказка ───────────────────────────────── */
+.algo-hint {
+  padding: 14px 24px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 13px;
+  line-height: 1.6;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.algo-hint--periodic { color: #1e40af; background: #f0f7ff; }
+.algo-hint--single   { color: #5b21b6; background: #faf5ff; }
+.algo-hint-icon      { font-size: 15px; line-height: 1.5; flex-shrink: 0; }
+
+/* ── Временная шкала ─────────────────────────── */
+.algo-timeline-section {
+  padding: 20px 24px 16px;
+  border-top: 1px solid #f1f5f9;
+}
+.algo-timeline-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 16px;
+}
+.algo-timeline-wrap { overflow-x: auto; }
+.algo-timeline-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ── Кнопка редактирования ───────────────────── */
+.algo-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  flex-shrink: 0;
+}
+.algo-edit-btn:hover { border-color: #9ca3af; background: #f9fafb; }
+
+/* ── Модалка ─────────────────────────────────── */
 .algo-modal-backdrop {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.35);
@@ -33,21 +202,20 @@
 .algo-modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--flow-border, #e5e7eb);
+  border-bottom: 1px solid #e5e7eb;
 }
-.algo-modal-title { font-size: 15px; font-weight: 600; color: var(--flow-text, #111827); }
-.algo-modal-close {
+.algo-modal-title  { font-size: 15px; font-weight: 600; color: #111827; }
+.algo-modal-close  {
   width: 28px; height: 28px; border: none; background: none;
   cursor: pointer; border-radius: 6px; color: #6b7280;
   display: flex; align-items: center; justify-content: center;
-  transition: background .12s;
+  transition: background .12s; font-size: 18px; line-height: 1;
 }
 .algo-modal-close:hover { background: #f3f4f6; }
 .algo-modal-body   { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 .algo-modal-footer {
   display: flex; justify-content: flex-end; gap: 8px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--flow-border, #e5e7eb);
+  padding: 14px 20px; border-top: 1px solid #e5e7eb;
 }
 .algo-form-field   { display: flex; flex-direction: column; gap: 5px; }
 .algo-form-label   { font-size: 13px; font-weight: 500; color: #374151; }
@@ -56,7 +224,7 @@
   border: 1px solid #e5e7eb; border-radius: 8px;
   font-size: 13.5px; color: #111827; background: #fff;
   outline: none; transition: border-color .15s, box-shadow .15s;
-  font-family: inherit;
+  font-family: inherit; box-sizing: border-box;
 }
 .algo-form-input:focus, .algo-form-textarea:focus {
   border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1);
@@ -69,180 +237,119 @@
 {% block body %}
 <div class="flow-page">
 
-  {# ── Заголовок ── #}
-  <div class="d-flex justify-content-between align-items-start mb-4">
-    <div>
-      <h1 class="h3 mb-1 fw-bold text-dark">
-        Алгоритм <span class="text-muted fw-normal">#{{ algorithm.id }}</span>
-      </h1>
-      <p class="text-muted small mb-0">Детали конфигурации и параметры выполнения</p>
-    </div>
-    <button class="btn btn-outline-primary btn-sm" id="openEditModal">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" class="me-1">
-        <path d="M9 2l2 2-7 7H2V9l7-7z" stroke="currentColor" stroke-width="1.3"
-              stroke-linejoin="round" fill="none"/>
-      </svg>
-      Редактировать
-    </button>
+  {# ── Заголовок страницы ── #}
+  <div class="mb-4">
+    <h1 class="h3 mb-1 fw-bold text-dark">
+      Алгоритм <span class="text-muted fw-normal">#{{ algorithm.id }}</span>
+    </h1>
+    <p class="text-muted small mb-0">Мониторинговый алгоритм</p>
   </div>
 
-  {# ── Название / описание ── #}
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body py-3">
-      <div class="row g-3">
-        <div class="col-md-6">
-          <div class="text-muted small mb-1">Название</div>
-          <div class="fw-semibold" id="displayTitle">{{ algorithm.title or '—' }}</div>
-        </div>
-        <div class="col-md-6">
-          <div class="text-muted small mb-1">Описание</div>
-          <div id="displayDescription">{{ algorithm.description or '—' }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
+  {# ── Единая карточка ── #}
+  <div class="algo-card">
 
-  {# ── Тип + параметры ── #}
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white border-0 pb-0">
-      <div class="d-flex align-items-center gap-3">
-        <div class="p-3 rounded-circle {% if algorithm.type == 'PERIODIC' %}bg-primary-subtle{% else %}bg-purple-subtle{% endif %}">
-          {% if algorithm.type == 'PERIODIC' %}
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
-               class="text-primary" viewBox="0 0 16 16">
-            <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
-            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
-          </svg>
-          {% else %}
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
-               class="text-purple" viewBox="0 0 16 16">
-            <path d="M4 14L4 2L12 14L12 2" stroke="currentColor" stroke-width="2.7"
-                  stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          </svg>
-          {% endif %}
-        </div>
-        <div>
-          <h4 class="mb-1">
-            <span class="badge {% if algorithm.type == 'PERIODIC' %}bg-primary-subtle text-primary-emphasis{% else %}bg-purple-subtle text-purple-emphasis{% endif %} fs-6">
-              {{ algorithm.type.value }}
-            </span>
-          </h4>
-          <p class="text-muted small mb-0">
-            {{ "Периодическое выполнение задачи через заданный интервал"
-               if algorithm.type == 'PERIODIC'
-               else "Однократное или многоэтапное выполнение по таймаутам" }}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-body">
-      <div class="row g-3">
-
+    {# Шапка: тип + кнопка редактирования #}
+    <div class="algo-type-header">
+      <div class="algo-type-left">
         {% if algorithm.type == 'PERIODIC' %}
-        <div class="col-md-8">
-          <div class="p-3 bg-light rounded border h-100">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                   class="text-primary" viewBox="0 0 16 16">
-                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1H8.5v3a.5.5 0 0 1-1 0v-3H4.5a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-              </svg>
-              <span class="fw-semibold text-dark">Период выполнения</span>
-            </div>
-            <div class="display-6 fw-bold text-primary mb-1" id="displayTimeout">
-              {# заполняется JS #}
-            </div>
-            <p class="text-muted small mb-0">Интервал между запусками задачи</p>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="p-3 bg-light rounded border h-100">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                   class="text-warning" viewBox="0 0 16 16">
-                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.496 6.033h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286a.237.237 0 0 0 .241.247zm2.325 6.443c.61 0 1.029-.394 1.029-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94 0 .533.425.927 1.01.927z"/>
-              </svg>
-              <span class="fw-semibold text-dark">Шум (рандомизация)</span>
-            </div>
-            <div class="display-6 fw-bold text-warning mb-1" id="displayNoise">
-              {# заполняется JS #}
-            </div>
-            <p class="text-muted small mb-0">Случайное отклонение от периода</p>
-          </div>
-        </div>
-
+        <span class="algo-type-badge algo-type-badge--periodic">
+          <span class="algo-type-icon algo-type-icon--periodic">⏱</span>
+          PERIODIC
+        </span>
         {% else %}
-        <div class="col-md-8">
-          <div class="p-3 bg-light rounded border h-100">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="d-flex align-items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                     class="text-purple" viewBox="0 0 16 16">
-                  <path d="M4.5 0a.5.5 0 0 1 .5.5V14a.5.5 0 0 1-.5.5H1a.5.5 0 0 1 0-1h3V.5a.5.5 0 0 1 .5-.5z"/>
-                  <path d="M10 1a.5.5 0 0 1 .5.5v13a.5.5 0 0 1-1 0v-13A.5.5 0 0 1 10 1z"/>
-                  <path d="M15.5 0a.5.5 0 0 1 .5.5v14a.5.5 0 0 1-1 0V.5a.5.5 0 0 1 .5-.5z"/>
-                </svg>
-                <span class="fw-semibold text-dark">Таймауты между запусками</span>
-              </div>
-              <span class="text-muted small">
-                Всего запусков:
-                <strong class="text-dark">
-                  {{ (algorithm.timeouts|length + 1) if algorithm.timeouts else 1 }}
-                </strong>
-              </span>
-            </div>
-
-            {% if algorithm.timeouts and algorithm.timeouts|length > 0 %}
-            <div class="d-flex flex-wrap gap-1 mb-2" id="timeoutBadges">
-              {# заполняется JS через formatDuration #}
-            </div>
-            {% else %}
-            <div class="text-muted small mb-2">Выполнение произойдёт немедленно</div>
-            {% endif %}
-            <p class="text-muted small mb-0">Последовательность ожидания</p>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="p-3 bg-light rounded border h-100">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                   class="text-warning" viewBox="0 0 16 16">
-                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM5.496 6.033h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286a.237.237 0 0 0 .241.247zm2.325 6.443c.61 0 1.029-.394 1.029-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94 0 .533.425.927 1.01.927z"/>
-              </svg>
-              <span class="fw-semibold text-dark">Шум (рандомизация)</span>
-            </div>
-            <div class="display-6 fw-bold text-warning mb-1" id="displayNoise">
-              {# заполняется JS #}
-            </div>
-            <p class="text-muted small mb-0">Применяется к каждому таймауту</p>
-          </div>
-        </div>
+        <span class="algo-type-badge algo-type-badge--single">
+          <span class="algo-type-icon algo-type-icon--single">⚡</span>
+          SINGLE
+        </span>
         {% endif %}
-
+        <p class="algo-type-desc">
+          {{ "Периодическое выполнение через заданный интервал"
+             if algorithm.type == 'PERIODIC'
+             else "Однократное или многоэтапное выполнение по таймаутам" }}
+        </p>
       </div>
-
-      {# ── Подсказка ── #}
-      <div class="mt-3 p-3 rounded border" id="algoHint"></div>
-
-      {# ── Временная шкала ── #}
-      <div class="mt-4">
-        <div class="d-flex align-items-center gap-2 mb-3 border-bottom pb-2">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="text-muted">
-            <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"/>
-            <path d="M7.5 4.5a.5.5 0 0 1 1 0v3.793l2.354 2.353a.5.5 0 0 1-.708.708L7.5 8.707V4.5z"/>
-          </svg>
-          <h6 class="text-primary fw-semibold mb-0 small text-uppercase">Временная шкала запусков</h6>
-        </div>
-        <div class="algo-timeline-wrap">
-          <svg id="algoTimeline" class="algo-timeline-svg"></svg>
-        </div>
-        <div id="timelineLegend" class="d-flex align-items-center gap-3 mt-2 small text-muted"></div>
-      </div>
-
+      <button class="algo-edit-btn" id="openEditModal">
+        ✎ Редактировать
+      </button>
     </div>
-  </div>
 
+    {# Мета: название + описание #}
+    <div class="algo-meta">
+      <div class="algo-meta-fields">
+        <div class="algo-meta-field">
+          <span class="algo-meta-label">Название</span>
+          <span class="algo-meta-value" id="displayTitle">{{ algorithm.title or '—' }}</span>
+        </div>
+        <div class="algo-meta-field">
+          <span class="algo-meta-label">Описание</span>
+          <span class="algo-meta-value" style="font-weight:400;color:#374151;"
+                id="displayDescription">{{ algorithm.description or '—' }}</span>
+        </div>
+      </div>
+    </div>
+
+    {# Параметры #}
+    {% if algorithm.type == 'PERIODIC' %}
+    <div class="algo-params algo-params--2">
+      <div class="algo-param">
+        <span class="algo-param-label">Период выполнения</span>
+        <span class="algo-param-value algo-param-value--accent" id="displayTimeout"></span>
+        <span class="algo-param-hint">Интервал между запусками задачи</span>
+      </div>
+      <div class="algo-param">
+        <span class="algo-param-label">Шум</span>
+        <span class="algo-param-value" id="displayNoise" style="font-size:22px;"></span>
+        <span class="algo-param-hint">Случайное отклонение от периода</span>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="algo-params algo-params--2">
+      <div class="algo-param">
+        <span class="algo-param-label">
+          Таймауты между запусками
+          <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9ca3af;">
+            — всего запусков:
+            <strong style="color:#111827;">
+              {{ (algorithm.timeouts|length + 1) if algorithm.timeouts else 1 }}
+            </strong>
+          </span>
+        </span>
+        {% if algorithm.timeouts and algorithm.timeouts|length > 0 %}
+        <div class="algo-timeout-badges" id="timeoutBadges"></div>
+        {% else %}
+        <span class="algo-param-value algo-param-value--purple" style="font-size:16px;">
+          Выполнится немедленно
+        </span>
+        {% endif %}
+        <span class="algo-param-hint">Последовательность ожидания между запусками</span>
+      </div>
+      <div class="algo-param">
+        <span class="algo-param-label">Шум</span>
+        <span class="algo-param-value" id="displayNoise" style="font-size:22px;"></span>
+        <span class="algo-param-hint">Применяется к каждому таймауту</span>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Подсказка #}
+    <div class="algo-hint {% if algorithm.type == 'PERIODIC' %}algo-hint--periodic{% else %}algo-hint--single{% endif %}"
+         id="algoHint">
+      <span class="algo-hint-icon">ℹ</span>
+      <span id="algoHintText"></span>
+    </div>
+
+    {# Временная шкала #}
+    <div class="algo-timeline-section">
+      <div class="algo-timeline-title">Временная шкала запусков</div>
+
+    <div class="algo-timeline-wrap">
+      <svg id="algoTimeline" class="algo-timeline-svg"></svg>
+    </div>
+      <div class="algo-timeline-legend" id="timelineLegend"></div>
+    </div>
+
+  </div>{# /algo-card #}
 </div>{# /flow-page #}
 
 {# ── Модалка редактирования ── #}
@@ -250,11 +357,7 @@
   <div class="algo-modal">
     <div class="algo-modal-header">
       <span class="algo-modal-title">Редактировать алгоритм #{{ algorithm.id }}</span>
-      <button class="algo-modal-close" id="editModalClose">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        </svg>
-      </button>
+      <button class="algo-modal-close" id="editModalClose">×</button>
     </div>
     <div class="algo-modal-body">
       <div class="algo-form-field">
@@ -290,71 +393,61 @@ const NOISE     = {{ algorithm.timeout_noize | default(0) }};
 const TIMEOUTS  = {{ algorithm.timeouts | tojson if algorithm.timeouts else '[]' }};
 
 /* ════════════════════════════════════════════════════════
-   formatDuration — переводит секунды в читаемую строку
+   formatDuration
 ═══════════════════════════════════════════════════════ */
 function formatDuration(sec) {
   if (!sec || sec === 0) return '0 сек';
   const abs = Math.abs(sec);
-  if (abs < 60)   return `${abs} сек`;
-  if (abs < 3600) {
-    const m = Math.floor(abs / 60), s = abs % 60;
-    return s ? `${m} мин ${s} сек` : `${m} мин`;
-  }
-  if (abs < 86400) {
-    const h = Math.floor(abs / 3600), m = Math.floor((abs % 3600) / 60);
-    return m ? `${h} ч ${m} мин` : `${h} ч`;
-  }
-  const d = Math.floor(abs / 86400), h = Math.floor((abs % 86400) / 3600);
+  if (abs < 60)    return `${abs} сек`;
+  if (abs < 3600)  { const m = Math.floor(abs/60), s = abs%60; return s ? `${m} мин ${s} сек` : `${m} мин`; }
+  if (abs < 86400) { const h = Math.floor(abs/3600), m = Math.floor((abs%3600)/60); return m ? `${h} ч ${m} мин` : `${h} ч`; }
+  const d = Math.floor(abs/86400), h = Math.floor((abs%86400)/3600);
   return h ? `${d} д ${h} ч` : `${d} д`;
 }
 
 /* ════════════════════════════════════════════════════════
-   Заполняем отображение таймаута и шума
+   Инициализация
 ═══════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Период (только для PERIODIC)
-  const dispTimeout = document.getElementById('displayTimeout');
-  if (dispTimeout) {
-    dispTimeout.innerHTML = `${formatDuration(TIMEOUT)}<span class="fs-6 text-muted fw-normal"> (${TIMEOUT} сек)</span>`;
-  }
+  /* Период */
+  const dt = document.getElementById('displayTimeout');
+  if (dt) dt.textContent = formatDuration(TIMEOUT);
 
-  // Шум — оба типа
+  /* Шум — везде где есть #displayNoise */
   document.querySelectorAll('#displayNoise').forEach(el => {
     if (!NOISE) {
-      el.innerHTML = `<span class="text-muted fs-5">без шума</span>`;
+      el.style.color    = '#9ca3af';
+      el.style.fontSize = '16px';
+      el.textContent    = 'без шума';
     } else {
-      el.innerHTML = `±${formatDuration(NOISE)}<span class="fs-6 text-muted fw-normal"> (±${NOISE} сек)</span>`;
+      el.textContent = `±${formatDuration(NOISE)}`;
+      el.style.color = '#b45309';
     }
   });
 
-  // Бейджи таймаутов для SINGLE
-  const badgesWrap = document.getElementById('timeoutBadges');
-  if (badgesWrap && TIMEOUTS.length) {
-    badgesWrap.innerHTML = TIMEOUTS.map(t =>
-      `<span class="bg-purple-subtle text-purple-emphasis px-2 py-1 rounded small fw-medium">
-         ${formatDuration(t)}
-       </span>`
+  /* Бейджи таймаутов для SINGLE */
+  const bw = document.getElementById('timeoutBadges');
+  if (bw && TIMEOUTS.length) {
+    bw.innerHTML = TIMEOUTS.map(t =>
+      `<span class="algo-timeout-badge">${formatDuration(t)}</span>`
     ).join('');
   }
 
-  // Подсказка
   buildHint();
-
-  // Временная шкала
   buildTimeline();
 });
 
 /* ════════════════════════════════════════════════════════
-   Подсказка "если задача запустится сейчас"
+   Подсказка
 ═══════════════════════════════════════════════════════ */
 function buildHint() {
   const fmt = (offsetSec = 0) => {
     const d = new Date(Date.now() + offsetSec * 1000);
-    return d.toLocaleString('sv-SE', {
+    return d.toLocaleString('ru-RU', {
       year:'numeric', month:'2-digit', day:'2-digit',
       hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false
-    }).replace(',', '');
+    });
   };
 
   let msg = '';
@@ -371,163 +464,166 @@ function buildHint() {
     }
   }
 
-  const isPeriodic = ALGO_TYPE === 'PERIODIC';
-  const hint = document.getElementById('algoHint');
-  hint.className = `mt-3 p-3 rounded border ${isPeriodic ? 'bg-primary-subtle border-primary-subtle' : 'bg-purple-subtle border-purple-subtle'}`;
-  hint.innerHTML = `
-    <div class="d-flex align-items-start gap-2 small ${isPeriodic ? 'text-primary-emphasis' : 'text-purple-emphasis'}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor"
-           class="mt-1 flex-shrink-0" viewBox="0 0 16 16">
-        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.399l-.455.003-.08-.423.458-.01h.578c.464 0 .697.177.578.753z"/>
-      </svg>
-      <span>${msg}</span>
-    </div>`;
+  document.getElementById('algoHintText').innerHTML = msg;
 }
 
 /* ════════════════════════════════════════════════════════
    Временная шкала
 ═══════════════════════════════════════════════════════ */
 function buildTimeline() {
-  const svg      = document.getElementById('algoTimeline');
-  const legend   = document.getElementById('timelineLegend');
+  const svgEl  = document.getElementById('algoTimeline');
+  const legend = document.getElementById('timelineLegend');
   const isPeriodic = ALGO_TYPE === 'PERIODIC';
-  const COLOR    = isPeriodic ? '#2563eb' : '#6a0dad';
+  const COLOR      = isPeriodic ? '#1d4ed8' : '#6d28d9';
+  const COLOR_SOFT = isPeriodic ? '#dbeafe' : '#ede9fe';
+  const NOISE_CLR  = isPeriodic ? '#93c5fd' : '#c4b5fd';
 
   /* Отправная точка — 12:00:00 сегодня */
-  const ORIGIN_HOUR = 12;
   const baseDate = new Date();
-  baseDate.setHours(ORIGIN_HOUR, 0, 0, 0);
+  baseDate.setHours(12, 0, 0, 0);
   const baseMs = baseDate.getTime();
 
-  /* Точки запуска (в секундах от base) */
-  let runPoints = [0]; // первый запуск = момент старта
+  /* Точки запуска */
+  let runPoints = [0];
   if (isPeriodic) {
     for (let i = 1; i <= 4; i++) runPoints.push(TIMEOUT * i);
   } else {
     let acc = 0;
-    runPoints = [0];
     TIMEOUTS.forEach(t => { acc += t; runPoints.push(acc); });
   }
 
-  const totalSec  = runPoints[runPoints.length - 1];
-  /* Определяем единицу шкалы */
-  let unitSec, unitLabel, tickCount;
-  if (totalSec < 3600) {
-    unitSec = 60; unitLabel = 'мин'; tickCount = Math.ceil(totalSec / 60) + 1;
-  } else if (totalSec < 86400) {
-    unitSec = 3600; unitLabel = 'ч'; tickCount = Math.ceil(totalSec / 3600) + 1;
-  } else {
-    unitSec = 86400; unitLabel = 'д'; tickCount = Math.ceil(totalSec / 86400) + 1;
-  }
-  // Ограничиваем тики разумным числом
+  const totalSec = runPoints[runPoints.length - 1];
+
+  /* Единица шкалы */
+  let unitSec, tickCount;
+  if      (totalSec < 3600)  { unitSec = 60;    tickCount = Math.ceil(totalSec / 60)    + 1; }
+  else if (totalSec < 86400) { unitSec = 3600;  tickCount = Math.ceil(totalSec / 3600)  + 1; }
+  else                        { unitSec = 86400; tickCount = Math.ceil(totalSec / 86400) + 1; }
   tickCount = Math.min(tickCount, 20);
 
-  /* Размеры SVG */
-  const W        = Math.max(svg.parentElement.clientWidth || 700, 400);
-  const PAD_L    = 16, PAD_R = 16;
-  const H        = NOISE ? 90 : 72;
-  const AXIS_Y   = 44;
-  const USABLE_W = W - PAD_L - PAD_R;
+  /* Размеры */
+  const W       = Math.max(svgEl.parentElement.clientWidth || 700, 400);
+  const PAD_L   = 24, PAD_R = 24;
+  const H       = NOISE ? 106 : 84;
+  const AXIS_Y  = 58;
+  const UW      = W - PAD_L - PAD_R;
+  const spanSec = Math.max(totalSec * 1.08, unitSec);
+  const toX     = s => PAD_L + (s / spanSec) * UW;
 
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.setAttribute('width', W);
-  svg.setAttribute('setAttribute', H);
-  svg.style.height = H + 'px';
-
-  /* Маппинг секунд → пикселей */
-  const spanSec = Math.max(totalSec * 1.08, unitSec); // чуть шире крайней точки
-  const toX = sec => PAD_L + (sec / spanSec) * USABLE_W;
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.setAttribute('width', W);
+  svgEl.style.height = H + 'px';
 
   let html = '';
 
-  /* Ось */
+  /* Ось — тонкая линия */
   html += `<line x1="${PAD_L}" y1="${AXIS_Y}" x2="${W - PAD_R}" y2="${AXIS_Y}"
-                 stroke="#d1d5db" stroke-width="2" stroke-linecap="round"/>`;
+                 stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round"/>`;
 
-  /* Тики шкалы */
+  /* Тики */
   for (let i = 0; i <= tickCount; i++) {
-    const sec  = i * unitSec;
+    const sec = i * unitSec;
     if (sec > spanSec + unitSec * 0.01) break;
-    const x    = toX(sec);
-    const absMs = baseMs + sec * 1000;
-    const d    = new Date(absMs);
+    const x = toX(sec);
+    const d = new Date(baseMs + sec * 1000);
 
-    let tickLabel;
-    if (unitSec === 60) {
-      tickLabel = d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
-    } else if (unitSec === 3600) {
-      tickLabel = d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+    /* При переходе суток показываем дату */
+    const prevD = new Date(baseMs + (sec - unitSec) * 1000);
+    const showDate = unitSec >= 86400 ||
+                     (unitSec === 3600 && d.getDate() !== prevD.getDate()) ||
+                     i === 0;
+
+    let line1, line2 = null;
+    if (unitSec === 60 || unitSec === 3600) {
+      line1 = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      if (showDate && i > 0) {
+        line2 = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+      }
     } else {
-      tickLabel = d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit' })
-               + ' ' + d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+      line1 = d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+      line2  = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     }
 
-    html += `<line x1="${x}" y1="${AXIS_Y - 4}" x2="${x}" y2="${AXIS_Y + 4}"
-                   stroke="#9ca3af" stroke-width="1"/>`;
-    html += `<text x="${x}" y="${AXIS_Y + 16}" text-anchor="middle"
-                   font-size="10" fill="#9ca3af" font-family="inherit">${tickLabel}</text>`;
+    html += `<line x1="${x}" y1="${AXIS_Y - 5}" x2="${x}" y2="${AXIS_Y + 5}"
+                   stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>`;
+    html += `<text x="${x}" y="${AXIS_Y + 18}" text-anchor="middle"
+                   font-size="11" font-weight="500" fill="#334155" font-family="inherit">${line1}</text>`;
+    if (line2) {
+      html += `<text x="${x}" y="${AXIS_Y + 30}" text-anchor="middle"
+                     font-size="10" fill="#64748b" font-family="inherit">${line2}</text>`;
+    }
   }
 
   /* Точки запуска */
   runPoints.forEach((sec, idx) => {
     const x = toX(sec);
 
-    /* Шум — скобочки */
-    if (NOISE && NOISE > 0) {
-      const noiseW = (NOISE / spanSec) * USABLE_W;
-      const bracketH = 8;
-      const by = AXIS_Y - 18;
-      // левая скобка
-      html += `<path d="M${x - noiseW} ${by + bracketH} L${x - noiseW} ${by} L${x - noiseW + 4} ${by}"
-                     fill="none" stroke="${COLOR}" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>`;
-      // правая скобка
-      html += `<path d="M${x + noiseW} ${by + bracketH} L${x + noiseW} ${by} L${x + noiseW - 4} ${by}"
-                     fill="none" stroke="${COLOR}" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>`;
+    /* Шум: полоса диапазона над осью */
+    if (NOISE > 0) {
+      const nw   = (NOISE / spanSec) * UW;
+      const barY = AXIS_Y - 26;
+      const barH = 10;
+
+      /* Фоновая полоса */
+      html += `<rect x="${x - nw}" y="${barY}" width="${nw * 2}" height="${barH}"
+                     rx="5" fill="${NOISE_CLR}" opacity="0.5"/>`;
+      /* Левая граница */
+      html += `<line x1="${x - nw}" y1="${barY - 2}" x2="${x - nw}" y2="${barY + barH + 2}"
+                     stroke="${NOISE_CLR}" stroke-width="2" stroke-linecap="round"/>`;
+      /* Правая граница */
+      html += `<line x1="${x + nw}" y1="${barY - 2}" x2="${x + nw}" y2="${barY + barH + 2}"
+                     stroke="${NOISE_CLR}" stroke-width="2" stroke-linecap="round"/>`;
+      /* Центральная черта — точный момент */
+      html += `<line x1="${x}" y1="${barY - 2}" x2="${x}" y2="${barY + barH + 2}"
+                     stroke="${COLOR}" stroke-width="2" stroke-linecap="round"/>`;
+      /* Соединительная линия от полосы до точки на оси */
+      html += `<line x1="${x}" y1="${barY + barH}" x2="${x}" y2="${AXIS_Y - 8}"
+                     stroke="${COLOR}" stroke-width="1" stroke-dasharray="2,2" opacity="0.4"/>`;
     }
 
-    /* Вертикальная линия от оси до точки */
-    html += `<line x1="${x}" y1="${AXIS_Y - 20}" x2="${x}" y2="${AXIS_Y}"
-                   stroke="${COLOR}" stroke-width="1" stroke-dasharray="3,2" opacity="0.4"/>`;
+    /* Точка на оси */
+    html += `<circle cx="${x}" cy="${AXIS_Y}" r="8" fill="${COLOR_SOFT}" stroke="${COLOR}" stroke-width="2"/>`;
+    html += `<circle cx="${x}" cy="${AXIS_Y}" r="3.5" fill="${COLOR}"/>`;
 
-    /* Точка */
-    html += `<circle cx="${x}" cy="${AXIS_Y}" r="5" fill="${COLOR}" stroke="white" stroke-width="1.5"/>`;
-
-    /* Номер запуска */
-    html += `<text x="${x}" y="${AXIS_Y - 24}" text-anchor="middle"
-                   font-size="10" font-weight="600" fill="${COLOR}" font-family="inherit">
-               ${idx + 1}
-             </text>`;
+    /* Номер внутри точки — только если r достаточно большой (сейчас r=8, помещается 1 цифра) */
+    if (idx < 9) {
+      html += `<text x="${x}" y="${AXIS_Y + 4}" text-anchor="middle"
+                     font-size="9" font-weight="700" fill="${COLOR}" font-family="inherit">${idx + 1}</text>`;
+    }
   });
 
-  svg.innerHTML = html;
+  svgEl.innerHTML = html;
 
   /* Легенда */
-  let legendHtml = `
-    <span style="display:inline-flex;align-items:center;gap:5px;">
-      <svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="${COLOR}" stroke="white" stroke-width="1.5"/></svg>
-      Запуск
-    </span>`;
+  let leg = `<span style="display:inline-flex;align-items:center;gap:6px;">
+    <svg width="18" height="18">
+      <circle cx="9" cy="9" r="7" fill="${COLOR_SOFT}" stroke="${COLOR}" stroke-width="2"/>
+      <circle cx="9" cy="9" r="3" fill="${COLOR}"/>
+    </svg>
+    Запуск
+  </span>`;
   if (NOISE) {
-    legendHtml += `
-      <span style="display:inline-flex;align-items:center;gap:5px;">
-        <svg width="22" height="12">
-          <path d="M2 10 L2 4 L6 4" fill="none" stroke="${COLOR}" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>
-          <path d="M20 10 L20 4 L16 4" fill="none" stroke="${COLOR}" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>
-        </svg>
-        ±${formatDuration(NOISE)} шума
-      </span>`;
+    leg += `<span style="display:inline-flex;align-items:center;gap:6px;">
+      <svg width="34" height="14">
+        <rect x="2" y="3" width="30" height="8" rx="4" fill="${NOISE_CLR}" opacity="0.5"/>
+        <line x1="17" y1="1" x2="17" y2="13" stroke="${COLOR}" stroke-width="2" stroke-linecap="round"/>
+        <line x1="2"  y1="1" x2="2"  y2="13" stroke="${NOISE_CLR}" stroke-width="2" stroke-linecap="round"/>
+        <line x1="32" y1="1" x2="32" y2="13" stroke="${NOISE_CLR}" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Разброс ±${formatDuration(NOISE)}
+    </span>`;
   }
-  legend.innerHTML = legendHtml;
+  legend.innerHTML = leg;
 }
 
 /* ════════════════════════════════════════════════════════
-   Модалка редактирования
+   Модалка
 ═══════════════════════════════════════════════════════ */
-const editModal  = document.getElementById('editModal');
-const editError  = document.getElementById('editError');
+const editModal = document.getElementById('editModal');
+const editError = document.getElementById('editError');
 
-function openEditModal()  { editModal.style.display = 'flex'; }
-function closeEditModal() { editModal.style.display = 'none'; editError.style.display = 'none'; }
+const openEditModal  = () => { editModal.style.display = 'flex'; };
+const closeEditModal = () => { editModal.style.display = 'none'; editError.style.display = 'none'; };
 
 document.getElementById('openEditModal').addEventListener('click', openEditModal);
 document.getElementById('editModalClose').addEventListener('click', closeEditModal);
@@ -550,15 +646,13 @@ document.getElementById('editSaveBtn').addEventListener('click', async function 
       body:    JSON.stringify({ title, description, monitoring_algorithm_id: ALGO_ID }),
     });
     const data = await res.json();
-
     if (data.success) {
-      // обновляем отображение без перезагрузки
       document.getElementById('displayTitle').textContent       = title || '—';
       document.getElementById('displayDescription').textContent = description || '—';
       closeEditModal();
     } else {
-      editError.textContent    = data.error || 'Ошибка сохранения';
-      editError.style.display  = 'block';
+      editError.textContent   = data.error || 'Ошибка сохранения';
+      editError.style.display = 'block';
     }
   } catch {
     editError.textContent   = 'Сетевая ошибка';
@@ -569,7 +663,6 @@ document.getElementById('editSaveBtn').addEventListener('click', async function 
   }
 });
 
-/* Перестраиваем шкалу при ресайзе */
 window.addEventListener('resize', buildTimeline);
 </script>
 {% endblock %}
