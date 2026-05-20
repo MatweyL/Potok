@@ -2,9 +2,11 @@
 {% block title %}Поток — Алгоритмы мониторинга{% endblock %}
 
 {% block extra_links %}
+
   <script src="/static/js/seconds_formatter.js"></script>
 
 {% endblock %}
+
 {% block body %}
 <div class="flow-page">
 
@@ -78,7 +80,6 @@
       </div>
     </div>
   <!-- Таблица -->
-  {# ── Таблица пользователей ── #}
 
   {# row-функция определена до вызова макроса #}
   <script>
@@ -110,8 +111,8 @@
         { "key": "id",         "label": "ID",       "sortable": true,  "width": "72px" },
         { "key": "type",   "label": "Тип",  "width": "72px"  },
         { "key": "config", "label": "Настройки запуска",  "width": "160px" },
-        { "key": "title",      "label": "Название",                        "width": "130px" },
-        { "key": "description",  "label": "Описание",                      "width": "130px" },
+        { "key": "title",      "label": "Название",                        "width": "150px" },
+        { "key": "description",  "label": "Описание",                      "width": "300px" },
       ],
       api_url      = "/monitoring-algorithms/json",
       row_template = "renderRow",
@@ -191,6 +192,7 @@ document.getElementById('createAlgoBtn').addEventListener('click', async functio
     const data = await res.json();
     if (data.success) {
       showAlert('Алгоритм создан', 'success');
+      window['algo_table_reload']?.();
       document.getElementById('newTitle').value       = '';
       document.getElementById('newDescription').value = '';
     } else {

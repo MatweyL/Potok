@@ -2,6 +2,11 @@
 {% set active_nav = 'monitoring_algorithms' %}
 {% block title %}Алгоритм #{{ algorithm.id }} — Поток{% endblock %}
 
+{% block extra_links %}
+
+  <script src="/static/js/seconds_formatter.js"></script>
+
+{% endblock %}
 {% block extra_css %}
 <style>
 /* ── Цвета типов ─────────────────────────────── */
@@ -390,19 +395,6 @@ const ALGO_TYPE = "{{ algorithm.type.value }}";
 const TIMEOUT   = {{ algorithm.timeout  | default(0) }};
 const NOISE     = {{ algorithm.timeout_noize | default(0) }};
 const TIMEOUTS  = {{ algorithm.timeouts | tojson if algorithm.timeouts else '[]' }};
-
-/* ════════════════════════════════════════════════════════
-   formatDuration
-═══════════════════════════════════════════════════════ */
-function formatDuration(sec) {
-  if (!sec || sec === 0) return '0 сек';
-  const abs = Math.abs(sec);
-  if (abs < 60)    return `${abs} сек`;
-  if (abs < 3600)  { const m = Math.floor(abs/60), s = abs%60; return s ? `${m} мин ${s} сек` : `${m} мин`; }
-  if (abs < 86400) { const h = Math.floor(abs/3600), m = Math.floor((abs%3600)/60); return m ? `${h} ч ${m} мин` : `${h} ч`; }
-  const d = Math.floor(abs/86400), h = Math.floor((abs%86400)/3600);
-  return h ? `${d} д ${h} ч` : `${d} д`;
-}
 
 /* ════════════════════════════════════════════════════════
    Инициализация

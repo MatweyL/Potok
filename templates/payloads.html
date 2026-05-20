@@ -1,110 +1,52 @@
 {% extends "base.html" %}
 
 {% block title %}Данные для сбора - Поток{% endblock %}
+{% block extra_links %}
 
+  <script src="/static/js/format_tools.js"></script>
+
+{% endblock %}
 {% block body %}
+
+
+{% from "components/flow_table.html" import render_flow_table %}
 <div class="flow-page">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 fw-bold text-dark">Данные для сбора</h1>
     </div>
+    <script>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <table id="payloadsTable" class="table table-hover align-middle mb-0" style="width:100%">
-                <thead class="bg-light text-secondary small text-uppercase">
-                    <tr>
-                        <th style="width: 80px;">ID</th>
-                        <th>Данные</th>
-                        <th style="width: 250px;">Уникальный хеш</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Данные подгружаются динамически -->
-                </tbody>
-            </table>
-        </div>
-    </div>
+  function renderRow(row) {
+      let value = '<span class="text-muted">—</span>';
+      if (row.data) {
+        value = formatJsonAsHtml(row.data);
+    }
+
+    const payloadId = `<a href="/payloads/${row.id}" class="text-decoration-none fw-medium">#${row.id}</a>`
+    return `<tr>
+      <td class="ft-cell ft-cell--muted ft-cell--mono">${payloadId}</td>
+      <td class="ft-cell ft-cell--muted ft-cell--mono">${row.checksum}</td>
+      <td class="ft-cell ft-cell--bold">${value}</td>
+    </tr>`;
+  }
+
+  </script>
+
+      {{ render_flow_table(
+          table_id   = "payloads_table",
+          columns    = [
+            { "key": "id",         "label": "ID",       "sortable": true,  "width": "72px" },
+            { "key": "checksum",   "label": "Уникальный хеш",  "width": "290px"  },
+            { "key": "value", "label": "Значение" },
+          ],
+          api_url      = "/payloads/json",
+          row_template = "renderRow"
+      ) }}
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    $('#payloadsTable').DataTable({
-        serverSide: true,
-        processing: true,
-        pageLength: 25,
-        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
-        order: [[0, 'desc']], // По умолчанию sort_by=id, sort_asc=false
-        ajax: {
-            url: '/payloads/',
-            data: function(d) {
-                // Маппинг параметров DataTables -> ваш API
-                d.offset = d.start;
-                d.limit = d.length;
-
-                if (d.order.length > 0) {
-                    const colIdx = d.order[0].column;
-                    const dir = d.order[0].dir;
-                    const sortMap = { 0: 'id', 1: 'data', 2: 'checksum' };
-                    d.sort_by = sortMap[colIdx] || 'id';
-                    d.sort_asc = dir === 'asc';
-                } else {
-                    d.sort_by = 'id';
-                    d.sort_asc = false;
-                }
-                d.search_value = d.search.value;
-                // Удаляем служебные поля DT, чтобы не ломать API
-                delete d.start; delete d.length; //delete d.draw;
-                delete d.columns; delete d.order; delete d.search;
-            },
-            dataFilter: function(rawJson) {
-                // Адаптация ответа под формат DataTables
-                const json = JSON.parse(rawJson);
-                console.log('📦 Ответ от сервера:', json);
-
-                const items = json.data || json.items || json.results || json;
-                const total = json.recordsTotal;
-                // dataFilter должен вернуть JSON-строку в формате DataTables
-                return JSON.stringify({
-                    draw: json.draw,
-                    recordsTotal: total,
-                    recordsFiltered: total,
-                    data: items
-                });
-            },
-            error: function(xhr, error, thrown) {
-                console.error('Ошибка загрузки полезных нагрузок:', error);
-                $('#payloadsTable').append(`<tbody><tr><td colspan="3" class="text-center text-danger py-3">Не удалось загрузить данные</td></tr></tbody>`);
-            }
-        },
-        columns: [
-            {
-                data: 'id',
-                render: function(data) {
-                    return data ? `<a href="/payloads/${data}" class="text-decoration-none fw-medium">${data}</a>` : '—';
-                }
-            },
-            {
-                data: 'data',
-                render: function(data) {
-                    if (!data) return '<span class="text-muted">—</span>';
-                    const jsonStr = JSON.stringify(data);
-                    const preview = jsonStr.length > 120 ? jsonStr.substring(0, 120) + '…' : jsonStr;
-                    return `<pre class="mb-0 bg-light p-2 rounded small text-break m-0" title="${jsonStr.replace(/"/g, '&quot;').replace(/\n/g, ' ')}">${preview}</pre>`;
-                }
-            },
-            {
-                data: 'checksum',
-                render: function(data) {
-                    return data ? `<code class="bg-light px-2 py-1 rounded small d-inline-block text-truncate" style="max-width:100%;">${data}</code>` : '<span class="text-muted">—</span>';
-                }
-            }
-        ],
-        columnDefs: [
-            { orderable: false, targets: [] } // Сортировка включена, если бэкенд поддерживает
-        ]
-    });
-});
 </script>
 {% endblock %}

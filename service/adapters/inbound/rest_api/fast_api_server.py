@@ -16,6 +16,7 @@ from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
 from .annotations import HTTPMethod, EveryType
 from .html.monitoring_algorithms import monitoring_algorithms_router
+from .html.payloads import payloads_router
 from .html.users import users_router
 from .html_router import router as html_router
 from .router import router as api_router
@@ -65,6 +66,7 @@ class FastAPIServer(Startable):
         self._app.include_router(api_router)
         self._app.include_router(html_router)
         self._app.include_router(users_router)
+        self._app.include_router(payloads_router)
         self._app.include_router(monitoring_algorithms_router)
         self._app.mount("/static", StaticFiles(directory=get_project_root().joinpath('static')), name="static")
         handle_422_exceptions(self._app)

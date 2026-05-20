@@ -23,5 +23,5 @@ class GetPayloadsUC(UseCase):
 
     async def apply(self, request: GetPayloadsUCRq) -> GetPayloadsUCRs:
         payloads = await self._payload_repo.paginated(request.pagination)
-        total = await self._payload_repo.count_by_fields(FilterFieldsDNF.empty())
+        total = await self._payload_repo.count_by_fields(request.pagination.filter_fields_dnf)
         return GetPayloadsUCRs(success=True, request=request, payloads=payloads, total=total)

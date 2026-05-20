@@ -144,12 +144,6 @@ async def create_tasks(request: Request, rq: CreateTasksUCRq):
     return rs
 
 
-@router.patch("/payloads/{payload_id}")
-async def update_payload(request: Request, payload_id: int, rq: UpdatePayloadUCRq):
-    rs = await request.app.state.use_case_facade.update_payload(rq)
-    return rs
-
-
 # -- КОД ВЫШЕ ПОДЛЕЖИТ РЕФАКТОРИНГУ --
 
 
@@ -298,51 +292,6 @@ async def tasks_json(
 
 
 
-@router.get("/payloads", response_class=HTMLResponse)
-async def payloads_page(request: Request):
-    return templates.TemplateResponse(
-        request=request, name="payloads.html",
-    )
-
-
-@router.get("/payloads/", )
-async def payloads_json(request: Request,
-                        draw: int = 1,
-                        offset: int = 0,
-                        limit: int = 25,
-                        order_by: str = 'id',
-                        asc_sort: bool = False,
-                        search_value: Optional[str] = None):
-    pagination = PaginationQuery(offset_page=offset,
-                                 limit_per_page=limit,
-                                 order_by=order_by,
-                                 asc_sort=asc_sort
-                                 )
-    if search_value:
-        pagination.filter_fields_dnf = FilterFieldsDNF.single('data', search_value, ConditionOperation.CONTAINS)
-    rs = await request.app.state.use_case_facade.get_payloads(
-        GetPayloadsUCRq(pagination=pagination)
-    )
-    return {
-        "draw": int(draw),
-        "recordsTotal": rs.total,
-        "recordsFiltered": rs.total,
-        "data": [payload.model_dump() for payload in rs.payloads],
-    }
-
-
-@router.get("/payloads/{payload_id}", response_class=HTMLResponse)
-async def payload_page(request: Request, payload_id: int):
-    rs = await request.app.state.use_case_facade.get_payload(
-        GetPayloadUCRq(payload_id=payload_id, )
-    )
-    return templates.TemplateResponse(
-        request=request, name="payload.html",
-        context={
-            "payload": rs.payload,
-            "tasks_detailed": rs.tasks_detailed_linked,
-        }
-    )
 
 
 @router.get("/tasks/{task_id}", response_class=HTMLResponse)
