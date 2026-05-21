@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 
@@ -13,7 +14,7 @@ from service.domain.schemas.task_run import TaskRun, TaskRunPK
 from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunGroupedMetrics, TaskRunAvgMetrics, \
     TaskRunGroupedAvgMetrics, TasksRunsStatusMetrics, StatusMetrics
 from service.ports.outbound.repo.abstract import Repo
-from service.ports.outbound.repo.task_run import WaitingTaskRunProvider, TaskRunMetricsProvider
+from service.ports.outbound.repo.task_run import WaitingTaskRunProvider, TaskRunMetricsProvider, RecentTaskRunsProvider
 
 
 class SATaskRunRepo(AbstractSARepo):
@@ -254,3 +255,60 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
                     task_run_grouped_avg_metrics.avg_interrupted_count = cnt
 
             return TaskRunAvgMetrics(grouped_avg_metrics_by_name=grouped_avg_metrics_by_name)
+
+
+class SARecentTaskRunsProvider(RecentTaskRunsProvider):
+    """
+    Нужен индекс
+      CREATE INDEX IF NOT EXISTS idx_task_run_task_id_updated
+      ON task_run (task_id, status_updated_at DESC NULLS LAST);
+    """
+
+    def __init__(self, database: Database, ):
+        self._database = database
+    async def get_recent_per_task(
+            self,
+            task_ids: List[int],
+            limit_per_task: int,
+    ) -> List[TaskRun]:
+        """
+        Возвращает последние limit_per_task запусков для каждого task_id.
+        Использует LATERAL JOIN для эффективной выборки топ-N на группу.
+        """
+        async with self._database.session as session:
+            query = text("""
+                SELECT tr.*
+                FROM unnest(:task_ids ::int[]) AS t(task_id)
+                CROSS JOIN LATERAL (
+                    SELECT *
+                    FROM task_run
+                    WHERE task_run.task_id = t.task_id
+                    ORDER BY status_updated_at DESC NULLS LAST
+                    LIMIT :limit_per_task
+                ) tr
+            """)
+            result = await session.execute(query, {
+                "task_ids": task_ids,
+                "limit_per_task": limit_per_task,
+            })
+            rows = result.mappings().all()
+            return [self._row_to_domain(row) for row in rows]
+
+    def _row_to_domain(self, row) -> TaskRun:
+        payload = Payload.model_validate(json.loads(row.payload), from_attributes=True) if row.payload else None
+        execution_bounds = None
+        if row.execution_bounds:
+            execution_bounds = as_execution_bounds(json.loads(row.execution_bounds))
+        return TaskRun(
+            id=row["id"],
+            task_id=row["task_id"],
+            group_name=row["group_name"],
+            priority=row["priority"],
+            type=row["type"],
+            payload=payload,
+            execution_bounds=execution_bounds,
+            execution_arguments=row["execution_arguments"],
+            status=row["status"],
+            status_updated_at=row["status_updated_at"],
+            description=row["description"],
+        )

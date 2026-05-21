@@ -33,7 +33,7 @@ from service.adapters.outbound.repo.sa.impls.task import SATaskRepo, SATaskProvi
 from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
 from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
 from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider, \
-    SATaskRunMetricsProvider
+    SATaskRunMetricsProvider, SARecentTaskRunsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
     SATaskRunTimeIntervalExecutionBoundsRepo
@@ -133,6 +133,7 @@ async def main():
     monitoring_algorithms = [periodic_monitoring_algorithm_repo, single_monitoring_algorithm_repo]
     task_to_execute_provider_registry = TaskToExecuteProviderRegistry(monitoring_algorithms)
     task_status_log_repo = SATaskStatusLogRepo(database, models.TaskStatusLog)
+    recent_task_runs_provider = SARecentTaskRunsProvider(database)
 
     if settings.use_ch_task_run_status_log_repo:
         task_run_status_log_repo = await create_task_run_status_log_repo(ch_client)
@@ -217,9 +218,11 @@ async def main():
     get_task_group_uc = GetTaskGroupUC(task_group_repo)
     get_task_detailed_uc = GetTaskDetailedUC(task_repo, payload_repo, task_group_repo, get_monitoring_algorithm_uc,
                                              get_task_progress_uc, task_run_metrics_provider)
-    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_task_runs_uc,
-                                               get_monitoring_algorithm_uc, payload_repo,
-                                               task_group_repo, task_repo, task_run_metrics_provider, )
+    get_tasks_detailed_uc = GetTasksDetailedUC(get_tasks_uc, get_all_monitoring_algorithms_uc,
+                                               payload_repo,
+                                               task_group_repo, task_repo,
+                                               recent_task_runs_provider,
+                                               task_run_metrics_provider, )
     get_all_task_group_uc = GetAllTaskGroupUC(task_group_repo)
     get_task_groups_without_project_uc = GetTaskGroupsWithoutProjectUC(project_repo, task_group_repo,
                                                                        task_group_by_project_repo)

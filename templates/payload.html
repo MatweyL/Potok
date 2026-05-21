@@ -7,8 +7,6 @@
 {% endblock %}
 
 {% block body %}
-{% from "components/flow_table.html" import render_flow_table %}
-{% from "components/task_runs_status_metrics.html" import render_task_runs_status_metrics %}
 
 <div class="flow-page">
 
@@ -69,125 +67,13 @@
       pre.textContent = JSON.stringify(PAYLOAD_DATA, null, 2);
     }
   });
+</script>
 
-  function escHtml(s) {
-    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
 
-  const RUN_COLORS = {
-    succeed:'#22c55e', error:'#ef4444', execution:'#3b82f6',
-    temp_error:'#f97316', interrupted:'#8b5cf6',
-    cancelled:'#9ca3af', waiting:'#d1d5db', queued:'#94a3b8',
-  };
-
-  const STATUS_BADGE = {
-    NEW:       ['#eff6ff','#1d4ed8'],
-    EXECUTION: ['#dbeafe','#1d4ed8'],
-    SUCCEED:   ['#dcfce7','#15803d'],
-    FINISHED:  ['#f1f5f9','#475569'],
-    CANCELLED: ['#f3f4f6','#374151'],
-    ERROR:     ['#fee2e2','#dc2626'],
-  };
-
-  function badge(label, bg, color) {
-    return `<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;background:${bg};color:${color};">${label}</span>`;
-  }
-function renderTaskRow(row) {
-  const task  = row.task  || {};
-  const tg    = row.task_group || null;
-  const algo  = row.monitoring_algorithm || null;
-  const runs  = row.task_runs_recent || [];
-
-  // Группа
-  const group = tg
-    ? `<a href="/task-groups/${tg.id}" class="text-decoration-none">
-         <div class="fw-semibold text-dark" style="font-size:13.5px;">${escHtml(tg.title)}</div>
-         <code class="text-muted" style="font-size:11px;">${escHtml(tg.name)}</code>
-       </a>`
-    : '<span class="text-muted">—</span>';
-
-  // Приоритет / тип
-  const priority = task.priority ? badge(task.priority, '#dbeafe', '#1d4ed8') : '—';
-  const type     = task.type     ? badge(task.type,     '#dbeafe', '#1d4ed8') : '—';
-
-  // Алгоритм мониторинга
-  let algoHtml = '<span class="text-muted">—</span>';
-  if (algo) {
-    let inner = '';
-    if (algo.type === 'PERIODIC') {
-      inner = badge('PERIODIC', '#dbeafe', '#1d4ed8')
-        + ` <span class="fw-semibold">${algo.timeout ?? ''}</span>`
-        + ` <span class="text-muted">±</span>`
-        + ` <span class="fw-semibold">${algo.timeout_noize ?? 0}</span>`;
-    } else if (algo.type === 'SINGLE') {
-      const ts = algo.timeouts || [];
-      inner = badge('SINGLE', '#ede9fe', '#6d28d9')
-        + (ts.length
-            ? ts.map(t => badge(t, '#f1f5f9', '#475569')).join(' ')
-            : badge('мгновенно', '#fef9c3', '#a16207'));
-      inner += ` <span class="text-muted">±${algo.timeout_noize ?? 0}</span>`;
-    } else {
-      inner = escHtml(algo.type ?? '');
-    }
-    algoHtml = `<a href="/monitoring-algorithms/${algo.id}"
-                   class="text-decoration-none d-inline-flex flex-wrap align-items-center gap-1">
-                  ${inner}
-                </a>`;
-  }
-
-  // Последние запуски — цветные точки
-  const dots = runs.length
-    ? `<div style="display:flex;gap:4px;align-items:center;">${runs.slice(0,3).map(r => {
-        const c = RUN_COLORS[(r.status || '').toLowerCase()] || '#e5e7eb';
-        return `<a href="/task-runs/${r.id}" title="${escHtml(r.status)}"
-                   style="display:inline-block;width:14px;height:14px;border-radius:50%;
-                          background:${c};border:2px solid ${c};"></a>`;
-      }).join('')}</div>`
-    : '<span class="text-muted">—</span>';
-
-  // Статус задачи
-  let statusHtml = '<span class="text-muted">—</span>';
-  if (task.status) {
-    const [bg, color] = STATUS_BADGE[task.status] || ['#f3f4f6', '#374151'];
-    statusHtml = badge(task.status, bg, color);
-  }
-
-  const fmt = v => (v && v !== 'None')
-    ? String(v).replace('T', ' ').slice(0, 16)
-    : '<span class="text-muted">—</span>';
-
-  return `<tr>
-    <td class="ft-cell ft-cell--mono ft-cell--muted">
-      <a href="/tasks/${task.id}" class="text-decoration-none fw-semibold text-dark">#${task.id}</a>
-    </td>
-    <td class="ft-cell">${group}</td>
-    <td class="ft-cell">${priority}</td>
-    <td class="ft-cell">${type}</td>
-    <td class="ft-cell">${algoHtml}</td>
-    <td class="ft-cell">${dots}</td>
-    <td class="ft-cell">${statusHtml}</td>
-    <td class="ft-cell ft-cell--muted" style="font-size:12px;white-space:nowrap;">${fmt(task.status_updated_at)}</td>
-    <td class="ft-cell ft-cell--muted" style="font-size:12px;white-space:nowrap;">${fmt(task.loaded_at)}</td>
-  </tr>`;
-}
-  </script>
-
-  {{ render_flow_table(
-      table_id     = "tasks_table",
-      columns      = [
-        { "key": "id",                "label": "ID",                 "sortable": true, "width": "64px" },
-        { "key": "group",             "label": "Группа",             "sortable": true },
-        { "key": "priority",          "label": "Приоритет",                            "width": "110px" },
-        { "key": "type",              "label": "Тип задачи",                           "width": "110px" },
-        { "key": "algo",              "label": "Алгоритм мониторинга" },
-        { "key": "runs",              "label": "Последние запуски",                    "width": "110px" },
-        { "key": "status",            "label": "Статус",                               "width": "120px" },
-        { "key": "status_updated_at", "label": "Обновление статуса", "sortable": true, "width": "150px" },
-        { "key": "loaded_at",         "label": "Загрузка",           "sortable": true, "width": "140px" },
-      ],
-      api_url      = "/payloads/" ~ payload.id ~ "/tasks/json",
-      row_template = "renderTaskRow"
+{% from "components/tasks_table.html" import render_tasks_table %}
+{{render_tasks_table(
+    table_id     = "tasks_table",
+    api_url      = "/payloads/" ~ payload.id ~ "/tasks/json",
   ) }}
-
 </div>
 {% endblock %}

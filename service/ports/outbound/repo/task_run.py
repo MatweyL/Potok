@@ -26,3 +26,14 @@ class TaskRunMetricsProvider(ABC):
     @abstractmethod
     async def provide_tasks_runs_status_metrics(self, tasks_ids: List[int]) -> TasksRunsStatusMetrics:
         pass
+
+
+class RecentTaskRunsProvider(ABC):
+
+    @abstractmethod
+    async def get_recent_per_task(
+            self,
+            task_ids: List[int],
+            limit_per_task: int,
+    ) -> List[TaskRun]:
+        pass
