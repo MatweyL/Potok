@@ -127,21 +127,30 @@ class CHAnalyticalMetricsProvider(AnalyticalMetricsProviderI):
 
     async def get_task_group_processing_speed(self, group_id: int) -> list[TaskGroupProcessingSpeedItem]:
         rows = await self._fetch_all("""
-            WITH runs_per_minute AS (
+            WITH
+            date_from AS toStartOfMinute(now() - INTERVAL 3 HOUR),
+            date_to AS toStartOfMinute(now()),
+            runs_per_minute AS (
                 SELECT toStartOfMinute(tr.status_updated_at) AS period,
                        count() AS completed_count
                 FROM task_run tr
                 INNER JOIN task t ON tr.task_id = t.id
                 WHERE t.group_id = {group_id:Int64}
                   AND tr.status = 'SUCCEED'
-                  AND tr.status_updated_at >= now() - INTERVAL 3 HOUR
+                  AND tr.status_updated_at >= date_from
+                  AND tr.status_updated_at <= date_to
                 GROUP BY period
+            ),
+            timeline AS (
+                SELECT date_from + number * INTERVAL 1 MINUTE AS period
+                FROM numbers(toUInt64(dateDiff('minute', date_from, date_to) + 1))
             )
-            SELECT period,
-                   round(completed_count / 60.0, 2) AS tasks_per_second,
-                   round(avg(completed_count / 60.0) OVER (ORDER BY period ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 2) AS avg_tasks_per_second
-            FROM runs_per_minute
-            ORDER BY period
+            SELECT timeline.period AS period,
+                   round(ifNull(runs_per_minute.completed_count, 0) / 60.0, 2) AS tasks_per_second,
+                   round(avg(ifNull(runs_per_minute.completed_count, 0) / 60.0) OVER (ORDER BY timeline.period ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 2) AS avg_tasks_per_second
+            FROM timeline
+            LEFT JOIN runs_per_minute ON timeline.period = runs_per_minute.period
+            ORDER BY timeline.period
         """, {"group_id": group_id})
         return self._validate_many(TaskGroupProcessingSpeedItem, rows)
 
