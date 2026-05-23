@@ -60,51 +60,6 @@ def dashboard_page(request: Request):
 
 
 
-@router.get("/api/dashboard/summary")
-async def dashboard_summary(request: Request):
-    return await request.app.state.analytical_metrics_service.get_dashboard_summary()
-
-
-@router.get("/api/dashboard/run-statuses")
-async def dashboard_run_statuses(request: Request, group_id: Optional[int] = None):
-    return await request.app.state.analytical_metrics_service.get_run_status_distribution(group_id=group_id)
-
-
-@router.get("/api/dashboard/performance-trends")
-async def dashboard_performance_trends(request: Request, period: str = Query("day", pattern="^(day|week)$")):
-    return await request.app.state.analytical_metrics_service.get_performance_trends(period=period)
-
-
-@router.get("/api/dashboard/run-heatmap")
-async def dashboard_run_heatmap(request: Request):
-    return await request.app.state.analytical_metrics_service.get_run_heatmap()
-
-
-@router.get("/api/dashboard/duration-distribution")
-async def dashboard_duration_distribution(request: Request, group_id: Optional[int] = None):
-    return await request.app.state.analytical_metrics_service.get_duration_distribution(group_id=group_id)
-
-
-@router.get("/api/task-groups/{task_group_id}/processing-speed")
-async def task_group_processing_speed(request: Request, task_group_id: int):
-    return await request.app.state.analytical_metrics_service.get_task_group_processing_speed(group_id=task_group_id)
-
-
-@router.get("/api/task-groups/{task_group_id}/run-statuses")
-async def task_group_run_statuses(request: Request, task_group_id: int):
-    return await request.app.state.analytical_metrics_service.get_run_status_distribution(group_id=task_group_id)
-
-
-@router.get("/api/task-groups/{task_group_id}/duration-distribution")
-async def task_group_duration_distribution(request: Request, task_group_id: int):
-    return await request.app.state.analytical_metrics_service.get_duration_distribution(group_id=task_group_id)
-
-
-@router.get("/api/tasks/{task_id}/run-statistics")
-async def task_run_statistics(request: Request, task_id: int):
-    return await request.app.state.analytical_metrics_service.get_task_run_statistics(task_id=task_id)
-
-
 @router.post("/auth/login")
 async def login(request: Request, rq: LoginUCRq, response: Response):
     rs = await request.app.state.auth_facade.login(rq)
@@ -240,14 +195,23 @@ async def task_group_page(request: Request, task_group_id: int):
         GetTaskGroupStatisticsUCRq(task_group_id=task_group_id))
     project_rs = await request.app.state.use_case_facade.get_project_by_task_group_uc(
         GetProjectByTaskGroupUCRq(task_group_id=task_group_id))
+
+    status_metrics = await request.app.state.analytical_metrics_service.get_run_status_distribution(group_id=task_group_id)
+    speed_metrics = await request.app.state.analytical_metrics_service.get_task_group_processing_speed(group_id=task_group_id)
+    duration_metrics = await request.app.state.analytical_metrics_service.get_duration_distribution(group_id=task_group_id)
+    print(speed_metrics)
     return templates.TemplateResponse(
-        request=request, name="task_group.html",
+        request=request, name="task_group_2.html",
         context={
             "task_group": task_group_rs.task_group,
             "task_group_statistics": task_group_statistics_rs.task_group_statistics,
             "project": project_rs.project,
+            "status_metrics": status_metrics,
+            "speed_metrics": speed_metrics,
+            "duration_metrics": duration_metrics,
         }
     )
+
 
 
 @router.put("/task-groups/{task_group_id}")
@@ -260,35 +224,6 @@ async def update_group(request: Request, task_group_id: int, rq: UpdateTaskGroup
 def tasks_page(request: Request):
     return templates.TemplateResponse(request=request, name="tasks.html")
 
-
-@router.get("/tasks/json")
-@router.get("/tasks/")
-async def tasks_json(
-        request: Request,
-        group_id: Optional[int] = None,
-        draw: int = 1,
-        offset: int = 0,
-        limit: int = 25,
-        order_by: str = 'id',
-        asc_sort: bool = False
-):
-    pagination = PaginationQuery(
-        offset_page=offset,
-        limit_per_page=limit,
-        order_by=order_by,
-        asc_sort=asc_sort,
-    )
-
-    rs = await request.app.state.use_case_facade.get_tasks_detailed(
-        GetTasksDetailedUCRq(pagination=pagination, task_group_id=group_id)
-    )
-
-    return {
-        "draw": int(draw),
-        "recordsTotal": rs.total,
-        "recordsFiltered": rs.total,  # TODO: заменить на total_filtered
-        "data": [item.model_dump() for item in rs.tasks],
-    }
 
 
 
@@ -321,39 +256,6 @@ async def update_task(request: Request, task_id: int, rq: UpdateTaskUCRq):
     rs: GetTaskDetailedUCRs = await request.app.state.use_case_facade.update_task(rq)
     return rs
 
-
-@router.get("/task-runs/")
-async def task_runs_json(request: Request,
-                         task_id: int,
-                         draw: int = 1,
-                         offset: int = 0,
-                         limit: int = 25,
-                         order_by: str = 'id',
-                         asc_sort: bool = False,
-                         task_run_status: Optional[str] = None
-                         ):
-    if task_run_status:
-        # Если указать TaskRunStatus в запросе, он некорректно конвертируется: сначала преобразуется в перечисление,
-        # а затем опять в строку: WAITING (str) -> TaskRunStatus.WAITING (enum) -> TaskRunStatus.WAITING(str)
-        try:
-            task_run_status = TaskRunStatus(task_run_status[task_run_status.find('.') + 1:].upper())
-        except ValueError as e:
-            logger.exception(e)
-            raise HTTPException(status_code=400, detail=f'unknown status: {task_run_status}')
-    pagination = PaginationQuery(offset_page=offset,
-                                 limit_per_page=limit,
-                                 order_by=order_by,
-                                 asc_sort=asc_sort
-                                 )
-    rs: GetTaskRunsUCRs = await request.app.state.use_case_facade.get_task_runs(GetTaskRunsUCRq(task_id=task_id,
-                                                                                                pagination=pagination,
-                                                                                                task_run_status=task_run_status))
-    return {
-        "draw": int(draw),
-        "recordsTotal": rs.total,
-        "recordsFiltered": rs.total,
-        "data": [task_run.model_dump() for task_run in rs.task_runs],
-    }
 
 
 @router.get("/task-runs/{task_run_id}")

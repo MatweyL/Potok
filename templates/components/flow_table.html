@@ -159,7 +159,8 @@
     });
 
     try {
-      const res  = await fetch(`${API_URL}?${params}`);
+      const connector = API_URL.includes('?') ? '&' : '?';
+      const res = await fetch(`${API_URL}${connector}${params}`);
       const data = await res.json();
       state.total = data.total || 0;
       renderRows(data.items || []);

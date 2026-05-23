@@ -143,7 +143,7 @@ class AioPikaRMQQueueBoundToExchangeCreator(QueueCreator):
             return True
         channel = await self._connection.connection.channel()
         try:
-            await channel.declare_queue(name, passive=True)
+            await channel.declare_queue(name, durable=True)
             self._existing_queues.add(name)
             return True
         except aio_pika.exceptions.ChannelClosed as e:

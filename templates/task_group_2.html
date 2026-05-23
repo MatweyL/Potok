@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% set active_nav = 'task_groups' %}
+{% from "components/chart_donut.html" import render_donut %}
+{% from "components/chart_line_container.html" import render_line_container %}
+{% from "components/chart_line.html" import render_line_chart %}
+{% from "components/chart_histogram.html" import render_histogram %}
+{% from "components/tasks_table.html" import render_tasks_table %}
+
+{% block title %}{{ task_group.title }} — Группа задач{% endblock %}
+
+{% block body %}
+
+{# ── Данные метрик ── #}
+{% set status_colors = {
+  'SUCCEED': '#16a34a', 'EXECUTION': '#2563eb', 'QUEUED': '#60a5fa', 'WAITING': '#9ca3af',
+  'ERROR': '#dc2626', 'TEMP_ERROR': '#f59e0b', 'INTERRUPTED': '#f97316', 'CANCELLED': '#94a3b8'
+} %}
+
+{% set effective_status_metrics  = status_metrics  or [] %}
+{% set effective_speed_metrics   = speed_metrics   or [] %}
+{% set effective_duration_metrics = duration_metrics or [] %}
+
+{% set USE_MOCK_METRICS = false %}
+
+{% if USE_MOCK_METRICS %}
+  {% set effective_status_metrics = [
+    {'status': 'SUCCEED', 'run_count': 342}, {'status': 'EXECUTION', 'run_count': 28},
+    {'status': 'QUEUED', 'run_count': 56}, {'status': 'WAITING', 'run_count': 24},
+    {'status': 'ERROR', 'run_count': 18}, {'status': 'TEMP_ERROR', 'run_count': 14},
+    {'status': 'INTERRUPTED', 'run_count': 8}, {'status': 'CANCELLED', 'run_count': 6}
+  ] %}
+  {% set effective_speed_metrics = [
+    {'period': none, 'tasks_per_second': 2.3, 'time_label': '10:00'},
+    {'period': none, 'tasks_per_second': 3.1, 'time_label': '10:15'},
+    {'period': none, 'tasks_per_second': 2.8, 'time_label': '10:30'},
+    {'period': none, 'tasks_per_second': 3.5, 'time_label': '10:45'},
+    {'period': none, 'tasks_per_second': 4.2, 'time_label': '11:00'},
+    {'period': none, 'tasks_per_second': 3.9, 'time_label': '11:15'},
+    {'period': none, 'tasks_per_second': 4.5, 'time_label': '11:30'},
+    {'period': none, 'tasks_per_second': 3.7, 'time_label': '11:45'},
+    {'period': none, 'tasks_per_second': 4.1, 'time_label': '12:00'}
+  ] %}
+  {% set effective_duration_metrics = [
+    {'duration_bucket': '0-30s', 'run_count': 42}, {'duration_bucket': '30-60s', 'run_count': 78},
+    {'duration_bucket': '60-90s', 'run_count': 124}, {'duration_bucket': '90-120s', 'run_count': 89},
+    {'duration_bucket': '120-150s', 'run_count': 58}, {'duration_bucket': '150-180s', 'run_count': 35},
+    {'duration_bucket': '180-210s', 'run_count': 22}, {'duration_bucket': '210+s', 'run_count': 10}
+  ] %}
+{% endif %}
+
+
+{% set donut_data = [] %}
+{% for item in effective_status_metrics %}
+  {% set _ = donut_data.append({'label': item.status, 'value': item.run_count, 'color': status_colors.get(item.status, '#64748b')}) %}
+{% endfor %}
+
+{% set speed_points = [] %}
+{% for item in effective_speed_metrics %}
+  {% set _ = speed_points.append({'label': item.time_label if item.time_label is defined else item.period.strftime('%H:%M'), 'value': item.tasks_per_second}) %}
+{% endfor %}
+
+{% set duration_data = [] %}
+{% for item in effective_duration_metrics %}
+  {% set _ = duration_data.append({'label': item.duration_bucket, 'value': item.run_count}) %}
+{% endfor %}
+
+{% set total_runs = duration_data | map(attribute='value') | sum %}
+{% set avg_speed  = ((effective_speed_metrics | map(attribute='tasks_per_second') | sum) / (effective_speed_metrics | length)) if effective_speed_metrics else 0 %}
+
+<div class="flow-page">
+
+  {# ── Заголовок ── #}
+  <div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <a href="/task-groups" class="text-muted text-decoration-none" style="font-size:13px;">← Группы задач</a>
+      </div>
+      <h1 class="flow-page-title mb-1">{{ task_group.title }}</h1>
+      <p class="text-muted mb-0" style="font-size:13px;">
+        Проект: {{ project.title if project else 'Без проекта' }}{% if project and project.name %} ({{ project.name }}){% endif %}
+        &nbsp;·&nbsp; ID группы: {{ task_group.id }}
+      </p>
+    </div>
+    <button class="flow-btn-outline" data-flow-open="editTaskGroupModal" style="margin-top:4px;">
+      ✎ Редактировать
+    </button>
+  </div>
+
+  {# ── Карточка описания группы ── #}
+  <div class="flow-chart-card mb-4">
+
+    {# Описание #}
+    <p class="mb-3" style="font-size:14px;color:#374151;">
+      {{ task_group.description or 'Описание отсутствует' }}
+    </p>
+
+    {# Параметры в одну строку с бейджами #}
+    <div class="d-flex align-items-center gap-3 flex-wrap pb-3 mb-3" style="border-bottom:1px solid var(--flow-border,#e5e7eb);">
+      <div style="font-size:12.5px;color:#6b7280;">
+        Очередь по приоритету:
+        {% if task_group.queue_per_priority %}
+          <span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;background:#dbeafe;color:#1d4ed8;">Включена</span>
+        {% else %}
+          <span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;background:#f1f5f9;color:#475569;">Выключена</span>
+        {% endif %}
+      </div>
+      <div style="font-size:12.5px;color:#6b7280;">
+        Группа:
+        {% if task_group.is_active %}
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;background:#dcfce7;color:#15803d;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;"></span>Активна
+          </span>
+        {% else %}
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:500;background:#f3f4f6;color:#6b7280;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;display:inline-block;"></span>Не активна
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Аргументы выполнения — аккордеон #}
+    {% if task_group.execution_arguments %}
+    <details>
+      <summary style="font-size:12.5px;color:#6b7280;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:10px;">▶</span> Аргументы выполнения
+      </summary>
+      <div class="mt-2 border rounded" style="background:#f9fafb;">
+        <pre class="mb-0 p-3" style="font-size:12.5px;max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;"><code>{{ task_group.execution_arguments | tojson(indent=2) }}</code></pre>
+      </div>
+    </details>
+    {% endif %}
+
+  </div>
+
+  {# ── Аналитика ── #}
+  <div class="d-flex align-items-center gap-2 mb-3 pb-2" style="border-bottom:1px solid var(--flow-border,#e5e7eb);">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" style="color:#9ca3af;flex-shrink:0;">
+      <rect x="1" y="7" width="3" height="6" rx=".5"/><rect x="5.5" y="4" width="3" height="9" rx=".5"/><rect x="10" y="1" width="3" height="12" rx=".5"/>
+    </svg>
+    <span style="font-size:11.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;">Аналитика</span>
+  </div>
+
+  {# Пустое состояние аналитики #}
+  {% if not effective_status_metrics and not effective_speed_metrics %}
+  <div class="flow-chart-card mb-4 text-center py-5 text-muted">
+    <div style="font-size:32px;opacity:.3;margin-bottom:8px;">📊</div>
+    <div style="font-size:14px;font-weight:500;">Данных пока нет</div>
+    <div style="font-size:13px;">Метрики появятся после первых запусков задач</div>
+  </div>
+  {% else %}
+
+  {# Донат + скорость #}
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      {{ render_donut(
+          donut_data     = donut_data,
+          donut_title    = 'Статусы запусков задач',
+          donut_subtitle = 'Всего запусков (24ч)',
+          donut_id       = 'group_statuses'
+      ) }}
+    </div>
+    <div class="col-lg-6">
+      {% call render_line_container(title='Скорость обработки группы') %}
+        {{ render_line_chart(
+            points   = speed_points,
+            chart_id = 'group_speed',
+            subtitle = 'Задач в секунду',
+            color    = '#10b981',
+            fill     = true,
+            stats    = [
+              {'label': 'Средняя', 'value': '%.2f' | format(avg_speed), 'unit': 'задач/сек'}
+            ]
+        ) }}
+      {% endcall %}
+    </div>
+  </div>
+
+  {# Гистограмма #}
+  {{ render_histogram(
+      histogram_data  = duration_data,
+      histogram_title = 'Распределение длительности запусков',
+      histogram_total = total_runs,
+      histogram_id    = 'group_duration'
+  ) }}
+
+  {% endif %}{# /аналитика #}
+
+  {# ── Таблица задач ── #}
+  <div class="d-flex align-items-center gap-2 mt-4 mb-3 pb-2" style="border-bottom:1px solid var(--flow-border,#e5e7eb);">
+    <span style="font-size:11.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;">Задачи в группе</span>
+  </div>
+
+  {{ render_tasks_table(
+      table_id = "tasks_table",
+      api_url  = "/tasks/json?group_id=" ~ task_group.id
+  ) }}
+
+</div>
+
+{# ── Модалка редактирования ── #}
+<div class="algo-modal-backdrop" id="editTaskGroupModal" style="display:none;">
+  <div class="algo-modal" style="max-width:540px;">
+    <div class="algo-modal-header">
+      <span class="algo-modal-title">Редактировать группу задач</span>
+      <button class="algo-modal-close" data-flow-close>×</button>
+    </div>
+    <div class="algo-modal-body">
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">Название <span style="color:#dc2626;">*</span></label>
+        <input type="text" id="editTitle" class="algo-form-input"
+               value="{{ task_group.title }}" required maxlength="255"/>
+      </div>
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">Короткое имя</label>
+        <input class="algo-form-input" value="{{ task_group.name }}" disabled
+               style="background:#f9fafb;color:#9ca3af;cursor:not-allowed;"/>
+        <span style="font-size:11.5px;color:#9ca3af;margin-top:2px;">Системный идентификатор, изменению не подлежит</span>
+      </div>
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">Описание</label>
+        <textarea id="editDescription" class="algo-form-textarea"
+                  rows="3" maxlength="1000">{{ task_group.description or '' }}</textarea>
+      </div>
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">Аргументы выполнения (JSON)</label>
+        <textarea id="editExecArgs" class="algo-form-textarea"
+                  rows="4" placeholder='{"key": "value"}'
+                  style="font-family:ui-monospace,monospace;font-size:12.5px;">{{ task_group.execution_arguments | tojson(indent=2) if task_group.execution_arguments else '{}' }}</textarea>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#374151;">
+          <input type="checkbox" id="editQueuePerPriority"
+                 {% if task_group.queue_per_priority %}checked{% endif %}
+                 style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb;"/>
+          Отдельные очереди на приоритет
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#374151;">
+          <input type="checkbox" id="editIsActive"
+                 {% if task_group.is_active %}checked{% endif %}
+                 style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb;"/>
+          Группа активна
+        </label>
+      </div>
+
+      <div id="editError" style="font-size:12.5px;color:#dc2626;display:none;margin-top:4px;"></div>
+    </div>
+    <div class="algo-modal-footer">
+      <button class="btn btn-secondary btn-sm" data-flow-close>Отмена</button>
+      <button class="btn btn-primary btn-sm px-4" id="saveTaskGroupBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const groupId = {{ task_group.id }};
+  const modal   = document.getElementById('editTaskGroupModal');
+  const saveBtn = document.getElementById('saveTaskGroupBtn');
+  const errEl   = document.getElementById('editError');
+
+  /* Открытие / закрытие */
+  document.querySelectorAll('[data-flow-open="editTaskGroupModal"]')
+    .forEach(el => el.addEventListener('click', () => { modal.style.display = 'flex'; }));
+  document.querySelectorAll('[data-flow-close]')
+    .forEach(el => el.addEventListener('click', () => { modal.style.display = 'none'; }));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+  /* Сохранение */
+  saveBtn?.addEventListener('click', async () => {
+    errEl.style.display = 'none';
+
+    let executionArguments = null;
+    const rawArgs = document.getElementById('editExecArgs').value.trim();
+    if (rawArgs) {
+      try {
+        executionArguments = JSON.parse(rawArgs);
+        if (typeof executionArguments !== 'object' || executionArguments === null)
+          throw new Error('Ожидается JSON-объект');
+      } catch (e) {
+        errEl.textContent   = 'Невалидный JSON в аргументах выполнения: ' + e.message;
+        errEl.style.display = 'block';
+        return;
+      }
+    }
+
+    const body = {
+      task_group_id:      groupId,
+      title:              document.getElementById('editTitle').value.trim(),
+      description:        document.getElementById('editDescription').value.trim(),
+      execution_arguments: executionArguments,
+      queue_per_priority: document.getElementById('editQueuePerPriority').checked,
+      is_active:          document.getElementById('editIsActive').checked,
+    };
+
+    saveBtn.disabled    = true;
+    const orig          = saveBtn.textContent;
+    saveBtn.textContent = 'Сохранение…';
+
+    try {
+      const res  = await fetch(`/task-groups/${groupId}`, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || data.detail || `Ошибка ${res.status}`);
+      }
+      modal.style.display = 'none';
+      window.location.reload();
+    } catch (e) {
+      errEl.textContent   = 'Не удалось сохранить: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      saveBtn.disabled    = false;
+      saveBtn.textContent = orig;
+    }
+  });
+});
+</script>
+
+<style>
+/* Аккордеон */
+details > summary { outline: none; }
+details[open] > summary span:first-child { transform: rotate(90deg); display:inline-block; }
+
+/* Модалка — если algo-modal-* ещё не подключены глобально */
+.algo-modal-backdrop {
+  position:fixed;inset:0;background:rgba(0,0,0,.35);
+  z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.algo-modal {
+  background:#fff;border-radius:14px;width:100%;max-width:540px;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden;
+}
+.algo-modal-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px 14px;border-bottom:1px solid #e5e7eb;
+}
+.algo-modal-title  { font-size:15px;font-weight:600;color:#111827; }
+.algo-modal-close  {
+  width:28px;height:28px;border:none;background:none;cursor:pointer;
+  border-radius:6px;color:#6b7280;font-size:20px;display:flex;align-items:center;justify-content:center;
+  transition:background .12s;
+}
+.algo-modal-close:hover { background:#f3f4f6; }
+.algo-modal-body   { padding:18px 20px;display:flex;flex-direction:column;gap:14px; }
+.algo-modal-footer { display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #e5e7eb; }
+.algo-form-field   { display:flex;flex-direction:column;gap:5px; }
+.algo-form-label   { font-size:13px;font-weight:500;color:#374151; }
+.algo-form-input,.algo-form-textarea {
+  width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+  font-size:13.5px;color:#111827;background:#fff;outline:none;
+  transition:border-color .15s,box-shadow .15s;font-family:inherit;box-sizing:border-box;
+}
+.algo-form-input:focus,.algo-form-textarea:focus {
+  border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1);
+}
+.algo-form-textarea { resize:vertical;min-height:72px; }
+</style>
+{% endblock %}

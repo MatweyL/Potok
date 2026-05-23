@@ -342,7 +342,8 @@ async def main():
     rmq_task_run_execution_status_consumer = RMQQueueConsumer(rmq_consumer,
                                                               settings.rmq_task_run_execution_status_queue,
                                                               receive_task_run_execution_status_uc.apply,
-                                                              CommandResponseToReceiveTaskRunExecutionStatusUCRq())
+                                                              CommandResponseToReceiveTaskRunExecutionStatusUCRq(),
+                                                              durable=True,)
 
     fastapi_server = FastAPIServer.from_settings(settings.fastapi_server)
     fastapi_server.app.state.auth_facade = auth_use_case_facade
@@ -353,11 +354,11 @@ async def main():
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [
-        # rmq_producer_connection,
-        # rmq_producer,
-        # rmq_consumer_connection,
-        # rmq_consumer,
-        # rmq_task_run_execution_status_consumer,
+        rmq_producer_connection,
+        rmq_producer,
+        rmq_consumer_connection,
+        rmq_consumer,
+        rmq_task_run_execution_status_consumer,
 
     ]
     periodic_runners = [

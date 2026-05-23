@@ -146,8 +146,8 @@ class CHAnalyticalMetricsProvider(AnalyticalMetricsProviderI):
                 FROM numbers(toUInt64(dateDiff('minute', date_from, date_to) + 1))
             )
             SELECT timeline.period AS period,
-                   round(ifNull(runs_per_minute.completed_count, 0) / 60.0, 4) AS tasks_per_second,
-                   round(avg(ifNull(runs_per_minute.completed_count, 0) / 60.0) OVER (ORDER BY timeline.period ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 4) AS avg_tasks_per_second
+                   round(ifNull(runs_per_minute.completed_count, 0) / 60.0, 2) AS tasks_per_second,
+                   round(avg(ifNull(runs_per_minute.completed_count, 0) / 60.0) OVER (ORDER BY timeline.period ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 2) AS avg_tasks_per_second
             FROM timeline
             LEFT JOIN runs_per_minute ON timeline.period = runs_per_minute.period
             ORDER BY timeline.period

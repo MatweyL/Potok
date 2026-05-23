@@ -1,0 +1,198 @@
+{#
+  components/task_runs_table.html
+  Таблица запусков задачи (TaskRun) с асинхронной подгрузкой через flow_table.
+
+  Параметры макроса render_task_runs_table:
+    table_id     — уникальный id (если несколько на странице)
+    api_url      — URL для GET, напр. "/task-runs/json?task_id=42"
+    initial_data — начальные данные (опц.)
+#}
+
+{% macro render_task_runs_table(table_id="task_runs_table", api_url="/task-runs/json", initial_data=none) %}
+{% from "components/flow_table.html" import render_flow_table %}
+
+<script>
+(function () {
+
+/* ── Стили статусов ──────────────────────────────────────── */
+const RUN_STYLES = {
+  succeed:     { bg: '#dcfce7', color: '#15803d', dot: '#22c55e',  label: 'Успешно' },
+  error:       { bg: '#fee2e2', color: '#dc2626', dot: '#ef4444',  label: 'Ошибка' },
+  execution:   { bg: '#dbeafe', color: '#1d4ed8', dot: '#3b82f6',  label: 'Выполняется' },
+  temp_error:  { bg: '#ffedd5', color: '#c2410c', dot: '#f97316',  label: 'Врем. ошибка' },
+  interrupted: { bg: '#ede9fe', color: '#6d28d9', dot: '#8b5cf6',  label: 'Прервано' },
+  cancelled:   { bg: '#f3f4f6', color: '#4b5563', dot: '#9ca3af',  label: 'Отменено' },
+  waiting:     { bg: '#f1f5f9', color: '#64748b', dot: '#cbd5e1',  label: 'Ожидает' },
+  queued:      { bg: '#e0f2fe', color: '#0369a1', dot: '#38bdf8',  label: 'В очереди' },
+};
+
+const PRIORITY_STYLES = {
+  HIGHEST: { bg: '#fee2e2', color: '#b91c1c' },
+  HIGH:    { bg: '#fef3c7', color: '#b45309' },
+  MEDIUM:  { bg: '#dbeafe', color: '#1d4ed8' },
+  LOW:     { bg: '#f1f5f9', color: '#475569' },
+  LOWEST:  { bg: '#f9fafb', color: '#9ca3af' },
+};
+
+const TYPE_STYLES = {
+  TIME_INTERVAL: { bg: '#f3e8ff', color: '#6d28d9' },
+  PAGINATION:    { bg: '#d1fae5', color: '#065f46' },
+  UNDEFINED:     { bg: '#f3f4f6', color: '#6b7280' },
+};
+
+/* ── Вспомогательные ─────────────────────────────────────── */
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function pill(label, bg, color) {
+  return `<span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:500;background:${bg};color:${color};">${esc(label)}</span>`;
+}
+
+function fmtDt(v) {
+  if (!v || v === 'None') return null;
+  return String(v).replace('T',' ').slice(0,16);
+}
+
+function fmtDuration(start, end) {
+  if (!start || !end) return null;
+  const ms = new Date(end) - new Date(start);
+  if (isNaN(ms) || ms < 0) return null;
+  const sec = Math.round(ms / 1000);
+  if (sec < 60)   return `${sec}с`;
+  if (sec < 3600) { const m = Math.floor(sec/60), s = sec%60; return s ? `${m}м ${s}с` : `${m}м`; }
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return m ? `${h}ч ${m}м` : `${h}ч`;
+}
+
+/* ── Рендер границ выполнения ────────────────────────────── */
+function renderBounds(bounds, type) {
+  const t = String(type || '').split('.').pop().toUpperCase();
+
+  if (!bounds || !Object.keys(bounds).length || t === 'UNDEFINED' || t === '') {
+    return `<span style="font-size:12px;color:#9ca3af;">—</span>`;
+  }
+
+  if (t === 'TIME_INTERVAL') {
+    const l        = bounds.left_bound_at  || bounds.left_bound  || null;
+    const r        = bounds.right_bound_at || bounds.right_bound || null;
+    const duration = fmtDuration(l, r);
+    const fmtL     = fmtDt(l);
+    const fmtR     = fmtDt(r);
+
+    /* Горизонтальная мини-шкала, если оба конца есть */
+    const bar = (fmtL && fmtR) ? `
+      <div style="display:flex;align-items:center;gap:4px;margin-top:4px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#6d28d9;flex-shrink:0;"></div>
+        <div style="flex:1;height:2px;background:linear-gradient(90deg,#a78bfa,#ddd6fe);border-radius:1px;"></div>
+        <div style="width:8px;height:8px;border-radius:50%;background:#6d28d9;flex-shrink:0;"></div>
+      </div>` : '';
+
+    return `
+      <div style="min-width:160px;max-width:220px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+          ${pill('TIME_INTERVAL', TYPE_STYLES.TIME_INTERVAL.bg, TYPE_STYLES.TIME_INTERVAL.color)}
+          ${duration ? `<span style="font-size:11px;font-weight:600;color:#6d28d9;">${duration}</span>` : ''}
+        </div>
+        ${bar}
+        <div style="display:grid;grid-template-columns:16px 1fr;gap:1px 6px;margin-top:4px;align-items:baseline;">
+          <span style="font-size:9.5px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;line-height:1.6;">С</span>
+          <span style="font-size:11px;font-family:ui-monospace,monospace;color:#374151;">
+            ${fmtL ?? `<span style="color:#d1d5db;">не задано</span>`}
+          </span>
+          <span style="font-size:9.5px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;line-height:1.6;">По</span>
+          <span style="font-size:11px;font-family:ui-monospace,monospace;color:#374151;">
+            ${fmtR ?? `<span style="color:#d1d5db;">не задано</span>`}
+          </span>
+        </div>
+      </div>`;
+  }
+
+  /* Fallback — JSON */
+  return `<pre style="font-size:11px;margin:0;padding:4px 6px;background:#f9fafb;border:1px solid #e5e7eb;
+                       border-radius:6px;max-width:200px;max-height:80px;overflow:auto;white-space:pre-wrap;">
+${esc(JSON.stringify(bounds, null, 2))}</pre>`;
+}
+
+/* ── Рендер строки ───────────────────────────────────────── */
+window['{{ table_id }}_renderRow'] = function(row) {
+
+  /* Статус */
+  const sKey   = String(row.status || '').toLowerCase();
+  const sStyle = RUN_STYLES[sKey] || { bg: '#f3f4f6', color: '#374151', dot: '#9ca3af', label: row.status || '—' };
+  const statusHtml = row.status
+    ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;
+                    font-size:12px;font-weight:500;background:${sStyle.bg};color:${sStyle.color};">
+         <span style="width:6px;height:6px;border-radius:50%;background:${sStyle.dot};flex-shrink:0;"></span>
+         ${esc(sStyle.label)}
+       </span>`
+    : '<span class="text-muted">—</span>';
+
+  /* Приоритет */
+  const pKey    = String(row.priority || '').split('.').pop().toUpperCase();
+  const pStyle  = PRIORITY_STYLES[pKey] || { bg: '#f3f4f6', color: '#6b7280' };
+  const priorityHtml = row.priority ? pill(pKey, pStyle.bg, pStyle.color) : '<span class="text-muted">—</span>';
+
+  /* Тип */
+  const tKey   = String(row.type || '').split('.').pop().toUpperCase();
+  const tStyle = TYPE_STYLES[tKey] || { bg: '#f3f4f6', color: '#6b7280' };
+  const typeHtml = row.type ? pill(tKey, tStyle.bg, tStyle.color) : '<span class="text-muted">—</span>';
+
+  /* Границы */
+  const boundsHtml = renderBounds(row.execution_bounds, row.type);
+
+  /* Аргументы */
+  const hasArgs = row.execution_arguments && typeof row.execution_arguments === 'object'
+                  && Object.keys(row.execution_arguments).length;
+  const argsHtml = hasArgs
+    ? `<pre style="font-size:11px;margin:0;padding:4px 6px;background:#f9fafb;border:1px solid #e5e7eb;
+                   border-radius:6px;max-width:180px;max-height:70px;overflow:auto;white-space:pre-wrap;">
+${esc(JSON.stringify(row.execution_arguments, null, 2))}</pre>`
+    : '<span style="font-size:12px;color:#9ca3af;">—</span>';
+
+  /* Описание */
+  const descHtml = row.description
+    ? `<span style="font-size:12.5px;color:#6b7280;max-width:180px;display:inline-block;word-break:break-word;">${esc(row.description)}</span>`
+    : '<span style="font-size:12px;color:#9ca3af;">—</span>';
+
+  /* Дата */
+  const dt = fmtDt(row.status_updated_at);
+  const updatedHtml = dt
+    ? `<span style="font-size:12px;font-family:ui-monospace,monospace;white-space:nowrap;color:#6b7280;">${dt}</span>`
+    : '<span style="color:#9ca3af;">—</span>';
+
+  return `<tr>
+    <td class="ft-cell ft-cell--mono ft-cell--muted">
+      <a href="/task-runs/${row.id}" class="text-decoration-none fw-semibold text-dark">#${row.id}</a>
+    </td>
+    <td class="ft-cell">${statusHtml}</td>
+    <td class="ft-cell">${priorityHtml}</td>
+    <td class="ft-cell">${typeHtml}</td>
+    <td class="ft-cell">${boundsHtml}</td>
+    <td class="ft-cell">${argsHtml}</td>
+    <td class="ft-cell">${descHtml}</td>
+    <td class="ft-cell">${updatedHtml}</td>
+  </tr>`;
+};
+
+})();
+</script>
+
+{{ render_flow_table(
+    table_id     = table_id,
+    columns      = [
+      { "key": "id",                  "label": "ID",               "sortable": true, "width": "72px"  },
+      { "key": "status",              "label": "Статус",           "sortable": true, "width": "150px" },
+      { "key": "priority",            "label": "Приоритет",                          "width": "110px" },
+      { "key": "type",                "label": "Тип",                                "width": "140px" },
+      { "key": "execution_bounds",    "label": "Границы выполнения"                                   },
+      { "key": "execution_arguments", "label": "Аргументы"                                            },
+      { "key": "description",         "label": "Описание"                                             },
+      { "key": "status_updated_at",   "label": "Обновлён",         "sortable": true, "width": "140px" },
+    ],
+    api_url      = api_url,
+    row_template = table_id ~ "_renderRow",
+    initial_data = initial_data
+) }}
+
+{% endmacro %}
