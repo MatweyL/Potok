@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from service.ports.common.changeable_parameter import ChangeableFloatParameter, ChangeableIntParameter
@@ -28,7 +28,7 @@ class DataAccumulator:
 
     async def upload(self):
         max_batch_size_reached = len(self._batch) >= self._max_batch_size_to_upload.value
-        upload_timeout_reached = (datetime.now() - self._last_upload_at).total_seconds() > self._upload_timeout.value
+        upload_timeout_reached = (datetime.now(timezone.utc) - self._last_upload_at).total_seconds() > self._upload_timeout.value
         if self._batch and (max_batch_size_reached or upload_timeout_reached):
             batch = self._batch
             self._batch.clear()
@@ -36,7 +36,7 @@ class DataAccumulator:
                         f"Reason: {max_batch_size_reached=}, {upload_timeout_reached=}")
             await self._repo.create_all(batch)
             logger.info(f"[{self._name}] Data uploaded successfully. Batch size: {len(batch)}")
-            self._last_upload_at = datetime.now()
+            self._last_upload_at = datetime.now(timezone.utc)
 
 
 class DataAccumulatorRunner:

@@ -13,7 +13,7 @@ logger.remove()  # Удаляем стандартный обработчик
 # Добавляем красивый формат с цветами
 logger.add(
     sink=lambda msg: print(msg, end=""),
-    level="WARNING",
+    level="INFO",
     format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     colorize=True
 )

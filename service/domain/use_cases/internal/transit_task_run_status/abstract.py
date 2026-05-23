@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from functools import cached_property
 
 from service.domain.schemas.enums import TaskRunStatus
@@ -52,7 +52,7 @@ class AbstractTransitTaskRunStatusUC(UseCase, ABC):
         # Если в запросе указано ttl - вычисляем граничную дату
         if request.ttl_seconds:
             # Вычисляем граничное время: задачи, обновлённые раньше этого момента, считаются просроченными
-            threshold_time = datetime.now() - timedelta(seconds=request.ttl_seconds)
+            threshold_time = datetime.now(timezone.utc) - timedelta(seconds=request.ttl_seconds)
 
             # Находим все TaskRun в статусе 1, которые пробыли в нём дольше TTL
             filter_fields = FilterFieldsDNF.single_conjunct(
@@ -79,7 +79,7 @@ class AbstractTransitTaskRunStatusUC(UseCase, ABC):
             )
 
         # Обновляем статус всех задач
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         update_fields = UpdateFields.multiple(
             {
                 "status": self.to_status,

@@ -1,5 +1,5 @@
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Tuple, Optional
 
 from sqlalchemy import select, text, DateTime, func
@@ -43,10 +43,10 @@ class SAPeriodicMonitoringAlgorithmRepo(AbstractSARepo, MonitoringAlgorithmRepo)
 
     async def provide_tasks_to_execute(self) -> List[Task]:
         async with self._database.session as session:
-            current_datetime = datetime.now()
+            current_datetime = datetime.now(timezone.utc)
             ready_to_execute_by_timeout = lt(func.cast(text("task.status_updated_at + "
                                                             " (interval '1' second * periodic_monitoring_algorithm.timeout)"),
-                                                       DateTime(timezone=False)),
+                                                       DateTime(timezone=True)),
                                              current_datetime)
             query = (
                 select(models.Task)
@@ -111,7 +111,7 @@ class SASingleMonitoringAlgorithmRepo(AbstractSARepo, MonitoringAlgorithmRepo):
             result = await session.execute(query)
             rows = result.all()
 
-            now = datetime.now()
+            now = datetime.now(timezone.utc)
             ready_tasks = []
 
             for task_model, algorithm_model in rows:

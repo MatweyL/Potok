@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import cached_property
 from typing import Optional, Dict, Any, Union
 

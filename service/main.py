@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from clickhouse_connect import get_async_client
@@ -280,10 +280,9 @@ async def main():
     # USE CASE: internal
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,
                                            task_run_time_interval_execution_bounds_repo,
-                                           transaction_factory, task_to_execute_provider_registry,
-                                           execution_bounds_provider,
-                                           payload_provider, actual_execution_bounds_provider,
-                                           task_group_repo)
+                                           transaction_factory,
+                                           task_to_execute_provider_registry,
+                                           payload_provider, task_group_repo)
     receive_task_run_execution_status_uc = ReceiveTaskRunExecutionStatusUC(task_run_repo,
                                                                            task_run_status_log_repo,
                                                                            time_interval_task_progress_repo,

@@ -1,6 +1,6 @@
 # service/domain/schemas/refresh_token.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 
 

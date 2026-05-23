@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 import pytest
@@ -33,7 +33,7 @@ def sample_payloads(_sample_payloads):
 @pytest.fixture
 def sample_tasks():
     """Примеры задач"""
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     return [
         Task(
             id=101,
@@ -130,7 +130,7 @@ async def test_provide_integration_scenario(payload_provider, sa_payload_repo):
     - Все задачи получают правильные payload'ы
     """
     # Arrange
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     payloads = [
         Payload(id=1, data={"url": "https://api1.com"}),
         Payload(id=2, data={"url": "https://api2.com"}),

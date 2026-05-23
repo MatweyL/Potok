@@ -116,24 +116,23 @@ class SAAnalyticalMetricsProvider(AnalyticalMetricsProviderI):
                        DATE_TRUNC('minute', NOW()) AS date_to
             ),
             runs_per_minute AS (
-                SELECT DATE_TRUNC('minute', tr.status_updated_at) AS period,
+                SELECT DATE_TRUNC('minute', tr.loaded_at) AS period,
                        COUNT(*) AS completed_count
                 FROM task_run tr
                 JOIN task t ON tr.task_id = t.id
                 CROSS JOIN bounds b
                 WHERE t.group_id = :group_id
-                  AND tr.status = 'SUCCEED'
-                  AND tr.status_updated_at >= b.date_from
-                  AND tr.status_updated_at <= b.date_to
-                GROUP BY DATE_TRUNC('minute', tr.status_updated_at)
+                  AND tr.loaded_at >= b.date_from
+                  AND tr.loaded_at <= b.date_to
+                GROUP BY DATE_TRUNC('minute', tr.loaded_at)
             ),
             timeline AS (
                 SELECT generate_series(b.date_from, b.date_to, INTERVAL '1 minute') AS period
                 FROM bounds b
             )
             SELECT timeline.period AS period,
-                   ROUND(COALESCE(runs_per_minute.completed_count, 0) / 60.0, 2) AS tasks_per_second,
-                   ROUND(AVG(COALESCE(runs_per_minute.completed_count, 0) / 60.0) OVER (ORDER BY timeline.period ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 2) AS avg_tasks_per_second
+                   ROUND(COALESCE(runs_per_minute.completed_count, 0) / 60.0, 4) AS tasks_per_second,
+                   ROUND(AVG(COALESCE(runs_per_minute.completed_count, 0) / 60.0) OVER (ORDER BY timeline.period ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 4) AS avg_tasks_per_second
             FROM timeline
             LEFT JOIN runs_per_minute ON timeline.period = runs_per_minute.period
             ORDER BY timeline.period

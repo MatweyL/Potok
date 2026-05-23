@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict
 
 import pytest
@@ -404,7 +404,7 @@ class TestFilterIntegration:
     @pytest.mark.asyncio
     async def test_filter_is_null(self, user_repo):
         await user_repo.create_all([
-            UserDomain(name="HasDate", email="hasdate@test.com", age=25, created_at=datetime.now()),
+            UserDomain(name="HasDate", email="hasdate@test.com", age=25, created_at=datetime.now(timezone.utc)),
             UserDomain(name="NoDate", email="nodate@test.com", age=30, created_at=None)
         ])
 
@@ -424,7 +424,7 @@ class TestFilterIntegration:
     @pytest.mark.asyncio
     async def test_filter_not_null(self, user_repo):
         await user_repo.create_all([
-            UserDomain(name="HasDate", email="hasdate@test.com", age=25, created_at=datetime.now()),
+            UserDomain(name="HasDate", email="hasdate@test.com", age=25, created_at=datetime.now(timezone.utc)),
             UserDomain(name="NoDate", email="nodate@test.com", age=30, created_at=None)
         ])
 
@@ -621,10 +621,10 @@ class TestConversionMethods:
 @pytest.mark.asyncio
 async def test_delete_by_condition(user_repo):
     users = [UserDomain(name=f"Auto_{i}", email=f"auto_{i}@test.com", age=25,
-                        created_at=datetime.now() - timedelta(seconds=3600 * i))
+                        created_at=datetime.now(timezone.utc) - timedelta(seconds=3600 * i))
              for i in range(24)
              ]
     created_users = await user_repo.create_all(users)
     assert len(created_users) == 24
-    deleted_count = await user_repo.delete_by_condition(FilterFieldsDNF.single('created_at', datetime.now() - timedelta(seconds=3600 * 12), ConditionOperation.LTE))
+    deleted_count = await user_repo.delete_by_condition(FilterFieldsDNF.single('created_at', datetime.now(timezone.utc) - timedelta(seconds=3600 * 12), ConditionOperation.LTE))
     assert deleted_count == 12

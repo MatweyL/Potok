@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict
 
 from service.domain.schemas.enums import TaskStatus
@@ -22,7 +22,7 @@ class CancelTasksUC(UseCase):
         self._task_repo = task_repo
 
     async def apply(self, request: CancelTasksUCRq) -> CancelTasksUCRs:
-        status_updated_at = datetime.now()
+        status_updated_at = datetime.now(timezone.utc)
         update_fields = UpdateFields.multiple({'status': TaskStatus.CANCELLED,
                                                'status_updated_at': status_updated_at})
         await self._task_repo.update_all({TaskPK(id=task_id): update_fields

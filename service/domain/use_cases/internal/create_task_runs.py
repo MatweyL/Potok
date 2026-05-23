@@ -1,6 +1,5 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 from more_itertools import batched
@@ -10,14 +9,15 @@ from service.domain.schemas.execution_bounds import ExecutionBounds
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import TaskPK, Task, TaskStatusLog, TaskStatusLogPK
 from service.domain.schemas.task_group import TaskGroup, TaskGroupPK
-from service.domain.schemas.task_run import TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK, \
-    TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK
-from service.domain.services.execution_bounds_provider import ExecutionBoundsProvider
+from service.domain.schemas.task_run import (
+    TaskRunPK, TaskRun, TaskRunStatusLog, TaskRunStatusLogPK,
+    TaskRunTimeIntervalExecutionBounds, TaskRunTimeIntervalExecutionBoundsPK,
+)
 from service.domain.services.payload_provider import PayloadProvider
-from service.domain.services.task_progress_provider import ActualExecutionBoundsProvider, TimeIntervalExecutionBoundsCutter
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
+from service.ports.common.logs import logger
 from service.ports.outbound.repo.abstract import Repo
-from service.ports.outbound.repo.fields import UpdateFields, FilterFieldsDNF, ConditionOperation
+from service.ports.outbound.repo.fields import UpdateFields, FilterFieldsDNF, ConditionOperation, PaginationQuery
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
 from service.ports.outbound.repo.transaction import TransactionFactory
 
@@ -31,189 +31,315 @@ class CreateTaskRunsUCRs(UCResponse):
     task_runs_created: int
 
 
-@dataclass(frozen=True)
-class TaskRunBuildContext:
-    status_updated_at: datetime
-    task_group_by_id: Dict[int, TaskGroup]
-    payload_by_task: Dict[Task, Payload]
-    execution_bounds_by_task: Dict[Task, List[ExecutionBounds]]
-    execution_bounds_cutter_by_task_id: Dict[int, TimeIntervalExecutionBoundsCutter]
+# ─────────────────────────────────────────────────────────────────────────────
+# Вспомогательные структуры
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class TimeInterval:
+    left_bound_at:  datetime
+    right_bound_at: datetime
+
+    @property
+    def duration_seconds(self) -> float:
+        return (self.right_bound_at - self.left_bound_at).total_seconds()
 
 
-class TaskRunBuilder(ABC):
-    @abstractmethod
-    def build(self, task: Task, context: TaskRunBuildContext) -> List[TaskRun]:
-        pass
+# ─────────────────────────────────────────────────────────────────────────────
+# Обработчики задач по типу
+# ─────────────────────────────────────────────────────────────────────────────
 
-    def _create_task_run(
-            self,
-            task: Task,
-            context: TaskRunBuildContext,
-            execution_bounds: Optional[ExecutionBounds],
-    ) -> TaskRun:
-        task_group = context.task_group_by_id[task.group_id]
-        return TaskRun(
+class UndefinedTaskRunBuilder:
+    """Для UNDEFINED-задач: один запуск без границ."""
+
+    def build(
+        self,
+        task:      Task,
+        group:     TaskGroup,
+        payload:   Payload,
+        now:       datetime,
+    ) -> List[TaskRun]:
+        return [TaskRun(
             task_id=task.id,
-            group_name=task_group.name,
+            group_name=group.name,
             priority=task.priority,
             type=task.type,
-            payload=context.payload_by_task[task],
-            execution_bounds=execution_bounds,
+            payload=payload,
+            execution_bounds=None,
             execution_arguments=task.execution_arguments,
             status=TaskRunStatus.WAITING,
-            status_updated_at=context.status_updated_at,
-        )
+            status_updated_at=now,
+        )]
 
 
-class GenericTaskRunBuilder(TaskRunBuilder):
-    def build(self, task: Task, context: TaskRunBuildContext) -> List[TaskRun]:
-        return [self._create_task_run(task, context, execution_bounds=None)]
+class TimeIntervalTaskRunBuilder:
+    """
+    Алгоритм создания запусков для задач типа TIME_INTERVAL.
 
+    При наличии last_bounds берёт: left = last.right_bound_at, right = now.
+    При отсутствии — вычисляет первый left из TaskGroup:
+        time_interval_first_left_bound_at  — абсолютная дата
+        time_interval_first_left_bound_depth — относительная глубина (секунды)
 
-class TimeIntervalTaskRunBuilder(TaskRunBuilder):
-    def build(self, task: Task, context: TaskRunBuildContext) -> List[TaskRun]:
-        execution_bounds_list = context.execution_bounds_by_task.get(task, [])
-        if not execution_bounds_list:
+    Если задан time_interval_max_period и интервал его превышает —
+    делит на равные отрезки.
+    """
+
+    def build(
+        self,
+        task:        Task,
+        group:       TaskGroup,
+        payload:     Payload,
+        now:         datetime,
+        last_bounds: Optional[TaskRunTimeIntervalExecutionBounds],
+    ) -> List[TimeInterval]:
+        """Возвращает список временных интервалов для создания TaskRun."""
+
+        if last_bounds is not None:
+            left  = last_bounds.execution_bounds.right_bound_at
+            right = now
+        else:
+            left  = self._first_left_bound(group, now)
+            right = now
+
+        if left >= right:
             return []
 
-        task_runs: List[TaskRun] = []
-        execution_bounds_cutter = context.execution_bounds_cutter_by_task_id.get(task.id)
-        for execution_bounds in execution_bounds_list:
-            correct_execution_bounds = execution_bounds
-            if execution_bounds_cutter:
-                correct_execution_bounds = execution_bounds_cutter.cut(execution_bounds)
-            if not self._has_positive_interval(correct_execution_bounds):
-                continue
-            task_runs.append(self._create_task_run(task, context, execution_bounds=correct_execution_bounds))
-        return task_runs
+        interval = TimeInterval(left_bound_at=left, right_bound_at=right)
+        max_period = group.time_interval_max_period  # секунды или None
+
+        if max_period is None or interval.duration_seconds <= max_period:
+            return [interval]
+
+        return self._split(interval, max_period)
 
     @staticmethod
-    def _has_positive_interval(execution_bounds: ExecutionBounds) -> bool:
-        left_bound_at = execution_bounds.left_bound_at
-        right_bound_at = execution_bounds.right_bound_at
-        return left_bound_at is not None and right_bound_at is not None and right_bound_at > left_bound_at
+    def _first_left_bound(group: TaskGroup, now: datetime) -> datetime:
+        if group.time_interval_first_left_bound_at is not None:
+            return group.time_interval_first_left_bound_at
+        depth = group.time_interval_first_left_bound_depth
+        if depth is None:
+            raise ValueError(
+                f"TaskGroup {group.id}: нужно задать "
+                "time_interval_first_left_bound_at или time_interval_first_left_bound_depth"
+            )
+        return now - timedelta(seconds=depth)
+
+    @staticmethod
+    def _split(interval: TimeInterval, max_period_seconds: float) -> List[TimeInterval]:
+        """Делит интервал на отрезки длиной не более max_period_seconds."""
+        runs_number = int(interval.duration_seconds // max_period_seconds) + 1
+        step = timedelta(seconds=interval.duration_seconds / runs_number)
+
+        result: List[TimeInterval] = []
+        left = interval.left_bound_at
+        for _ in range(runs_number):
+            right = min(left + step, interval.right_bound_at)
+            if right > left:
+                result.append(TimeInterval(left_bound_at=left, right_bound_at=right))
+            left = right
+
+        return result
+
+    def build_task_runs(
+        self,
+        task:        Task,
+        group:       TaskGroup,
+        payload:     Payload,
+        now:         datetime,
+        last_bounds: Optional[TaskRunTimeIntervalExecutionBounds],
+    ) -> List[TaskRun]:
+        intervals = self.build(task, group, payload, now, last_bounds)
+        return [
+            TaskRun(
+                task_id=task.id,
+                group_name=group.name,
+                priority=task.priority,
+                type=task.type,
+                payload=payload,
+                execution_bounds=ExecutionBounds(
+                    left_bound_at=iv.left_bound_at,
+                    right_bound_at=iv.right_bound_at,
+                ),
+                execution_arguments=task.execution_arguments,
+                status=TaskRunStatus.WAITING,
+                status_updated_at=now,
+            )
+            for iv in intervals
+        ]
 
 
-class TaskRunBuilderRegistry:
-    def __init__(self, builders_by_task_type: Optional[Dict[TaskType, TaskRunBuilder]] = None):
-        self._generic_builder = GenericTaskRunBuilder()
-        self._builders_by_task_type = builders_by_task_type or {
-            TaskType.TIME_INTERVAL: TimeIntervalTaskRunBuilder(),
-        }
-
-    def get(self, task_type: TaskType) -> TaskRunBuilder:
-        return self._builders_by_task_type.get(task_type, self._generic_builder)
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Use Case
+# ─────────────────────────────────────────────────────────────────────────────
 
 class CreateTaskRunsUC(UseCase):
-    def __init__(self,
-                 task_repo: Repo[Task, Task, TaskPK],
-                 task_run_repo: Repo[TaskRun, TaskRun, TaskRunPK],
-                 task_status_log_repo: Repo[TaskStatusLog, TaskStatusLog, TaskStatusLogPK],
-                 task_run_status_log_repo: Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
-                 task_run_time_interval_execution_bounds_repo: Repo[
-                     TaskRunTimeIntervalExecutionBounds,
-                     TaskRunTimeIntervalExecutionBounds,
-                     TaskRunTimeIntervalExecutionBoundsPK],
-                 transaction_factory: TransactionFactory,
-                 tasks_to_execute_provider_registry: TaskToExecuteProviderRegistry,
-                 execution_bounds_provider: ExecutionBoundsProvider,
-                 payload_provider: PayloadProvider,
-                 actual_execution_bounds_provider: ActualExecutionBoundsProvider,
-                 task_group_repo: Repo[TaskGroup, TaskGroup, TaskGroupPK],
-                 task_run_builder_registry: TaskRunBuilderRegistry = None,
-                 tasks_batch_size: int = 5000):
-        self._task_repo = task_repo
-        self._task_run_repo = task_run_repo
-        self._task_status_log_repo = task_status_log_repo
-        self._task_run_status_log_repo = task_run_status_log_repo
+
+    def __init__(
+        self,
+        task_repo:                                    Repo[Task,         Task,         TaskPK],
+        task_run_repo:                                Repo[TaskRun,      TaskRun,      TaskRunPK],
+        task_status_log_repo:                         Repo[TaskStatusLog, TaskStatusLog, TaskStatusLogPK],
+        task_run_status_log_repo:                     Repo[TaskRunStatusLog, TaskRunStatusLog, TaskRunStatusLogPK],
+        task_run_time_interval_execution_bounds_repo: Repo[
+            TaskRunTimeIntervalExecutionBounds,
+            TaskRunTimeIntervalExecutionBounds,
+            TaskRunTimeIntervalExecutionBoundsPK,
+        ],
+        transaction_factory:                          TransactionFactory,
+        tasks_to_execute_provider_registry:           TaskToExecuteProviderRegistry,
+        payload_provider:                             PayloadProvider,
+        task_group_repo:                              Repo[TaskGroup, TaskGroup, TaskGroupPK],
+        tasks_batch_size:                             int = 5000,
+    ):
+        self._task_repo                                    = task_repo
+        self._task_run_repo                                = task_run_repo
+        self._task_status_log_repo                         = task_status_log_repo
+        self._task_run_status_log_repo                     = task_run_status_log_repo
         self._task_run_time_interval_execution_bounds_repo = task_run_time_interval_execution_bounds_repo
-        self._transaction_factory = transaction_factory
-        self._tasks_to_execute_provider_registry = tasks_to_execute_provider_registry
-        self._execution_bounds_provider = execution_bounds_provider
-        self._payload_provider = payload_provider
-        self._actual_execution_bounds_provider = actual_execution_bounds_provider
-        self._task_group_repo = task_group_repo
-        self._task_run_builder_registry = task_run_builder_registry or TaskRunBuilderRegistry()
-        self._tasks_batch_size = tasks_batch_size
+        self._transaction_factory                          = transaction_factory
+        self._tasks_to_execute_provider_registry           = tasks_to_execute_provider_registry
+        self._payload_provider                             = payload_provider
+        self._task_group_repo                              = task_group_repo
+        self._tasks_batch_size                             = tasks_batch_size
+
+        self._undefined_builder     = UndefinedTaskRunBuilder()
+        self._time_interval_builder = TimeIntervalTaskRunBuilder()
 
     async def apply(self, request: CreateTaskRunsUCRq) -> CreateTaskRunsUCRs:
-        tasks_to_create_runs = await self._tasks_to_execute_provider_registry.provide_tasks_to_execute()
-        if not tasks_to_create_runs:
+        tasks = await self._tasks_to_execute_provider_registry.provide_tasks_to_execute()
+        if not tasks:
             return CreateTaskRunsUCRs(success=True, request=request, task_runs_created=0)
 
-        task_runs_created_count = 0
+        total_created = 0
         async with self._transaction_factory.create() as transaction:
-            for tasks_chunk in batched(tasks_to_create_runs, self._tasks_batch_size):
-                tasks_chunk = list(tasks_chunk)
-                status_updated_at = datetime.now()
-                context = await self._build_context(tasks_chunk, status_updated_at)
-                task_runs_to_create = self._build_task_runs(tasks_chunk, context)
-                task_ids_with_runs = {task_run.task_id for task_run in task_runs_to_create}
-                tasks_to_update = [task for task in tasks_chunk if task.id in task_ids_with_runs]
-                if not tasks_to_update:
-                    continue
+            for chunk in batched(tasks, self._tasks_batch_size):
+                chunk = list(chunk)
+                created = await self._process_chunk(chunk, transaction)
+                total_created += created
 
-                await self._task_repo.update_all({task: UpdateFields.multiple({
-                    "status": TaskStatus.EXECUTION,
-                    "status_updated_at": status_updated_at})
-                    for task in tasks_to_update}, transaction=transaction)
-                task_status_logs = self._build_task_status_logs(tasks_to_update, status_updated_at)
+        logger.info(f"CreateTaskRunsUC: создано {total_created} запусков")
+        return CreateTaskRunsUCRs(success=True, request=request, task_runs_created=total_created)
 
-                task_runs_created = await self._task_run_repo.create_all(task_runs_to_create, transaction=transaction)
-                task_runs_time_interval_execution_bounds = self._build_task_runs_time_interval_execution_bounds(
-                    task_runs_created)
-                task_run_status_logs = self._build_task_run_status_logs(task_runs_created, status_updated_at)
+    async def _process_chunk(self, tasks: List[Task], transaction) -> int:
+        now = datetime.now(timezone.utc)
 
-                await self._task_run_time_interval_execution_bounds_repo.create_all(
-                    task_runs_time_interval_execution_bounds, transaction=transaction)
-                await self._task_status_log_repo.create_all(task_status_logs, transaction=transaction)
-                await self._task_run_status_log_repo.create_all(task_run_status_logs, transaction=transaction)
-                task_runs_created_count += len(task_runs_created)
-        return CreateTaskRunsUCRs(success=True, request=request, task_runs_created=task_runs_created_count)
-
-    async def _build_context(self, tasks: List[Task], status_updated_at: datetime) -> TaskRunBuildContext:
+        # ── 1. Загружаем группы и payload батчем ─────────────────────────────
+        group_ids  = list({t.group_id for t in tasks})
         task_groups = await self._task_group_repo.filter(
-            FilterFieldsDNF.single("id", list({task.group_id for task in tasks}), ConditionOperation.IN)
+            FilterFieldsDNF.single("id", group_ids, ConditionOperation.IN)
         )
-        payload_by_task = await self._payload_provider.provide(tasks)
-        execution_bounds_by_task = await self._execution_bounds_provider.provide_batch(tasks)
-        execution_bounds_cutter_by_task_id = await self._actual_execution_bounds_provider.provide(
-            [task.id for task in tasks if task.type == TaskType.TIME_INTERVAL]
-        )
-        return TaskRunBuildContext(
-            status_updated_at=status_updated_at,
-            task_group_by_id={task_group.id: task_group for task_group in task_groups},
-            payload_by_task=payload_by_task,
-            execution_bounds_by_task=execution_bounds_by_task,
-            execution_bounds_cutter_by_task_id=execution_bounds_cutter_by_task_id,
-        )
+        group_by_id: Dict[int, TaskGroup] = {g.id: g for g in task_groups}
+        payload_by_task: Dict[Task, Payload] = await self._payload_provider.provide(tasks)
 
-    def _build_task_runs(self, tasks: List[Task], context: TaskRunBuildContext) -> List[TaskRun]:
-        task_runs: List[TaskRun] = []
+        # ── 2. Разделяем задачи по типу ──────────────────────────────────────
+        undefined_tasks:     List[Task] = []
+        time_interval_tasks: List[Task] = []
+
         for task in tasks:
-            task_runs.extend(self._task_run_builder_registry.get(task.type).build(task, context))
-        return task_runs
+            if task.type == TaskType.TIME_INTERVAL:
+                time_interval_tasks.append(task)
+            else:
+                undefined_tasks.append(task)
 
-    def _build_task_status_logs(self, tasks: List[Task], status_updated_at: datetime) -> List[TaskStatusLog]:
-        return [TaskStatusLog(task_id=task.id,
-                              status_updated_at=status_updated_at,
-                              status=TaskStatus.EXECUTION)
-                for task in tasks]
+        # ── 3. Строим TaskRun для каждого типа ───────────────────────────────
+        all_task_runs: List[TaskRun] = []
 
-    def _build_task_run_status_logs(self, task_runs: List[TaskRun], status_updated_at: datetime) -> List[TaskRunStatusLog]:
-        return [TaskRunStatusLog(task_run_id=task_run.id,
-                                 status_updated_at=status_updated_at,
-                                 status=task_run.status)
-                for task_run in task_runs]
+        # UNDEFINED — просто создаём по одному запуску
+        for task in undefined_tasks:
+            group   = group_by_id[task.group_id]
+            payload = payload_by_task[task]
+            all_task_runs.extend(
+                self._undefined_builder.build(task, group, payload, now)
+            )
 
-    def _build_task_runs_time_interval_execution_bounds(
-            self,
-            task_runs: List[TaskRun],
-    ) -> List[TaskRunTimeIntervalExecutionBounds]:
-        return [TaskRunTimeIntervalExecutionBounds(
-            task_run_id=task_run.id,
-            task_id=task_run.task_id,
-            execution_bounds=task_run.execution_bounds
-        ) for task_run in task_runs
-            if task_run.type == TaskType.TIME_INTERVAL and task_run.execution_bounds is not None]
+        # TIME_INTERVAL — нужна последняя запись bounds для каждой задачи
+        if time_interval_tasks:
+            last_bounds_by_task_id = await self._load_last_bounds(time_interval_tasks)
+            for task in time_interval_tasks:
+                group       = group_by_id[task.group_id]
+                payload     = payload_by_task[task]
+                last_bounds = last_bounds_by_task_id.get(task.id)
+                runs = self._time_interval_builder.build_task_runs(
+                    task, group, payload, now, last_bounds
+                )
+                all_task_runs.extend(runs)
+
+        if not all_task_runs:
+            return 0
+
+        # ── 4. Сохраняем всё в одной транзакции ──────────────────────────────
+        task_ids_with_runs = {run.task_id for run in all_task_runs}
+        tasks_to_update    = [t for t in tasks if t.id in task_ids_with_runs]
+
+        await self._task_repo.update_all(
+            {
+                task: UpdateFields.multiple({
+                    "status":            TaskStatus.EXECUTION,
+                    "status_updated_at": now,
+                })
+                for task in tasks_to_update
+            },
+            transaction=transaction,
+        )
+
+        task_runs_created = await self._task_run_repo.create_all(all_task_runs, transaction=transaction)
+
+        # Логи статусов задач и запусков
+        await self._task_status_log_repo.create_all(
+            [TaskStatusLog(task_id=t.id, status_updated_at=now, status=TaskStatus.EXECUTION)
+             for t in tasks_to_update],
+            transaction=transaction,
+        )
+        await self._task_run_status_log_repo.create_all(
+            [TaskRunStatusLog(task_run_id=r.id, status_updated_at=now, status=r.status)
+             for r in task_runs_created],
+            transaction=transaction,
+        )
+
+        # Bounds для TIME_INTERVAL
+        bounds_to_save = [
+            TaskRunTimeIntervalExecutionBounds(
+                task_run_id=r.id,
+                task_id=r.task_id,
+                execution_bounds=r.execution_bounds,
+            )
+            for r in task_runs_created
+            if r.type == TaskType.TIME_INTERVAL and r.execution_bounds is not None
+        ]
+        if bounds_to_save:
+            await self._task_run_time_interval_execution_bounds_repo.create_all(
+                bounds_to_save, transaction=transaction
+            )
+
+        return len(task_runs_created)
+
+    async def _load_last_bounds(
+        self,
+        tasks: List[Task],
+    ) -> Dict[int, TaskRunTimeIntervalExecutionBounds]:
+        """
+        Для каждой TIME_INTERVAL задачи загружает последнюю запись bounds
+        (по right_bound_at desc, limit 1) одним запросом на задачу.
+
+        TODO: если репозиторий получит поддержку GROUP BY / DISTINCT ON —
+        заменить на один батч-запрос.
+        """
+        task_ids = [t.id for t in tasks]
+        result: Dict[int, TaskRunTimeIntervalExecutionBounds] = {}
+
+        # Загружаем все bounds для задач и берём последнюю на каждую
+        all_bounds = await self._task_run_time_interval_execution_bounds_repo.filter(
+            FilterFieldsDNF.single("task_id", task_ids, ConditionOperation.IN)
+        )
+        # Группируем и выбираем последнюю по right_bound_at
+        for bounds in all_bounds:
+            task_id = bounds.task_id
+            existing = result.get(task_id)
+            if existing is None or (
+                bounds.execution_bounds.right_bound_at >
+                existing.execution_bounds.right_bound_at
+            ):
+                result[task_id] = bounds
+
+        return result

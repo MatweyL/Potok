@@ -1,6 +1,6 @@
 import enum
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from functools import cached_property
 from typing import Any, Dict, List
 

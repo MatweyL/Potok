@@ -123,7 +123,7 @@ class UUIDPKMixin:
 
 class LoadTimestampMixin:
     loaded_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         server_default=func.now(),          # ← server_default лучше для автозаполнения на стороне БД
         nullable=False,
         # insert_default=func.now()         # можно и так, но server_default предпочтительнее

@@ -1,6 +1,6 @@
 from typing import List
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from functools import cached_property
 
 from service.domain.schemas.enums import TaskRunStatus, TaskStatus

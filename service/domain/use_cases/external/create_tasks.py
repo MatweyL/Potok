@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import chain
 from typing import List
 
@@ -47,7 +47,7 @@ class CreateTasksUC(UseCase):
                     transaction
                 )
                 task_configuration_dict = request.task_configuration.model_dump()
-                status_updated_at = datetime.now()
+                status_updated_at = datetime.now(timezone.utc)
                 tasks = [Task(payload_id=payload.id,
                               status=TaskStatus.NEW,
                               status_updated_at=status_updated_at,

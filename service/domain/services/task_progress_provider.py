@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 
 from service.domain.schemas.execution_bounds import TimeIntervalBounds

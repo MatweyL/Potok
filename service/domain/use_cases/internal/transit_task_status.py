@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from more_itertools import batched
 
@@ -38,7 +38,7 @@ class TransitTaskStatusUC(UseCase):
         tasks_ids_to_transit = await self._task_provider.provide_tasks_ids_to_transit_via_sql()
         succeed_tasks_ids = tasks_ids_to_transit.succeed_ids
         error_tasks_ids = tasks_ids_to_transit.error_ids
-        status_updated_at = datetime.now()
+        status_updated_at = datetime.now(timezone.utc)
         # Формируем данные для пакетного обновления статусов
         tasks_to_update = {TaskPK(id=task_id): UpdateFields.multiple({'status': TaskStatus.SUCCEED,
                                                                       'status_updated_at': status_updated_at})

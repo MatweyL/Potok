@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Dict, Optional, Any
 
 from pydantic import BaseModel, Field
@@ -36,6 +37,14 @@ class TaskGroupBody(BaseModel):
                                                  " очередей (по одной на каждый приоритет)."
                                                  "Если False — то одна общая очередь для всех приоритетов группы",
                                      default=True)
+
+    time_interval_max_period: float | None = Field(description="Максимальный размер временного"
+                                                               " интервала для сбора данных", default=None)
+    time_interval_first_left_bound_at: datetime | None = Field(description="Минимальная левая дата сбора при первом сборе",
+                                                               default=None)
+    time_interval_first_left_bound_depth: float | None = Field(description="Как глубоко относительно текущей даты будем"
+                                                                           " собирать источник при первом сборе",
+                                                               default=None)
 
 
 class TaskGroup(TaskGroupPK, TaskGroupBody):

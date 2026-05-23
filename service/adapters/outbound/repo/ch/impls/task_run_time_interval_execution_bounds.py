@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from clickhouse_connect.driver.asyncclient import AsyncClient

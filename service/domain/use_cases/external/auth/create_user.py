@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from service.domain.schemas.app_user import AppUser, AppUserPK, AppUserDTO
@@ -37,7 +37,7 @@ class CreateUserUC(UseCase):
         roles = request.roles if request.roles else [AppUserRole.OPERATOR]
         password_hash = self._hasher.hash(request.password)
         app_user = AppUser(roles=roles, username=request.username, password_hash=password_hash,
-                           created_at=datetime.now())
+                           created_at=datetime.now(timezone.utc))
         app_user = await self._app_user_repo.create(app_user)
         return CreateUserUCRs(success=True,
                               request=request,

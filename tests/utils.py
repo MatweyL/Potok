@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from service.domain.schemas.enums import TaskStatus, TaskRunStatus
@@ -21,7 +21,7 @@ async def create_tasks(task_repo: Repo,
     task_group = await task_group_repo.create( TaskGroup(name=group_name, title='', description=''))
     payload = await payload_repo.create(Payload(data={}))
     tasks = [Task(group_id=task_group.id,monitoring_algorithm_id=algorithm.id,status=task_status,
-                  status_updated_at=datetime.now(), payload_id=payload.id) for i in range(tasks_amount)]
+                  status_updated_at=datetime.now(timezone.utc), payload_id=payload.id) for i in range(tasks_amount)]
     tasks = await task_repo.create_all(tasks)
     return tasks
 

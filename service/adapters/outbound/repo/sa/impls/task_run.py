@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Union
 
 from sqlalchemy import text, select, union_all
@@ -141,7 +141,7 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
     async def provide_by_period(self, period_s: int,
                                 group_name: Union[Optional[str], List[str]] = None) -> TaskRunMetrics:
 
-        bound_datetime = datetime.now() - timedelta(seconds=period_s)
+        bound_datetime = datetime.now(timezone.utc) - timedelta(seconds=period_s)
 
         async with self._database.session as session:
             if group_name:
@@ -203,7 +203,7 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
     async def provide_avg_by_period(self, period_s: int,
                                     group_name: Union[Optional[str], List[str]] = None) -> TaskRunAvgMetrics:
 
-        bound_datetime = datetime.now() - timedelta(seconds=period_s)
+        bound_datetime = datetime.now(timezone.utc) - timedelta(seconds=period_s)
 
         async with self._database.session as session:
             if group_name:

@@ -1,6 +1,6 @@
 from typing import List
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from functools import cached_property
 
 from service.domain.schemas.enums import TaskRunStatus, TaskStatus
@@ -56,7 +56,7 @@ class ResumeTaskRunsUC(UseCase):
                 tasks_runs_to_resume.append(cancelled_task_run)
 
         # Обновляем статус подошедших задач
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         update_fields = UpdateFields.multiple(
             {
                 "status": TaskRunStatus.WAITING,

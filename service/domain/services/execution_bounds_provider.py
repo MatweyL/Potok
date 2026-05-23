@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Protocol, runtime_checkable
 
 from service.domain.schemas.enums import TaskType
@@ -84,7 +84,7 @@ class DefaultExecutionBoundsProvider:
 
         result: Dict[Task, List[ExecutionBounds]] = {}
 
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         for task in tasks:
             latest_right_bound = latest_right_bound_by_task_id.get(task.id)

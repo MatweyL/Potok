@@ -1,7 +1,7 @@
 # src/auth/infrastructure/token_service.py
 # или src/core/security/token_service.py — как вам удобнее
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, Optional
 
 import jwt
@@ -40,10 +40,10 @@ class TokenService:
             "sub": str(user.id),
             "username": user.username,
             "roles": [role.value for role in user.roles],  # enum → строки
-            "iat": datetime.now(),
+            "iat": datetime.now(timezone.utc),
         }
 
-        expire = datetime.now() + timedelta(minutes=self.access_token_expire_minutes)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=self.access_token_expire_minutes)
         to_encode.update({"exp": expire})
 
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
@@ -57,10 +57,10 @@ class TokenService:
         to_encode: Dict[str, Any] = {
             "sub": str(user.id),
             "type": "refresh",  # чтобы отличать от access
-            "iat": datetime.now(),
+            "iat": datetime.now(timezone.utc),
         }
 
-        expire = datetime.now() + timedelta(days=self.refresh_token_expire_days)
+        expire = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
         to_encode.update({"exp": expire})
 
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
@@ -107,7 +107,7 @@ class TokenService:
         return access, refresh
 
     def build_refresh_token_entity(self, user: AppUser | AppUserDTO, token: str) -> RefreshToken:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         return RefreshToken(
             user_id=user.id,
             token=token,

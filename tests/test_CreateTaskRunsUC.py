@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict
 
 import pytest
@@ -51,7 +51,7 @@ def create_task_v2(sa_task_repo, sa_task_group_repo):
         t = Task(
             type=task_type,
             status=status,
-            status_updated_at=datetime.now() - timedelta(seconds=status_update_elapsed_seconds),
+            status_updated_at=datetime.now(timezone.utc) - timedelta(seconds=status_update_elapsed_seconds),
             payload_id=payload.id,
             monitoring_algorithm_id=monitoring_algorithm.id,
             group_id=task_group.id,
@@ -68,7 +68,7 @@ def create_time_interval_task_progress(sa_time_interval_task_progress_repo,
                                        sa_task_run_repo,
                                        sa_task_group_repo):
     async def _inner(task: Task, right_bound_at: datetime = None, left_bound_at: datetime = None, ):
-        right_bound_at = right_bound_at or datetime.now() - timedelta(days=1)
+        right_bound_at = right_bound_at or datetime.now(timezone.utc) - timedelta(days=1)
         left_bound_at = left_bound_at if left_bound_at else datetime.min
         t = TimeIntervalTaskProgress(task_id=task.id, right_bound_at=right_bound_at, left_bound_at=left_bound_at,
                                      collected_data_amount=10, saved_data_amount=10)
@@ -77,7 +77,7 @@ def create_time_interval_task_progress(sa_time_interval_task_progress_repo,
         task_group = await sa_task_group_repo.get(TaskGroupPK(id=task.group_id))
         task_run = TaskRun(task_id=task.id, group_name=task_group.name, priority=task.priority, type=task.type,
                            payload=None, execution_bounds=execution_bounds, status=TaskRunStatus.SUCCEED,
-                           status_updated_at=datetime.now())
+                           status_updated_at=datetime.now(timezone.utc))
         task_run = await sa_task_run_repo.create(task_run)
         await sa_task_run_time_interval_execution_bounds_repo.create(TaskRunTimeIntervalExecutionBounds(
             task_run_id=task_run.id, task_id=task.id, execution_bounds=execution_bounds
@@ -212,7 +212,7 @@ async def test_apply_uses_time_interval_progress_to_cut_overlapping_bounds(
     payload = await create_payload()
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
     task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.SUCCEED)
-    progress_right_bound_at = datetime.now() - timedelta(days=1)
+    progress_right_bound_at = datetime.now(timezone.utc) - timedelta(days=1)
     await create_time_interval_task_progress(task, right_bound_at=progress_right_bound_at)
 
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
@@ -239,8 +239,8 @@ async def test_apply_skips_time_interval_run_when_latest_right_bound_is_not_less
     task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.SUCCEED)
     await create_time_interval_task_progress(
         task,
-        left_bound_at=datetime.now(),
-        right_bound_at=datetime.now() + timedelta(days=1),
+        left_bound_at=datetime.now(timezone.utc),
+        right_bound_at=datetime.now(timezone.utc) + timedelta(days=1),
     )
 
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
@@ -339,7 +339,7 @@ async def test_apply_can_use_real_clickhouse_time_interval_tables(
     payload = await create_payload()
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
     task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.SUCCEED)
-    previous_right_bound_at = (datetime.now() - timedelta(days=1)).replace(microsecond=0)
+    previous_right_bound_at = (datetime.now(timezone.utc) - timedelta(days=1)).replace(microsecond=0)
     previous_bounds = TimeIntervalBounds(
         left_bound_at=datetime(2020, 1, 1),
         right_bound_at=previous_right_bound_at,

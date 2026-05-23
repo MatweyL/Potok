@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from service.domain.schemas.enums import TaskRunStatus
@@ -43,7 +43,7 @@ class RetrieveWaitingTaskRunsUC(UseCase):
             group_names = [active_group.name for active_group in active_groups]
             batch_size_by_group_name = await self._balancing_algorithm.calculate_batch_size_by_group(group_names)
             task_runs = await self._waiting_task_run_provider.provide(batch_size_by_group_name)
-            status_updated_at = datetime.now()
+            status_updated_at = datetime.now(timezone.utc)
             await self._task_run_repo.update_all({task_run: UpdateFields.multiple({
                 'status': TaskRunStatus.QUEUED,
                 'status_updated_at': status_updated_at,

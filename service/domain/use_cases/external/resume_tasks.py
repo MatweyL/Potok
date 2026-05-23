@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict
 
 from service.domain.schemas.enums import TaskStatus
@@ -31,7 +31,7 @@ class ResumeTasksUC(UseCase):
                 FilterField(name='id', value=request.tasks_ids, operation=ConditionOperation.IN)
             ]
         )
-        status_updated_at = datetime.now()
+        status_updated_at = datetime.now(timezone.utc)
         update_fields = UpdateFields.multiple({'status': TaskStatus.EXECUTION,
                                                'status_updated_at': status_updated_at})
         cancelled_tasks = await self._task_repo.filter(cancelled_tasks_condition)

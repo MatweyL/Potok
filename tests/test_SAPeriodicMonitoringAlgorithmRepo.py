@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timezone, timedelta
 from typing import Callable, Awaitable
 
 import pytest
@@ -45,7 +45,7 @@ def create_task(sa_monitoring_algorithm_repo,
 
 @pytest_asyncio.fixture
 async def _new_task_periodic_ma(create_task, ):
-    target_datetime = datetime.now()
+    target_datetime = datetime.now(timezone.utc)
     task = await create_task(1, TaskStatus.NEW, target_datetime)
     return task
 
@@ -59,7 +59,7 @@ def new_task_periodic_ma(_new_task_periodic_ma):
 @pytest_asyncio.fixture
 async def _succeed_task_periodic_ma_ready_to_execute(create_task, ):
     timeout = 30
-    target_datetime = datetime.now() - timedelta(seconds=timeout + 1)
+    target_datetime = datetime.now(timezone.utc) - timedelta(seconds=timeout + 1)
     task = await create_task(2, TaskStatus.SUCCEED, target_datetime, timeout)
     return task
 
@@ -73,7 +73,7 @@ def succeed_task_periodic_ma_ready_to_execute(_succeed_task_periodic_ma_ready_to
 @pytest_asyncio.fixture
 async def _execution_task_periodic_ma_ready_to_execute(create_task, ):
     timeout = 30
-    target_datetime = datetime.now() - timedelta(seconds=timeout + 1)
+    target_datetime = datetime.now(timezone.utc) - timedelta(seconds=timeout + 1)
     task = await create_task(3, TaskStatus.EXECUTION, target_datetime, timeout)
     return task
 
@@ -87,7 +87,7 @@ def execution_task_periodic_ma_ready_to_execute(_execution_task_periodic_ma_read
 @pytest_asyncio.fixture
 async def _execution_task_periodic_ma_not_ready_to_execute(create_task, ):
     timeout = 30
-    target_datetime = datetime.now()
+    target_datetime = datetime.now(timezone.utc)
     task = await create_task(4, TaskStatus.EXECUTION, target_datetime, timeout)
     return task
 

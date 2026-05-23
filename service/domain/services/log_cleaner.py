@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from service.domain.schemas.task_run import TaskRunStatusLogPK, TaskRunStatusLog
 from service.ports.common.logs import logger
@@ -16,7 +16,7 @@ class TaskRunStatusLogCleaner:
     async def clean_logs(self):
         deleted_logs = await self._task_run_status_log.delete_by_condition(
             FilterFieldsDNF.single('status_updated_at',
-                                   datetime.now() - timedelta(seconds=self._ttl_seconds),
+                                   datetime.now(timezone.utc) - timedelta(seconds=self._ttl_seconds),
                                    ConditionOperation.LT)
         )
         logger.info(f"deleted {deleted_logs} log(s) from {self._task_run_status_log.__class__.__name__}")

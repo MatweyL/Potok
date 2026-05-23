@@ -1,6 +1,6 @@
 # service/domain/use_cases/refresh_token_uc.py
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timezone
 
 from service.domain.schemas.app_user import AppUser, AppUserPK, AppUserDTO
 from service.domain.schemas.refresh_token import RefreshToken
@@ -54,7 +54,7 @@ class RefreshTokenUC(UseCase):
         stored_token = stored[0]
 
         # 3. Проверяем срок в БД (страховка)
-        if stored_token.expires_at < datetime.now():
+        if stored_token.expires_at < datetime.now(timezone.utc):
             await self._refresh_token_repo.delete(stored_token)
             return RefreshTokenUCRs(
                 success=False, error="Refresh token expired", request=request

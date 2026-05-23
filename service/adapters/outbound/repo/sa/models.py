@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List
 
 from sqlalchemy import JSON, BIGINT, ForeignKey, VARCHAR, Enum, INT, DateTime, FLOAT, TEXT, UUID, Boolean
@@ -23,7 +23,7 @@ class Task(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     execution_arguments: Mapped[Dict] = mapped_column(JSONWithDatetime, nullable=True)
 
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus))
-    status_updated_at: Mapped[datetime] = mapped_column(DateTime)
+    status_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     payload_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("payload.id"))
 
 
@@ -55,28 +55,28 @@ class TaskRun(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     payload: Mapped[Dict] = mapped_column(JSONWithDatetime, nullable=True)
 
     status: Mapped[TaskRunStatus] = mapped_column(Enum(TaskRunStatus))
-    status_updated_at: Mapped[datetime] = mapped_column(DateTime)
+    status_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     description: Mapped[str] = mapped_column(TEXT, nullable=True)
 
 
 class TaskRunStatusLog(Base, TablenameMixin, LoadTimestampMixin):
     task_run_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_run.id"), primary_key=True)
-    status_updated_at: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
+    status_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
     status: Mapped[TaskRunStatus] = mapped_column(Enum(TaskRunStatus))
     description: Mapped[str] = mapped_column(TEXT, nullable=True)
 
 
 class TaskStatusLog(Base, TablenameMixin, LoadTimestampMixin):
     task_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task.id"), primary_key=True)
-    status_updated_at: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
+    status_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus))
     description: Mapped[str] = mapped_column(TEXT, nullable=True)
 
 
 class TimeIntervalTaskProgress(Base, TablenameMixin, LoadTimestampMixin):
     task_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task.id"), primary_key=True)
-    right_bound_at: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
-    left_bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    right_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    left_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     collected_data_amount: Mapped[int] = mapped_column(INT, )
     saved_data_amount: Mapped[int] = mapped_column(INT, )
 
@@ -84,23 +84,23 @@ class TimeIntervalTaskProgress(Base, TablenameMixin, LoadTimestampMixin):
 class TaskRunTimeIntervalExecutionBounds(Base, TablenameMixin, LoadTimestampMixin):
     task_run_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_run.id"), primary_key=True)
     task_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task.id"), )
-    right_bound_at: Mapped[datetime] = mapped_column(DateTime, )
-    left_bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    right_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), )
+    left_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AppUser(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     roles: Mapped[List[AppUserRole]] = mapped_column(JSON, nullable=False)
     username: Mapped[str] = mapped_column(TEXT, nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(TEXT, nullable=False, )
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
 
 class RefreshToken(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     user_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("app_user.id"), primary_key=True)
     token: Mapped[str] = mapped_column(TEXT, nullable=False, )
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class Project(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
@@ -124,7 +124,7 @@ class TaskGroupByProject(Base, TablenameMixin, LoadTimestampMixin):
 
 class TaskRunTimeIntervalProgress(Base, TablenameMixin, LoadTimestampMixin):
     task_run_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_run.id"), primary_key=True)
-    right_bound_at: Mapped[datetime] = mapped_column(DateTime, primary_key=True)
-    left_bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    right_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    left_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     collected_data_amount: Mapped[int] = mapped_column(INT, )
     saved_data_amount: Mapped[int] = mapped_column(INT, )
