@@ -57,7 +57,7 @@ class GetTasksDetailedUC(UseCase):
         # ── Фильтры пагинации ────────────────────────────────────────────────
         if request.task_group_id:
             gf = FilterField(name="group_id", value=request.task_group_id)
-            if not request.pagination.filter_fields_dnf:
+            if not request.pagination.filter_fields_dnf or request.pagination.filter_fields_dnf and not request.pagination.filter_fields_dnf.conjunctions:
                 request.pagination.filter_fields_dnf = FilterFieldsDNF.single("group_id", request.task_group_id)
             else:
                 for c in request.pagination.filter_fields_dnf.conjunctions:

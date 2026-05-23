@@ -138,7 +138,8 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
     def __init__(self, database: Database, ):
         self._database = database
 
-    async def provide_by_period(self, period_s: int, group_name: Union[Optional[str],List[str]]=None) -> TaskRunMetrics:
+    async def provide_by_period(self, period_s: int,
+                                group_name: Union[Optional[str], List[str]] = None) -> TaskRunMetrics:
 
         bound_datetime = datetime.now() - timedelta(seconds=period_s)
 
@@ -199,7 +200,8 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
 
             return TaskRunMetrics(grouped_metrics_by_name=grouped_metrics_by_name)
 
-    async def provide_avg_by_period(self, period_s: int,  group_name: Union[Optional[str],List[str]]=None) -> TaskRunAvgMetrics:
+    async def provide_avg_by_period(self, period_s: int,
+                                    group_name: Union[Optional[str], List[str]] = None) -> TaskRunAvgMetrics:
 
         bound_datetime = datetime.now() - timedelta(seconds=period_s)
 
@@ -230,7 +232,7 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
             query_kwargs = {'bound_datetime': bound_datetime}
             if group_name:
                 query_kwargs["group_name"] = group_name
-            result = await session.execute(query,query_kwargs)
+            result = await session.execute(query, query_kwargs)
             rows = result.fetchall()
 
             grouped_avg_metrics_by_name: Dict[str, TaskRunGroupedAvgMetrics] = {}
@@ -266,6 +268,7 @@ class SARecentTaskRunsProvider(RecentTaskRunsProvider):
 
     def __init__(self, database: Database, ):
         self._database = database
+
     async def get_recent_per_task(
             self,
             task_ids: List[int],
@@ -299,6 +302,9 @@ class SARecentTaskRunsProvider(RecentTaskRunsProvider):
         execution_bounds = None
         if row.execution_bounds:
             execution_bounds = as_execution_bounds(json.loads(row.execution_bounds))
+        execution_arguments = None
+        if row.execution_arguments:
+            execution_arguments = json.loads(row["execution_arguments"])
         return TaskRun(
             id=row["id"],
             task_id=row["task_id"],
@@ -307,7 +313,7 @@ class SARecentTaskRunsProvider(RecentTaskRunsProvider):
             type=row["type"],
             payload=payload,
             execution_bounds=execution_bounds,
-            execution_arguments=row["execution_arguments"],
+            execution_arguments=execution_arguments,
             status=row["status"],
             status_updated_at=row["status_updated_at"],
             description=row["description"],
