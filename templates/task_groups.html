@@ -196,3 +196,21 @@
 </div>
 
 {% endblock %}
+
+
+{% block extra_js %}
+<script>
+(async () => {
+  const summaryRes = await fetch('/api/dashboard/summary');
+  const summary = await summaryRes.json();
+
+  const cards = document.querySelectorAll('.flow-kpi-card .flow-kpi-value');
+  if (cards.length >= 4) {
+    cards[0].textContent = cards[0].textContent || '0';
+    cards[1].textContent = summary.total_tasks ?? cards[1].textContent;
+    cards[2].textContent = summary.execution_count ?? cards[2].textContent;
+    cards[3].textContent = summary.success_rate ? `${summary.success_rate.toFixed(1)}%` : cards[3].textContent;
+  }
+})();
+</script>
+{% endblock %}
