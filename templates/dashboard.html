@@ -158,5 +158,32 @@
     await fetch('/auth/logout', { method: 'POST' });
     window.location.href = '/login';
   });
+
+  (async () => {
+    const [summaryRes, statusesRes, durationsRes] = await Promise.all([
+      fetch('/api/dashboard/summary'),
+      fetch('/api/dashboard/run-statuses'),
+      fetch('/api/dashboard/duration-distribution')
+    ]);
+
+    const summary = await summaryRes.json();
+    const statuses = await statusesRes.json();
+    const durations = await durationsRes.json();
+
+    const kpis = document.querySelectorAll('.flow-kpi-card .flow-kpi-value');
+    if (kpis.length >= 4) {
+      kpis[0].textContent = summary.execution_count ?? 0;
+      kpis[1].textContent = summary.succeed_count ?? 0;
+      kpis[2].textContent = summary.error_count ?? 0;
+      kpis[3].textContent = `${Math.round(summary.avg_execution_duration ?? 0)}с`;
+    }
+
+    if (window.updateDonutChart && statuses?.items) {
+      window.updateDonutChart('main_donut', statuses.items);
+    }
+    if (window.updateHistogramChart && durations?.buckets) {
+      window.updateHistogramChart('main_hist', durations.buckets);
+    }
+  })();
 </script>
 {% endblock %}
