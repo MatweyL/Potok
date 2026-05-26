@@ -21,6 +21,7 @@
 {% set effective_duration_metrics = duration_metrics or [] %}
 
 {% set USE_MOCK_METRICS = false %}
+{% set task_per_second_scaler = 3600 %}
 
 {% if USE_MOCK_METRICS %}
   {% set effective_status_metrics = [
@@ -56,7 +57,7 @@
 
 {% set speed_points = [] %}
 {% for item in effective_speed_metrics %}
-  {% set _ = speed_points.append({'label': item.time_label if item.time_label is defined else item.period.strftime('%H:%M'), 'value': item.tasks_per_second}) %}
+  {% set _ = speed_points.append({'label': item.time_label if item.time_label is defined else item.period.strftime('%H:%M'), 'value': item.tasks_per_second * task_per_second_scaler}) %}
 {% endfor %}
 
 {% set duration_data = [] %}

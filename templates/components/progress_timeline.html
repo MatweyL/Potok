@@ -14,14 +14,15 @@
 
 <div class="ptl-root">
   {% set sorted_progress = task_progress | sort(attribute="right_bound_at") %}
-  {% for p in sorted_progress %}
+  {% set visible_progress = sorted_progress[:3] %}
+  {% set hidden_progress = sorted_progress[3:] %}
+
+  {% for p in visible_progress %}
     {% set is_done = p.collected_data_amount > 0 or p.saved_data_amount > 0 %}
     {% set pct = ((p.saved_data_amount / p.collected_data_amount) * 100) | round(0) | int
                  if p.collected_data_amount > 0 else 0 %}
 
     <div class="ptl-item">
-
-      {# Spine: точка + линия вниз #}
       <div class="ptl-spine">
         <div class="ptl-dot {{ 'ptl-dot--done' if is_done else 'ptl-dot--pending' }}">
           {% if is_done %}
@@ -33,14 +34,12 @@
           <div style="width:8px;height:8px;border-radius:50%;background:#d1d5db;"></div>
           {% endif %}
         </div>
-        {% if not loop.last %}
+        {% if not loop.last or hidden_progress %}
         <div class="ptl-connector {{ 'ptl-connector--done' if is_done else '' }}"></div>
         {% endif %}
       </div>
 
-      {# Карточка #}
       <div class="ptl-card {{ 'ptl-card--done' if is_done else 'ptl-card--pending' }}">
-
         <div class="ptl-date">
           <span class="ptl-date-day">{{ p.right_bound_at.strftime('%d.%m.%Y') }}</span>
           <span class="ptl-date-time">{{ p.right_bound_at.strftime('%H:%M') }}</span>
@@ -75,173 +74,118 @@
         {% else %}
         <div class="ptl-empty">Нет данных</div>
         {% endif %}
-
       </div>
     </div>
   {% endfor %}
+
+  {% if hidden_progress %}
+  <details class="ptl-more">
+    <summary class="ptl-more-toggle">Раскрыть ({{ hidden_progress | length }})</summary>
+    {% for p in hidden_progress %}
+      {% set is_done = p.collected_data_amount > 0 or p.saved_data_amount > 0 %}
+      {% set pct = ((p.saved_data_amount / p.collected_data_amount) * 100) | round(0) | int
+                   if p.collected_data_amount > 0 else 0 %}
+
+      <div class="ptl-item">
+        <div class="ptl-spine">
+          <div class="ptl-dot {{ 'ptl-dot--done' if is_done else 'ptl-dot--pending' }}">
+            {% if is_done %}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2.5 6l2.5 2.5L9.5 3.5" stroke="white" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {% else %}
+            <div style="width:8px;height:8px;border-radius:50%;background:#d1d5db;"></div>
+            {% endif %}
+          </div>
+          {% if not loop.last %}
+          <div class="ptl-connector {{ 'ptl-connector--done' if is_done else '' }}"></div>
+          {% endif %}
+        </div>
+
+        <div class="ptl-card {{ 'ptl-card--done' if is_done else 'ptl-card--pending' }}">
+          <div class="ptl-date">
+            <span class="ptl-date-day">{{ p.right_bound_at.strftime('%d.%m.%Y') }}</span>
+            <span class="ptl-date-time">{{ p.right_bound_at.strftime('%H:%M') }}</span>
+            {% if is_done %}
+            <span class="ptl-status-chip">✓ выполнено</span>
+            {% else %}
+            <span class="ptl-status-chip ptl-status-chip--pending">ожидание</span>
+            {% endif %}
+          </div>
+
+          {% if is_done %}
+          <div class="ptl-body">
+            <div class="ptl-metric">
+              <span class="ptl-metric-label">Собрано</span>
+              <div class="ptl-metric-right">
+                <div class="ptl-bar-track">
+                  <div class="ptl-bar-fill" style="width:100%;"></div>
+                </div>
+                <span class="ptl-metric-value">{{ p.collected_data_amount }}</span>
+              </div>
+            </div>
+            <div class="ptl-metric">
+              <span class="ptl-metric-label">Сохранено</span>
+              <div class="ptl-metric-right">
+                <div class="ptl-bar-track">
+                  <div class="ptl-bar-fill ptl-bar-fill--saved" style="width:{{ pct }}%;"></div>
+                </div>
+                <span class="ptl-metric-value ptl-metric-value--green">{{ p.saved_data_amount }}</span>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="ptl-empty">Нет данных</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </details>
+  {% endif %}
 </div>
 
 <style>
-.ptl-root {
-  display: flex;
-  flex-direction: column;
-  padding: 2px 0;
-}
-
-/* Строка: spine + карточка */
-.ptl-item {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;  /* spine тянется на всю высоту карточки */
-}
-
-/* ── Spine ─────────────────────────────────── */
-.ptl-spine {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  width: 26px;
-}
-
-.ptl-dot {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-  margin-top: 10px; /* выравнивание с датой */
-}
-.ptl-dot--done {
-  background: #16a34a;
-  box-shadow: 0 0 0 4px #dcfce7;
-}
-.ptl-dot--pending {
-  background: #fff;
-  border: 2px solid #d1d5db;
-  box-shadow: 0 0 0 3px #f3f4f6;
-}
-
-/* Линия-коннектор — занимает оставшееся пространство */
-.ptl-connector {
-  flex: 1;
-  width: 3px;
-  background: #e5e7eb;
-  border-radius: 2px;
-  margin: 4px 0 0 0;
-  min-height: 16px;
-}
-.ptl-connector--done {
-  background: linear-gradient(180deg, #22c55e 0%, #86efac 100%);
-}
-
-/* ── Карточка ──────────────────────────────── */
-.ptl-card {
-  flex: 1;
-  border-radius: 10px;
-  padding: 10px 14px 12px;
-  margin-bottom: 10px;
-  min-width: 0;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
-}
-.ptl-card--done {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-}
-.ptl-card--pending {
-  border-color: #e5e7eb;
-  background: #fafafa;
-}
-
-/* Дата */
-.ptl-date {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.ptl-date-day {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #111827;
-}
-.ptl-date-time {
-  font-size: 12px;
-  font-family: ui-monospace, monospace;
-  color: #6b7280;
-}
-.ptl-status-chip {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 1px 8px;
-  border-radius: 20px;
-  background: #dcfce7;
-  color: #15803d;
-}
-.ptl-status-chip--pending {
-  background: #f1f5f9;
-  color: #94a3b8;
-}
-
-/* Тело с метриками */
-.ptl-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ptl-metric {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ptl-metric-label {
-  font-size: 12px;
-  color: #6b7280;
-  width: 70px;
-  flex-shrink: 0;
-}
-.ptl-metric-right {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ptl-bar-track {
-  flex: 1;
-  height: 6px;
-  background: #d1fae5;
-  border-radius: 3px;
-  overflow: hidden;
-}
-.ptl-bar-fill {
-  height: 100%;
-  background: #16a34a;
-  border-radius: 3px;
-}
-.ptl-bar-fill--saved {
-  background: #15803d;
-}
-.ptl-metric-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: #111827;
-  min-width: 32px;
-  text-align: right;
-}
+.ptl-root { display: flex; flex-direction: column; padding: 2px 0; }
+.ptl-item { display: flex; gap: 12px; align-items: stretch; }
+.ptl-spine { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 26px; }
+.ptl-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; z-index: 1; margin-top: 10px; }
+.ptl-dot--done { background: #16a34a; box-shadow: 0 0 0 4px #dcfce7; }
+.ptl-dot--pending { background: #fff; border: 2px solid #d1d5db; box-shadow: 0 0 0 3px #f3f4f6; }
+.ptl-connector { flex: 1; width: 3px; background: #e5e7eb; border-radius: 2px; margin: 4px 0 0 0; min-height: 16px; }
+.ptl-connector--done { background: linear-gradient(180deg, #22c55e 0%, #86efac 100%); }
+.ptl-card { flex: 1; border-radius: 10px; padding: 10px 14px 12px; margin-bottom: 10px; min-width: 0; border: 1.5px solid #e5e7eb; background: #fff; }
+.ptl-card--done { border-color: #bbf7d0; background: #f0fdf4; }
+.ptl-card--pending { border-color: #e5e7eb; background: #fafafa; }
+.ptl-date { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.ptl-date-day { font-size: 13.5px; font-weight: 700; color: #111827; }
+.ptl-date-time { font-size: 12px; font-family: ui-monospace, monospace; color: #6b7280; }
+.ptl-status-chip { margin-left: auto; font-size: 11px; font-weight: 500; padding: 1px 8px; border-radius: 20px; background: #dcfce7; color: #15803d; }
+.ptl-status-chip--pending { background: #f1f5f9; color: #94a3b8; }
+.ptl-body { display: flex; flex-direction: column; gap: 6px; }
+.ptl-metric { display: flex; align-items: center; gap: 8px; }
+.ptl-metric-label { font-size: 12px; color: #6b7280; width: 70px; flex-shrink: 0; }
+.ptl-metric-right { flex: 1; display: flex; align-items: center; gap: 8px; }
+.ptl-bar-track { flex: 1; height: 6px; background: #d1fae5; border-radius: 3px; overflow: hidden; }
+.ptl-bar-fill { height: 100%; background: #16a34a; border-radius: 3px; }
+.ptl-bar-fill--saved { background: #15803d; }
+.ptl-metric-value { font-size: 13px; font-weight: 700; color: #111827; min-width: 32px; text-align: right; }
 .ptl-metric-value--green { color: #16a34a; }
+.ptl-empty { font-size: 12px; color: #9ca3af; font-style: italic; }
 
-.ptl-empty {
-  font-size: 12px;
-  color: #9ca3af;
-  font-style: italic;
+.ptl-more { margin-top: 4px; }
+.ptl-more-toggle {
+  cursor: pointer;
+  user-select: none;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 10px 38px;
+  list-style: none;
 }
+.ptl-more-toggle::-webkit-details-marker { display: none; }
+.ptl-more-toggle::before { content: '▸ '; }
+.ptl-more[open] .ptl-more-toggle::before { content: '▾ '; }
 </style>
 {% endif %}
 

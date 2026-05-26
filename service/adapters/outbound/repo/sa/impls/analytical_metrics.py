@@ -111,31 +111,31 @@ class SAAnalyticalMetricsProvider(AnalyticalMetricsProviderI):
 
     async def get_task_group_processing_speed(self, group_id: int) -> list[TaskGroupProcessingSpeedItem]:
         rows = await self._fetch_all("""
-            WITH bounds AS (
-                SELECT DATE_TRUNC('minute', NOW() - INTERVAL '3 hours') AS date_from,
-                       DATE_TRUNC('minute', NOW()) AS date_to
-            ),
-            runs_per_minute AS (
-                SELECT DATE_TRUNC('minute', tr.loaded_at) AS period,
-                       COUNT(*) AS completed_count
-                FROM task_run tr
-                JOIN task t ON tr.task_id = t.id
-                CROSS JOIN bounds b
-                WHERE t.group_id = :group_id
-                  AND tr.loaded_at >= b.date_from
-                  AND tr.loaded_at <= b.date_to
-                GROUP BY DATE_TRUNC('minute', tr.loaded_at)
-            ),
-            timeline AS (
-                SELECT generate_series(b.date_from, b.date_to, INTERVAL '1 minute') AS period
-                FROM bounds b
-            )
-            SELECT timeline.period AS period,
-                   ROUND(COALESCE(runs_per_minute.completed_count, 0) / 60.0, 4) AS tasks_per_second,
-                   ROUND(AVG(COALESCE(runs_per_minute.completed_count, 0) / 60.0) OVER (ORDER BY timeline.period ROWS BETWEEN 9 PRECEDING AND CURRENT ROW), 4) AS avg_tasks_per_second
-            FROM timeline
-            LEFT JOIN runs_per_minute ON timeline.period = runs_per_minute.period
-            ORDER BY timeline.period
+        WITH bounds AS (
+            SELECT DATE_TRUNC('hour', NOW() - INTERVAL '3 hours') AS date_from,
+                   DATE_TRUNC('hour', NOW()) AS date_to
+        ),
+        runs_per_hour AS (
+            SELECT DATE_TRUNC('hour', tr.loaded_at) AS period,
+                   COUNT(*) AS completed_count
+            FROM task_run tr
+            JOIN task t ON tr.task_id = t.id
+            CROSS JOIN bounds b
+            WHERE t.group_id = :group_id
+              AND tr.loaded_at >= b.date_from
+              AND tr.loaded_at <= b.date_to
+            GROUP BY DATE_TRUNC('hour', tr.loaded_at)
+        ),
+        timeline AS (
+            SELECT generate_series(b.date_from, b.date_to, INTERVAL '1 hour') AS period
+            FROM bounds b
+        )
+        SELECT timeline.period AS period,
+               ROUND(COALESCE(runs_per_hour.completed_count, 0) / 3600.0, 4) AS tasks_per_second,
+               ROUND(AVG(COALESCE(runs_per_hour.completed_count, 0) / 3600.0) OVER (ORDER BY timeline.period ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 4) AS avg_tasks_per_second
+        FROM timeline
+            LEFT JOIN runs_per_hour ON timeline.period = runs_per_hour.period
+        ORDER BY timeline.period
         """, {"group_id": group_id})
         return self._validate_many(TaskGroupProcessingSpeedItem, rows)
 

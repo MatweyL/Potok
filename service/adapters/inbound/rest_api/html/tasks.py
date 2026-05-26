@@ -101,3 +101,26 @@ async def task_runs_json(request: Request,
         "total": rs.total,
         "items": [task_run.model_dump() for task_run in rs.task_runs],
     }
+
+@router.get("/task-runs/status-logs/json")
+async def task_run_status_logs_json(request: Request,
+                         task_run_id: int,
+                         page: int = 1,
+                         per_page: int = 25,
+                         search: str | None = None,
+                         order: Literal["asc", "desc"] = "desc"
+                         ):
+    pagination = PaginationQuery(
+        offset_page=per_page * (max(page - 1, 0)),
+        limit_per_page=per_page,
+        order_by='loaded_at',
+        asc_sort=order == "asc",
+    )
+    rs: GetTaskRunStatusLogsUCRs = await request.app.state.use_case_facade.get_task_run_status_logs(
+        GetTaskRunStatusLogsUCRq(task_run_id=task_run_id,
+                                 pagination=pagination)
+    )
+    return {
+        "total": rs.total,
+        "items": [task_run_status_log.model_dump() for task_run_status_log in rs.task_run_status_logs],
+    }

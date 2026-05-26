@@ -490,7 +490,7 @@ function buildTimeline() {
   if      (totalSec < 3600)  { unitSec = 60;    tickCount = Math.ceil(totalSec / 60)    + 1; }
   else if (totalSec < 86400) { unitSec = 3600;  tickCount = Math.ceil(totalSec / 3600)  + 1; }
   else                        { unitSec = 86400; tickCount = Math.ceil(totalSec / 86400) + 1; }
-  tickCount = Math.min(tickCount, 20);
+  tickCount = Math.min(tickCount, 60);
 
   /* Размеры */
   const W       = Math.max(svgEl.parentElement.clientWidth || 700, 400);
