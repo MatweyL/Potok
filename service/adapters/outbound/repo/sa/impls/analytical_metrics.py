@@ -36,12 +36,22 @@ class SAAnalyticalMetricsProvider(AnalyticalMetricsProviderI):
                       AND status_updated_at >= CURRENT_DATE + make_interval(days => :day_offset)
                       AND status_updated_at < CURRENT_DATE + make_interval(days => :next_day_offset)
                 ) AS errors_today,
-                ROUND(AVG(EXTRACT(EPOCH FROM (status_updated_at - loaded_at))) FILTER (
-                    WHERE status = 'SUCCEED'
-                      AND status_updated_at >= CURRENT_DATE + make_interval(days => :day_offset)
-                      AND status_updated_at < CURRENT_DATE + make_interval(days => :next_day_offset)
+                ROUND(AVG(
+                    EXTRACT(EPOCH FROM (
+                        tr.status_updated_at - (
+                            SELECT trl.status_updated_at
+                            FROM task_run_status_log trl
+                            WHERE trl.task_run_id = tr.id AND trl.status = 'EXECUTION'
+                            ORDER BY trl.status_updated_at
+                            LIMIT 1
+                        )
+                    ))
+                ) FILTER (
+                    WHERE tr.status = 'SUCCEED'
+                      AND tr.status_updated_at >= CURRENT_DATE + make_interval(days => :day_offset)
+                      AND tr.status_updated_at < CURRENT_DATE + make_interval(days => :next_day_offset)
                 )) AS avg_duration_seconds
-            FROM task_run
+            FROM task_run tr
         """, {"day_offset": day_offset, "next_day_offset": day_offset + 1})
         return DashboardSummaryMetrics.model_validate(row)
 
@@ -62,12 +72,22 @@ class SAAnalyticalMetricsProvider(AnalyticalMetricsProviderI):
         trunc = "hour" if period == "day" else "day"
         interval = "24 hours" if period == "day" else "7 days"
         rows = await self._fetch_all(f"""
-            SELECT DATE_TRUNC('{trunc}', status_updated_at) AS period,
-                   COUNT(*) FILTER (WHERE status = 'SUCCEED') AS completed_count,
-                   ROUND(AVG(EXTRACT(EPOCH FROM (status_updated_at - loaded_at))) FILTER (WHERE status = 'SUCCEED')) AS avg_duration_seconds
-            FROM task_run
-            WHERE status_updated_at >= NOW() - INTERVAL '{interval}'
-            GROUP BY DATE_TRUNC('{trunc}', status_updated_at)
+            SELECT DATE_TRUNC('{trunc}', tr.status_updated_at) AS period,
+                   COUNT(*) FILTER (WHERE tr.status = 'SUCCEED') AS completed_count,
+                   ROUND(AVG(
+                       EXTRACT(EPOCH FROM (
+                           tr.status_updated_at - (
+                               SELECT trl.status_updated_at
+                               FROM task_run_status_log trl
+                               WHERE trl.task_run_id = tr.id AND trl.status = 'EXECUTION'
+                               ORDER BY trl.status_updated_at
+                               LIMIT 1
+                           )
+                       ))
+                   ) FILTER (WHERE tr.status = 'SUCCEED')) AS avg_duration_seconds
+            FROM task_run tr
+            WHERE tr.status_updated_at >= NOW() - INTERVAL '{interval}'
+            GROUP BY DATE_TRUNC('{trunc}', tr.status_updated_at)
             ORDER BY period
         """)
         return self._validate_many(PerformanceTrendItem, rows)
@@ -99,10 +119,18 @@ class SAAnalyticalMetricsProvider(AnalyticalMetricsProviderI):
             END AS duration_bucket,
             COUNT(*) AS run_count
             FROM (
-                SELECT EXTRACT(EPOCH FROM (tr.status_updated_at - tr.loaded_at)) AS duration_sec
+                SELECT EXTRACT(EPOCH FROM (
+                    tr.status_updated_at - (
+                        SELECT trl.status_updated_at
+                        FROM task_run_status_log trl
+                        WHERE trl.task_run_id = tr.id AND trl.status = 'EXECUTION'
+                        ORDER BY trl.status_updated_at
+                        LIMIT 1
+                    )
+                )) AS duration_sec
                 FROM task_run tr
                 {join_sql}
-                WHERE tr.status = 'SUCCEED' AND tr.loaded_at >= NOW() - INTERVAL '24 hours'
+                WHERE tr.status = 'SUCCEED' AND tr.status_updated_at >= NOW() - INTERVAL '24 hours'
             ) sub
             GROUP BY duration_bucket
             ORDER BY MIN(duration_sec)

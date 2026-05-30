@@ -1,378 +1,497 @@
 {% extends "base.html" %}
 
-{% block title %}Проекты - Поток{% endblock %}
+{% block title %}Проекты — Поток{% endblock %}
 
 {% block body %}
 <div class="flow-page">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">Проекты</h1>
-        <button class="btn btn-primary" data-flow-open="createProjectModal">
-            Создать проект
-        </button>
-    </div>
 
-    <div id="projectsContainer" class="row g-4">
-        {% for project in projects %}
-        <div class="col-md-6 col-lg-4" data-project-id="{{ project.id }}">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header d-flex justify-content-between align-items-center bg-white">
-                    <h5 class="card-title mb-0">
-                        <a href="/projects/{{ project.id }}" class="text-decoration-none text-dark fw-semibold">
-                            {{ project.title }}
-                        </a>
-                    </h5>
-                    <span class="badge bg-secondary-subtle text-secondary-emphasis">ID: {{ project.id }}</span>
-                </div>
-                <div class="card-body">
-                    <p class="card-text text-muted small mb-3">{{ project.description or "—" }}</p>
+  <div class="proj-page-header">
+    <h1 class="flow-page-title" style="margin-bottom:0;">Проекты</h1>
+    <button class="proj-create-btn" data-flow-open="createProjectModal">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="7.5" y1="2" x2="7.5" y2="13"/><line x1="2" y1="7.5" x2="13" y2="7.5"/>
+      </svg>
+      Создать проект
+    </button>
+  </div>
 
-                    <h6 class="mt-3 mb-2">Группы задач:</h6>
-                    <div class="task-groups-list" data-project-id="{{ project.id }}">
-                        <div class="flow-spinner flow-spinner--sm text-primary" role="status">
-                            <span class="visually-hidden">Загрузка...</span>
-                        </div>
-                    </div>
+  <div id="projectsGrid" class="proj-grid">
+    {% for project in projects %}
+    <div class="proj-card{% if loop.index > 3 %} proj-card--hidden{% endif %}" data-project-id="{{ project.id }}">
 
-                    <button class="btn btn-outline-primary btn-sm mt-3 w-100"
-                            data-flow-open="attachTaskGroupModal"
-                            data-project-id="{{ project.id }}"
-                            data-project-title="{{ project.title }}">
-                        + Привязать группу задач
-                    </button>
-                </div>
-            </div>
+      <div class="proj-card-header">
+        <a href="/projects/{{ project.id }}" class="proj-card-title">{{ project.title }}</a>
+        <span class="proj-card-id">ID {{ project.id }}</span>
+      </div>
+
+      <p class="proj-card-desc">{{ project.description or "Описание отсутствует" }}</p>
+
+      <div class="proj-groups-section">
+        <div class="proj-groups-label">Группы задач</div>
+        <div class="proj-groups-list" data-project-id="{{ project.id }}">
+          <span class="proj-groups-loading">
+            <svg class="proj-spin" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6366f1" stroke-width="2">
+              <circle cx="7" cy="7" r="5" stroke-opacity=".25"/><path d="M7 2a5 5 0 0 1 5 5" stroke-linecap="round"/>
+            </svg>
+            Загрузка...
+          </span>
         </div>
-        {% endfor %}
+      </div>
+
+      <button class="proj-attach-btn"
+              data-flow-open="attachTaskGroupModal"
+              data-project-id="{{ project.id }}"
+              data-project-title="{{ project.title }}">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/>
+        </svg>
+        Привязать группу
+      </button>
+
     </div>
+    {% endfor %}
+  </div>
+
+  {% if projects | length > 3 %}
+  <div style="text-align:center;margin-top:12px;">
+    <button class="proj-expand-btn" id="expandProjectsBtn">
+      <svg id="expandIcon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .25s;">
+        <polyline points="2,5 7,10 12,5"/>
+      </svg>
+      Раскрыть ещё {{ projects | length - 3 }}
+    </button>
+  </div>
+  {% endif %}
+
 </div>
 
 <!-- Modal: Создать проект -->
 <div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Создать проект</h5>
-                <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
-            </div>
-            <div class="modal-body">
-                <form id="createProjectForm">
-                    <div class="mb-3">
-                        <label for="projectTitle" class="form-label">Название проекта <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="projectTitle" required maxlength="255">
-                    </div>
-                    <div class="mb-3">
-                        <label for="projectDescription" class="form-label">Описание</label>
-                        <textarea class="form-control" id="projectDescription" rows="3" maxlength="1000"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
-                <button type="button" class="btn btn-primary" id="createProjectBtn">Создать</button>
-            </div>
-        </div>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Создать проект</h5>
+        <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createProjectForm">
+          <div class="mb-3">
+            <label for="projectTitle" class="form-label">Название <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="projectTitle" required maxlength="255">
+          </div>
+          <div class="mb-3">
+            <label for="projectDescription" class="form-label">Описание</label>
+            <textarea class="form-control" id="projectDescription" rows="3" maxlength="1000"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
+        <button type="button" class="btn btn-primary" id="createProjectBtn">Создать</button>
+      </div>
     </div>
+  </div>
 </div>
 
 <!-- Modal: Привязать группу задач -->
 <div class="modal fade" id="attachTaskGroupModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Привязать группу задач</h5>
-                <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="attachProjectId">
-                <div class="mb-3">
-                    <label for="taskGroupSelect" class="form-label">Доступные группы задач</label>
-                    <select class="form-select" id="taskGroupSelect" multiple size="6">
-                        <option value="">Загрузка списка...</option>
-                    </select>
-                    <div class="form-text">Удерживайте <kbd>Ctrl</kbd> (или <kbd>Cmd</kbd> на Mac) для выбора нескольких групп</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
-                <button type="button" class="btn btn-primary" id="attachTaskGroupBtn">Привязать</button>
-            </div>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Привязать группу задач</h5>
+        <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="attachProjectId">
+        <div class="mb-3">
+          <label for="taskGroupSelect" class="form-label">Доступные группы задач</label>
+          <select class="form-select" id="taskGroupSelect" multiple size="6">
+            <option value="">Загрузка списка...</option>
+          </select>
+          <div class="form-text">Удерживайте <kbd>Ctrl</kbd> (или <kbd>Cmd</kbd>) для выбора нескольких групп</div>
         </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
+        <button type="button" class="btn btn-primary" id="attachTaskGroupBtn">Привязать</button>
+      </div>
     </div>
+  </div>
 </div>
+
+<style>
+/* ── Projects page ──────────────────────────────────────── */
+.proj-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.proj-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .18s, transform .15s;
+}
+.proj-create-btn:hover { background: #4f46e5; transform: translateY(-1px); }
+
+.proj-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.proj-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: box-shadow .2s, transform .2s;
+}
+.proj-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.09);
+  transform: translateY(-2px);
+}
+.proj-card--hidden { display: none; }
+
+.proj-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.proj-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  text-decoration: none;
+  line-height: 1.3;
+}
+.proj-card-title:hover { color: #6366f1; }
+.proj-card-id {
+  font-size: 11px;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.proj-card-desc {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.proj-groups-section { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.proj-groups-label { font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
+
+.proj-groups-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+.proj-spin { animation: proj-rotate 1s linear infinite; }
+@keyframes proj-rotate { to { transform: rotate(360deg); } }
+
+.proj-group-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.proj-group-item-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.proj-group-item-name {
+  font-weight: 600;
+  color: #111827;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proj-group-item-name:hover { color: #6366f1; }
+.proj-group-item-sub { font-size: 11px; color: #9ca3af; }
+
+.proj-group-detach {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1px solid #fca5a5;
+  background: #fff;
+  color: #ef4444;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.proj-group-detach:hover { background: #fef2f2; }
+
+.proj-group-empty { font-size: 13px; color: #9ca3af; font-style: italic; }
+
+.proj-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #f0f9ff;
+  color: #0ea5e9;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  transition: background .15s, border-color .15s;
+}
+.proj-attach-btn:hover { background: #e0f2fe; border-color: #7dd3fc; }
+
+/* Expand button */
+.proj-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  background: #fff;
+  color: #6366f1;
+  border: 1.5px solid #c7d2fe;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.proj-expand-btn:hover { background: #eef2ff; border-color: #a5b4fc; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const API = {
-        getTaskGroups: (projectId) => `/projects/${projectId}/task-groups`,
-        getAvailableGroups: '/task-groups/without-project',
-        bind: '/projects/task-group/bind',
-        unbind: '/projects/task-group/unbind',
-        create: '/projects/create'
-    };
+  const API = {
+    getTaskGroups: (id) => `/projects/${id}/task-groups`,
+    getAvailableGroups: '/task-groups/without-project',
+    bind: '/projects/task-group/bind',
+    unbind: '/projects/task-group/unbind',
+    create: '/projects/create'
+  };
 
-    // Загрузка групп задач для каждой карточки проекта
-    document.querySelectorAll('.task-groups-list').forEach(container => {
-        const projectId = container.dataset.projectId;
-        fetchTaskGroups(projectId, container);
+  /* ── Загрузка групп для всех карточек ── */
+  document.querySelectorAll('.proj-groups-list').forEach(el => {
+    fetchTaskGroups(el.dataset.projectId, el);
+  });
+
+  function fetchTaskGroups(projectId, container) {
+    fetch(API.getTaskGroups(projectId))
+      .then(r => r.json())
+      .then(groups => renderTaskGroups(projectId, container, groups))
+      .catch(() => { container.innerHTML = '<span class="text-danger" style="font-size:13px;">Ошибка загрузки</span>'; });
+  }
+
+  function renderTaskGroups(projectId, container, groups) {
+    container.innerHTML = '';
+    if (!groups || !groups.length) {
+      container.innerHTML = '<span class="proj-group-empty">Нет привязанных групп</span>';
+      return;
+    }
+    groups.forEach(g => {
+      const badge = g.is_active
+        ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dcfce7;color:#16a34a;">Активна</span>'
+        : '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#f3f4f6;color:#9ca3af;">Не активна</span>';
+      const div = document.createElement('div');
+      div.className = 'proj-group-item';
+      div.innerHTML = `
+        <div class="proj-group-item-info">
+          <a href="/task-groups/${g.id}" class="proj-group-item-name">${esc(g.title)}</a>
+          <span class="proj-group-item-sub">${esc(g.name)} ${badge}</span>
+        </div>
+        <button class="proj-group-detach" data-project-id="${projectId}" data-group-id="${g.id}" title="Отвязать">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="1" y1="1" x2="10" y2="10"/><line x1="10" y1="1" x2="1" y2="10"/>
+          </svg>
+          Отвязать
+        </button>`;
+      container.appendChild(div);
     });
+    container.querySelectorAll('.proj-group-detach').forEach(btn => btn.addEventListener('click', handleDetach));
+  }
 
-    function fetchTaskGroups(projectId, container) {
-        fetch(API.getTaskGroups(projectId))
-            .then(res => res.json())
-            .then(groups => renderTaskGroups(projectId, container, groups))
-            .catch(err => {
-                console.error('Ошибка загрузки групп задач:', err);
-                container.innerHTML = '<span class="text-danger small">Ошибка загрузки</span>';
-            });
-    }
+  function handleDetach(e) {
+    const btn = e.currentTarget;
+    if (!confirm('Отвязать группу задач от проекта?')) return;
+    btn.disabled = true;
+    fetch(API.unbind, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: +btn.dataset.projectId, task_group_id: +btn.dataset.groupId })
+    })
+    .then(r => r.json())
+    .then(() => {
+      const c = document.querySelector(`.proj-groups-list[data-project-id="${btn.dataset.projectId}"]`);
+      if (c) fetchTaskGroups(btn.dataset.projectId, c);
+    })
+    .catch(() => { alert('Ошибка при отвязке'); btn.disabled = false; });
+  }
 
-    function renderTaskGroups(projectId, container, groups) {
-        container.innerHTML = '';
-        if (!groups || groups.length === 0) {
-            container.innerHTML = '<span class="text-muted small">Нет привязанных групп</span>';
-            return;
-        }
-        groups.forEach(group => {
-            const desc = group.description ?
-                (group.description.length > 50 ? group.description.substring(0, 50) + '…' : group.description) : '—';
-            const statusBadge = group.is_active
-                ? '<span class="badge bg-success-subtle text-success-emphasis">Активна</span>'
-                : '<span class="badge bg-secondary-subtle text-secondary-emphasis">Не активна</span>';
-
-            const item = document.createElement('div');
-            item.className = 'd-flex justify-content-between align-items-start mb-2 p-2 border rounded small bg-light';
-            item.innerHTML = `
-                <div class="flex-grow-1 me-2">
-                    <a href="/task-groups/${group.id}" class="text-decoration-none fw-medium text-dark">${escapeHtml(group.title)}</a>
-                    <div class="text-muted" style="font-size: 0.85em;">${escapeHtml(group.name)}</div>
-                    <div class="text-muted small text-truncate" title="${escapeHtml(group.description || '')}">${escapeHtml(desc)}</div>
-                    <div class="mt-1">${statusBadge}</div>
-                </div>
-                <button class="btn btn-outline-danger btn-sm detach-btn flex-shrink-0"
-                        data-project-id="${projectId}"
-                        data-group-id="${group.id}"
-                        title="Отвязать группу">
-                    Отвязать
-                </button>
-            `;
-            container.appendChild(item);
-        });
-        container.querySelectorAll('.detach-btn').forEach(btn => {
-            btn.addEventListener('click', handleDetach);
-        });
-    }
-
-    function handleDetach(e) {
-        const btn = e.currentTarget;
-        const projectId = btn.dataset.projectId;
-        const groupId = btn.dataset.groupId;
-
-        if (!confirm('Отвязать группу задач от проекта?')) return;
-
-        btn.disabled = true;
-        btn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span>';
-
-        fetch(API.unbind, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                project_id: parseInt(projectId),
-                task_group_id: parseInt(groupId)
-            })
-        })
-        .then(res => res.json())
-        .then(() => {
-            const container = document.querySelector(`.task-groups-list[data-project-id="${projectId}"]`);
-            if (container) fetchTaskGroups(projectId, container);
-        })
-        .catch(err => {
-            console.error('Ошибка отвязки:', err);
-            alert('Ошибка при отвязке группы задач');
-            btn.disabled = false;
-            btn.textContent = 'Отвязать';
-        });
-    }
-
-    // Загрузка доступных групп при открытии модального окна привязки
-    const attachModal = document.getElementById('attachTaskGroupModal');
-    attachModal?.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        const projectId = button.dataset.projectId;
-        document.getElementById('attachProjectId').value = projectId;
-
-        const select = document.getElementById('taskGroupSelect');
-        select.innerHTML = '<option value="">Загрузка...</option>';
-        select.disabled = true;
-
-        fetch(API.getAvailableGroups)
-            .then(res => res.json())
-            .then(groups => {
-                select.innerHTML = '';
-                if (!groups || groups.length === 0) {
-                    select.innerHTML = '<option value="" disabled>Нет доступных групп</option>';
-                    return;
-                }
-                groups.forEach(group => {
-                    const option = document.createElement('option');
-                    option.value = group.id;
-                    option.textContent = `${group.title} (${group.name})`;
-                    select.appendChild(option);
-                });
-                select.disabled = false;
-            })
-            .catch(err => {
-                console.error('Ошибка загрузки доступных групп:', err);
-                select.innerHTML = '<option value="" disabled>Ошибка загрузки</option>';
-            });
+  /* ── Expand кнопка ── */
+  const expandBtn = document.getElementById('expandProjectsBtn');
+  let expanded = false;
+  expandBtn?.addEventListener('click', function() {
+    expanded = !expanded;
+    document.querySelectorAll('.proj-card--hidden').forEach(c => {
+      c.style.display = expanded ? '' : 'none';
     });
-
-    // Привязка выбранных групп
-    document.getElementById('attachTaskGroupBtn')?.addEventListener('click', function() {
-        const projectId = document.getElementById('attachProjectId').value;
-        const select = document.getElementById('taskGroupSelect');
-        const selectedIds = Array.from(select.selectedOptions)
-            .filter(opt => opt.value)
-            .map(opt => parseInt(opt.value));
-
-        if (selectedIds.length === 0) {
-            alert('Выберите хотя бы одну группу задач');
-            return;
-        }
-
-        const btn = this;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span> Привязываю...';
-
-        fetch(API.bind, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                project_id: parseInt(projectId),
-                task_group_ids: selectedIds
-            })
-        })
-        .then(res => res.json())
-        .then(() => {
-            const modal = attachModal?.classList.remove('is-open');
-            const container = document.querySelector(`.task-groups-list[data-project-id="${projectId}"]`);
-            if (container) fetchTaskGroups(projectId, container);
-        })
-        .catch(err => {
-            console.error('Ошибка привязки:', err);
-            alert('Ошибка при привязке групп задач');
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.textContent = 'Привязать';
-        });
-    });
-
-    // Создание нового проекта
-    document.getElementById('createProjectBtn')?.addEventListener('click', function() {
-        const title = document.getElementById('projectTitle').value.trim();
-        const description = document.getElementById('projectDescription').value.trim();
-
-        if (!title) {
-            alert('Введите название проекта');
-            return;
-        }
-
-        const btn = this;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span> Создаю...';
-
-        fetch(API.create, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, description })
-        })
-        .then(res => res.json())
-        .then(data => {
-            const modal = document.getElementById('createProjectModal')?.classList.remove('is-open');
-            addProjectToDOM(data.id, title, description);
-            document.getElementById('createProjectForm').reset();
-        })
-        .catch(err => {
-            console.error('Ошибка создания проекта:', err);
-            alert('Ошибка при создании проекта');
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.textContent = 'Создать';
-        });
-    });
-
-    function addProjectToDOM(id, title, description) {
-        const container = document.getElementById('projectsContainer');
-        const newCard = document.createElement('div');
-        newCard.className = 'col-md-6 col-lg-4';
-        newCard.dataset.projectId = id;
-        newCard.innerHTML = `
-            <div class="card h-100 shadow-sm">
-                <div class="card-header d-flex justify-content-between align-items-center bg-white">
-                    <h5 class="card-title mb-0">
-                        <a href="/projects/${id}" class="text-decoration-none text-dark fw-semibold">${escapeHtml(title)}</a>
-                    </h5>
-                    <span class="badge bg-secondary-subtle text-secondary-emphasis">ID: ${id}</span>
-                </div>
-                <div class="card-body">
-                    <p class="card-text text-muted small mb-3">${escapeHtml(description || '—')}</p>
-
-                    <h6 class="mt-3 mb-2">Группы задач:</h6>
-                    <div class="task-groups-list" data-project-id="${id}">
-                        <span class="text-muted small">Нет привязанных групп</span>
-                    </div>
-
-                    <button class="btn btn-outline-primary btn-sm mt-3 w-100"
-                            data-flow-open="attachTaskGroupModal"
-                            data-project-id="${id}"
-                            data-project-title="${escapeHtml(title)}">
-                        + Привязать группу задач
-                    </button>
-                </div>
-            </div>
-        `;
-        container.insertBefore(newCard, container.firstChild);
-
-        // Навешиваем обработчик для новой кнопки привязки
-        newCard.querySelector('[data-flow-open="attachTaskGroupModal"]')?.addEventListener('click', function() {
-            document.getElementById('attachProjectId').value = id;
-            loadAvailableGroupsToSelect();
-        });
+    // переключаем классы
+    if (expanded) {
+      document.querySelectorAll('.proj-card').forEach(c => c.classList.remove('proj-card--hidden'));
+      expandBtn.querySelector('svg').style.transform = 'rotate(180deg)';
+      expandBtn.childNodes[1].textContent = ' Свернуть';
+    } else {
+      let idx = 0;
+      document.querySelectorAll('.proj-card').forEach(c => {
+        idx++;
+        if (idx > 3) c.classList.add('proj-card--hidden');
+      });
+      expandBtn.querySelector('svg').style.transform = '';
+      const total = document.querySelectorAll('.proj-card').length;
+      expandBtn.childNodes[1].textContent = ` Раскрыть ещё ${total - 3}`;
     }
+  });
 
-    function loadAvailableGroupsToSelect() {
-        const select = document.getElementById('taskGroupSelect');
-        select.innerHTML = '<option value="">Загрузка...</option>';
-        select.disabled = true;
+  /* ── Модальное: привязать группу ── */
+  const attachModal = document.getElementById('attachTaskGroupModal');
+  attachModal?.addEventListener('show.bs.modal', function(e) {
+    const projectId = e.relatedTarget?.dataset?.projectId;
+    if (projectId) document.getElementById('attachProjectId').value = projectId;
+    loadAvailableGroups();
+  });
 
-        fetch(API.getAvailableGroups)
-            .then(res => res.json())
-            .then(groups => {
-                select.innerHTML = '';
-                if (!groups || groups.length === 0) {
-                    select.innerHTML = '<option value="" disabled>Нет доступных групп</option>';
-                    return;
-                }
-                groups.forEach(group => {
-                    const option = document.createElement('option');
-                    option.value = group.id;
-                    option.textContent = `${group.title} (${group.name})`;
-                    select.appendChild(option);
-                });
-                select.disabled = false;
-            });
-    }
+  function loadAvailableGroups() {
+    const sel = document.getElementById('taskGroupSelect');
+    sel.innerHTML = '<option disabled>Загрузка...</option>';
+    sel.disabled = true;
+    fetch(API.getAvailableGroups)
+      .then(r => r.json())
+      .then(groups => {
+        sel.innerHTML = '';
+        if (!groups?.length) { sel.innerHTML = '<option disabled>Нет доступных групп</option>'; return; }
+        groups.forEach(g => {
+          const o = document.createElement('option');
+          o.value = g.id;
+          o.textContent = `${g.title} (${g.name})`;
+          sel.appendChild(o);
+        });
+        sel.disabled = false;
+      });
+  }
 
-    // Утилита для экранирования HTML
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+  document.getElementById('attachTaskGroupBtn')?.addEventListener('click', function() {
+    const projectId = document.getElementById('attachProjectId').value;
+    const sel = document.getElementById('taskGroupSelect');
+    const ids = Array.from(sel.selectedOptions).filter(o => o.value).map(o => +o.value);
+    if (!ids.length) { alert('Выберите хотя бы одну группу'); return; }
+    const btn = this;
+    btn.disabled = true; btn.textContent = 'Привязываю...';
+    fetch(API.bind, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: +projectId, task_group_ids: ids })
+    })
+    .then(r => r.json())
+    .then(() => {
+      document.getElementById('attachTaskGroupModal')?.classList.remove('is-open');
+      const c = document.querySelector(`.proj-groups-list[data-project-id="${projectId}"]`);
+      if (c) fetchTaskGroups(projectId, c);
+    })
+    .catch(() => alert('Ошибка при привязке'))
+    .finally(() => { btn.disabled = false; btn.textContent = 'Привязать'; });
+  });
+
+  /* ── Создать проект ── */
+  document.getElementById('createProjectBtn')?.addEventListener('click', function() {
+    const title = document.getElementById('projectTitle').value.trim();
+    const desc  = document.getElementById('projectDescription').value.trim();
+    if (!title) { alert('Введите название проекта'); return; }
+    const btn = this; btn.disabled = true; btn.textContent = 'Создаю...';
+    fetch(API.create, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description: desc })
+    })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('createProjectModal')?.classList.remove('is-open');
+      document.getElementById('createProjectForm').reset();
+      addProjectCard(data.id, title, desc);
+    })
+    .catch(() => alert('Ошибка при создании'))
+    .finally(() => { btn.disabled = false; btn.textContent = 'Создать'; });
+  });
+
+  function addProjectCard(id, title, desc) {
+    const grid = document.getElementById('projectsGrid');
+    const card = document.createElement('div');
+    card.className = 'proj-card';
+    card.dataset.projectId = id;
+    card.innerHTML = `
+      <div class="proj-card-header">
+        <a href="/projects/${id}" class="proj-card-title">${esc(title)}</a>
+        <span class="proj-card-id">ID ${id}</span>
+      </div>
+      <p class="proj-card-desc">${esc(desc || 'Описание отсутствует')}</p>
+      <div class="proj-groups-section">
+        <div class="proj-groups-label">Группы задач</div>
+        <div class="proj-groups-list" data-project-id="${id}">
+          <span class="proj-group-empty">Нет привязанных групп</span>
+        </div>
+      </div>
+      <button class="proj-attach-btn" data-flow-open="attachTaskGroupModal"
+              data-project-id="${id}" data-project-title="${esc(title)}">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/>
+        </svg>
+        Привязать группу
+      </button>`;
+    grid.insertBefore(card, grid.firstChild);
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
 });
 </script>
 {% endblock %}

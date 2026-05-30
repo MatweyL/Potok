@@ -1,119 +1,295 @@
 {% extends "base.html" %}
 {% from 'components/task_group_card.html' import render_task_group_card %}
 
-{% block title %}{{ project.title }} - Поток{% endblock %}
+{% block title %}{{ project.title }} — Поток{% endblock %}
 
 {% block body %}
-<div class="container-fluid py-4">
-    <!-- Информация о проекте -->
-    <div class="card mb-4 shadow-sm border-0">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom">
-            <div class="d-flex align-items-center gap-3">
-                <h1 class="h4 mb-0 fw-bold text-dark" id="projectTitle">{{ project.title }}</h1>
-                <button class="btn btn-outline-primary btn-sm" data-flow-open="editProjectModal">
-                    Редактировать
-                </button>
-            </div>
-            <span class="badge bg-secondary-subtle text-secondary-emphasis fs-6">ID: {{ project.id }}</span>
-        </div>
-        <div class="card-body bg-light-subtle">
-            <p class="card-text text-muted mb-0" id="projectDescription">{{ project.description or "Описание отсутствует" }}</p>
-        </div>
-    </div>
+<div class="flow-page">
 
-    <h2 class="h5 mb-3">Группы задач</h2>
+  <!-- Шапка проекта -->
+  <div class="proj-detail-header">
+    <div class="proj-detail-header-left">
+      <div class="proj-detail-title-row">
+        <h1 class="proj-detail-title" id="projectTitle">{{ project.title }}</h1>
+        <span class="proj-detail-id">ID {{ project.id }}</span>
+      </div>
+      <p class="proj-detail-desc" id="projectDescription">{{ project.description or "Описание отсутствует" }}</p>
+    </div>
+    <div class="proj-detail-actions">
+      <button class="proj-detail-btn proj-detail-btn--secondary" data-flow-open="editProjectModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 2l2 2-8 8H2v-2L10 2z"/>
+        </svg>
+        Редактировать
+      </button>
+      <button class="proj-detail-btn proj-detail-btn--primary" data-flow-open="attachGroupModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="7" y1="1" x2="7" y2="13"/><line x1="1" y1="7" x2="13" y2="7"/>
+        </svg>
+        Привязать группу
+      </button>
+    </div>
+  </div>
 
-    {% if task_groups %}
-    <div class="row g-4">
-        {% for group in task_groups %}
-        {{ render_task_group_card(group, task_group_statistics_by_name.get(group.name), project, false) }}
-        {% endfor %}
+  <!-- Список групп задач -->
+  <div class="proj-detail-groups-header">
+    <h2 class="proj-detail-groups-title">Группы задач</h2>
+    <span class="proj-detail-groups-count">{{ task_groups | length }}</span>
+  </div>
+
+  {% if task_groups %}
+  <div class="row g-4" id="taskGroupsContainer">
+    {% for group in task_groups %}
+    <div class="col-md-6 col-lg-4 proj-tg-col" data-group-id="{{ group.id }}">
+      {{ render_task_group_card(group, task_group_statistics_by_name.get(group.name), project, false) }}
+      <div class="proj-tg-detach-row">
+        <button class="proj-tg-detach-btn" data-group-id="{{ group.id }}" data-group-title="{{ group.title }}">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
+          </svg>
+          Отвязать от проекта
+        </button>
+      </div>
     </div>
-    {% else %}
-    <div class="alert alert-light border text-center py-4">
-        <span class="text-muted">К этому проекту не привязано групп задач</span>
-    </div>
-    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="proj-detail-empty" id="taskGroupsEmpty">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round">
+      <rect x="6" y="10" width="28" height="5" rx="2"/><rect x="6" y="18" width="28" height="5" rx="2"/><rect x="6" y="26" width="28" height="5" rx="2"/>
+    </svg>
+    <p>К этому проекту не привязано групп задач</p>
+  </div>
+  {% endif %}
+
 </div>
-<!-- Модальное окно редактирования проекта -->
+
+<!-- Modal: Редактировать проект -->
 <div class="modal fade" id="editProjectModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Редактировать проект</h5>
-                <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editProjectForm" onsubmit="return false;">
-                    <div class="mb-3">
-                        <label for="editProjectTitle" class="form-label">Название <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="editProjectTitle" value="{{ project.title }}" required maxlength="255">
-                    </div>
-                    <div class="mb-3">
-                        <label for="editProjectDescription" class="form-label">Описание</label>
-                        <textarea class="form-control" id="editProjectDescription" rows="3" maxlength="1000">{{ project.description }}</textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
-                <button type="button" class="btn btn-primary" id="saveProjectBtn">Сохранить</button>
-            </div>
-        </div>
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Редактировать проект</h5>
+        <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editProjectForm" onsubmit="return false;">
+          <div class="mb-3">
+            <label for="editProjectTitle" class="form-label">Название <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="editProjectTitle" value="{{ project.title }}" required maxlength="255">
+          </div>
+          <div class="mb-3">
+            <label for="editProjectDescription" class="form-label">Описание</label>
+            <textarea class="form-control" id="editProjectDescription" rows="3" maxlength="1000">{{ project.description }}</textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
+        <button type="button" class="btn btn-primary" id="saveProjectBtn">Сохранить</button>
+      </div>
     </div>
+  </div>
 </div>
+
+<!-- Modal: Привязать группу задач -->
+<div class="modal fade" id="attachGroupModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Привязать группу задач</h5>
+        <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="attachGroupSelect" class="form-label">Доступные группы задач</label>
+          <select class="form-select" id="attachGroupSelect" multiple size="6">
+            <option disabled>Загрузка...</option>
+          </select>
+          <div class="form-text">Удерживайте <kbd>Ctrl</kbd> (или <kbd>Cmd</kbd>) для выбора нескольких групп</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
+        <button type="button" class="btn btn-primary" id="doAttachGroupBtn">Привязать</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* ── Project detail page ─────────────────────────── */
+.proj-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.proj-detail-header-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1; }
+.proj-detail-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.proj-detail-title { font-size: 22px; font-weight: 700; color: #111827; margin: 0; }
+.proj-detail-id { font-size: 12px; color: #9ca3af; background: #f3f4f6; padding: 3px 9px; border-radius: 20px; }
+.proj-detail-desc { font-size: 14px; color: #6b7280; margin: 0; line-height: 1.5; }
+
+.proj-detail-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.proj-detail-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500;
+  cursor: pointer; border: 1.5px solid transparent; transition: all .18s; white-space: nowrap;
+}
+.proj-detail-btn--secondary {
+  background: #fff; color: #374151; border-color: #d1d5db;
+}
+.proj-detail-btn--secondary:hover { background: #f9fafb; border-color: #9ca3af; }
+.proj-detail-btn--primary {
+  background: #6366f1; color: #fff; border-color: #6366f1;
+}
+.proj-detail-btn--primary:hover { background: #4f46e5; border-color: #4f46e5; }
+
+.proj-detail-groups-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.proj-detail-groups-title { font-size: 18px; font-weight: 600; color: #111827; margin: 0; }
+.proj-detail-groups-count {
+  font-size: 13px; font-weight: 600; color: #6366f1;
+  background: #eef2ff; padding: 2px 9px; border-radius: 20px;
+}
+
+.proj-tg-col { display: flex; flex-direction: column; }
+.proj-tg-detach-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+.proj-tg-detach-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; font-size: 12px; font-weight: 500;
+  background: #fff; color: #ef4444;
+  border: 1px solid #fca5a5; border-radius: 6px;
+  cursor: pointer; transition: background .15s;
+}
+.proj-tg-detach-btn:hover { background: #fef2f2; }
+
+.proj-detail-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 48px 24px; text-align: center;
+  background: #f9fafb; border: 1px dashed #d1d5db;
+  border-radius: 14px; color: #9ca3af; font-size: 14px;
+}
+.proj-detail-empty p { margin: 0; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const saveBtn = document.getElementById('saveProjectBtn');
-    const editModalEl = document.getElementById('editProjectModal');
-    const projectId = {{ project.id }};
+  const projectId = {{ project.id }};
 
-    saveBtn?.addEventListener('click', async function() {
-        const title = document.getElementById('editProjectTitle').value.trim();
-        const description = document.getElementById('editProjectDescription').value.trim();
+  /* ── Редактировать проект ── */
+  document.getElementById('saveProjectBtn')?.addEventListener('click', async function() {
+    const title = document.getElementById('editProjectTitle').value.trim();
+    const desc  = document.getElementById('editProjectDescription').value.trim();
+    if (!title) { alert('Название не может быть пустым'); return; }
 
-        if (!title) {
-            alert('Название проекта не может быть пустым');
-            return;
-        }
+    this.disabled = true; this.textContent = 'Сохранение...';
+    try {
+      const r = await fetch(`/projects/${projectId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId, title, description: desc })
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Ошибка');
+      document.getElementById('projectTitle').textContent = title;
+      document.getElementById('projectDescription').textContent = desc || 'Описание отсутствует';
+      document.getElementById('editProjectModal')?.classList.remove('is-open');
+    } catch(e) {
+      alert(`Ошибка: ${e.message}`);
+    } finally {
+      this.disabled = false; this.textContent = 'Сохранить';
+    }
+  });
 
-        // Блокируем кнопку на время запроса
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span class="flow-spinner flow-spinner--sm" role="status"></span> Сохранение...';
+  /* ── Привязать группу ── */
+  document.getElementById('attachGroupModal')?.addEventListener('show.bs.modal', function() {
+    const sel = document.getElementById('attachGroupSelect');
+    sel.innerHTML = '<option disabled>Загрузка...</option>'; sel.disabled = true;
+    fetch('/task-groups/without-project')
+      .then(r => r.json())
+      .then(groups => {
+        sel.innerHTML = '';
+        if (!groups?.length) { sel.innerHTML = '<option disabled>Нет доступных групп</option>'; return; }
+        groups.forEach(g => {
+          const o = document.createElement('option');
+          o.value = g.id; o.textContent = `${g.title} (${g.name})`;
+          sel.appendChild(o);
+        });
+        sel.disabled = false;
+      });
+  });
 
-        try {
-            const response = await fetch(`/projects/${projectId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    project_id: projectId,
-                    title: title,
-                    description: description
-                })
-            });
+  document.getElementById('doAttachGroupBtn')?.addEventListener('click', function() {
+    const sel = document.getElementById('attachGroupSelect');
+    const ids = Array.from(sel.selectedOptions).filter(o => o.value).map(o => +o.value);
+    if (!ids.length) { alert('Выберите хотя бы одну группу'); return; }
+    const btn = this; btn.disabled = true; btn.textContent = 'Привязываю...';
+    fetch('/projects/task-group/bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId, task_group_ids: ids })
+    })
+    .then(r => r.json())
+    .then(() => { document.getElementById('attachGroupModal')?.classList.remove('is-open'); location.reload(); })
+    .catch(() => alert('Ошибка при привязке'))
+    .finally(() => { btn.disabled = false; btn.textContent = 'Привязать'; });
+  });
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.detail || 'Ошибка сервера');
-            }
-
-            // Обновляем DOM без перезагрузки
-            document.getElementById('projectTitle').textContent = title;
-            document.getElementById('projectDescription').textContent = description || 'Описание отсутствует';
-
-            // Закрываем модальное окно
-            const modal = document.getElementById('editProjectModal')?.classList.remove('is-open');
-        } catch (error) {
-            console.error('Ошибка обновления проекта:', error);
-            alert(`Не удалось сохранить изменения: ${error.message}`);
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Сохранить';
-        }
+  /* ── Отвязать группу ── */
+  document.querySelectorAll('.proj-tg-detach-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const groupTitle = this.dataset.groupTitle;
+      if (!confirm(`Отвязать группу "${groupTitle}" от проекта?`)) return;
+      this.disabled = true;
+      fetch('/projects/task-group/unbind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId, task_group_id: +this.dataset.groupId })
+      })
+      .then(r => r.json())
+      .then(() => {
+        const col = this.closest('.proj-tg-col');
+        col?.remove();
+        updateGroupCount();
+      })
+      .catch(() => { alert('Ошибка при отвязке'); this.disabled = false; });
     });
+  });
+
+  function updateGroupCount() {
+    const count = document.querySelectorAll('.proj-tg-col').length;
+    const badge = document.querySelector('.proj-detail-groups-count');
+    if (badge) badge.textContent = count;
+    if (count === 0) {
+      const container = document.getElementById('taskGroupsContainer');
+      if (container) {
+        container.innerHTML = '';
+        container.className = '';
+        container.id = 'taskGroupsEmpty';
+        container.className = 'proj-detail-empty';
+        container.innerHTML = `
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round">
+            <rect x="6" y="10" width="28" height="5" rx="2"/><rect x="6" y="18" width="28" height="5" rx="2"/><rect x="6" y="26" width="28" height="5" rx="2"/>
+          </svg>
+          <p>К этому проекту не привязано групп задач</p>`;
+      }
+    }
+  }
 });
 </script>
 {% endblock %}
