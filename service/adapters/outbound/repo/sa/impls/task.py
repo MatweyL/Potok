@@ -7,7 +7,8 @@ from service.adapters.outbound.repo.sa.abstract import AbstractSARepo
 from service.adapters.outbound.repo.sa.database import Database
 from service.adapters.outbound.repo.sa.impls.task_mapper import TaskMapper
 from service.domain.schemas.task import TaskPK, Task
-from service.ports.outbound.repo.task import TaskProvider, TasksToTransitStatus
+from service.ports.outbound.repo.task import TaskProvider, TasksToTransitStatus, TaskStatisticsProvider, \
+    TaskGroupsStatistics
 
 
 class SATaskRepo(AbstractSARepo):
@@ -66,3 +67,37 @@ HAVING BOOL_OR(status = 'SUCCEED') OR BOOL_AND(status = 'ERROR')
             return TasksToTransitStatus(succeed_ids=succeed_ids,
                                         error_ids=error_ids)
 
+
+
+class SATaskStatisticsProvider(TaskStatisticsProvider):
+    def __init__(self, database: Database, ):
+        self._database = database
+
+    async def provide_groups_statistics(self) -> TaskGroupsStatistics:
+        async with self._database.session as session:
+            query = text("""
+                WITH tasks_count_by_group AS (
+                    SELECT group_id, COUNT(*) AS amount
+                    FROM task
+                    GROUP BY group_id
+                )
+                SELECT tg.name AS group_name, COALESCE(tcbg.amount, 0) AS amount
+                FROM task_group tg
+                LEFT JOIN tasks_count_by_group tcbg ON tcbg.group_id = tg.id
+            """)
+            result = await session.execute(query)
+            rows = result.fetchall()
+
+            tasks_count_by_group_name: Dict[str, int] = {}
+            total_tasks_count = 0
+
+            for row in rows:
+                group_name = row[0]
+                amount = int(row[1])
+                tasks_count_by_group_name[group_name] = amount
+                total_tasks_count += amount
+
+            return TaskGroupsStatistics(
+                total_tasks_count=total_tasks_count,
+                tasks_count_by_group_name=tasks_count_by_group_name,
+            )

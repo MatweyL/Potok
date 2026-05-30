@@ -49,3 +49,7 @@ async def task_group_duration_distribution(request: Request, task_group_id: int)
 @analytical_metrics_router.get("/api/tasks/{task_id}/run-statistics")
 async def task_run_statistics(request: Request, task_id: int):
     return await request.app.state.analytical_metrics_service.get_task_run_statistics(task_id=task_id)
+
+@analytical_metrics_router.get("/api/task-groups")
+async def task_run_statistics(request: Request):
+    return await request.app.state.analytical_metrics_service.get_groups_statistics()

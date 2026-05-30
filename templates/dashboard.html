@@ -1,48 +1,13 @@
 {% extends "base.html" %}
+{% set active_nav = 'dashboard' %}
 {% block title %}Дашборд — Поток{% endblock %}
 
-{% block extra_css %}
-
-{% endblock %}
-
-
 {% block body %}
-{# ── Объект stats с полями по умолчанию ── #}
-{% set stats = {
-    "succeed_count": 342,
-    "execution_count": 28,
-    "queued_count": 56,
-    "waiting_count": 24,
-    "error_count": 18,
-    "temp_error_count": 14,
-    "interrupted_count": 8,
-    "cancelled_count": 6
-} %}
-
-{# ── Данные для компонентов (в реальном проекте придут из контекста Jinja) ── #}
-{% set donut_data_example = [
-    {"label": "Успешно",          "value": stats.succeed_count,    "color": "#22c55e"},
-    {"label": "Выполняется",      "value": stats.execution_count,  "color": "#3b82f6"},
-    {"label": "В очереди",        "value": stats.queued_count,     "color": "#93c5fd"},
-    {"label": "Ожидает",          "value": stats.waiting_count,    "color": "#d1d5db"},
-    {"label": "Ошибка",           "value": stats.error_count,      "color": "#ef4444"},
-    {"label": "Временная ошибка", "value": stats.temp_error_count, "color": "#f59e0b"},
-    {"label": "Прервано",         "value": stats.interrupted_count,"color": "#f97316"},
-    {"label": "Отменено",         "value": stats.cancelled_count,  "color": "#9ca3af"}
-] %}
-
-{% set histogram_data_example = [
-  {"label": "0-30s",   "value": 42},
-  {"label": "30-60s",  "value": 78},
-  {"label": "60-90s",  "value": 124},
-  {"label": "90-120s", "value": 89},
-  {"label": "120-150s","value": 58},
-  {"label": "150-180s","value": 35},
-  {"label": "180-210s","value": 22},
-  {"label": "210+s",   "value": 10}
-] %}
-
-{# heatmap_data передаётся из view как переменная контекста #}
+{% from "components/chart_donut.html"      import render_donut %}
+{% from "components/chart_heatmap.html"    import render_heatmap %}
+{% from "components/chart_histogram.html"  import render_histogram %}
+{% from "components/chart_line_container.html" import render_line_container %}
+{% from "components/chart_line.html"       import render_line_chart %}
 
 <div class="flow-page">
   <h1 class="flow-page-title">Дашборд</h1>
@@ -52,8 +17,10 @@
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Активных запусков</span>
-      <span class="flow-kpi-value">{{ stats.execution_count | default(28) }}</span>
-      <span class="flow-kpi-delta up">+12% со вчера</span>
+      <span class="flow-kpi-value" id="kpi-active-runs">
+        <span class="kpi-skeleton"></span>
+      </span>
+      <span class="flow-kpi-delta" id="kpi-active-runs-delta"></span>
       <div class="flow-kpi-icon" style="background:#eff6ff;">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round">
           <polyline points="1,13 5,8 9,11 13,4 17,7"/>
@@ -63,8 +30,10 @@
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Выполнено за сегодня</span>
-      <span class="flow-kpi-value">{{ stats.succeed_count | default(342) }}</span>
-      <span class="flow-kpi-delta up">+8% со вчера</span>
+      <span class="flow-kpi-value" id="kpi-completed-today">
+        <span class="kpi-skeleton"></span>
+      </span>
+      <span class="flow-kpi-delta" id="kpi-completed-today-delta"></span>
       <div class="flow-kpi-icon" style="background:#f0fdf4;">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="9" cy="9" r="7.5"/>
@@ -75,21 +44,25 @@
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Ошибок</span>
-      <span class="flow-kpi-value">{{ stats.error_count | default(18) }}</span>
-      <span class="flow-kpi-delta down">-5% со вчера</span>
+      <span class="flow-kpi-value" id="kpi-errors-today">
+        <span class="kpi-skeleton"></span>
+      </span>
+      <span class="flow-kpi-delta" id="kpi-errors-today-delta"></span>
       <div class="flow-kpi-icon" style="background:#fef2f2;">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="9" cy="9" r="7.5" stroke="#ef4444" stroke-width="2"/>
-  <path d="M9 5.5 L9 10.5" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="9" cy="13" r="0.9" fill="#ef4444"/>
-</svg>
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <circle cx="9" cy="9" r="7.5" stroke="#ef4444" stroke-width="2"/>
+          <path d="M9 5.5L9 10.5" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="9" cy="13" r="0.9" fill="#ef4444"/>
+        </svg>
       </div>
     </div>
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Средняя длительность</span>
-      <span class="flow-kpi-value">{{ stats.avg_execution_duration | default("94") }}с</span>
-      <span class="flow-kpi-delta down">-15% со вчера</span>
+      <span class="flow-kpi-value" id="kpi-avg-duration">
+        <span class="kpi-skeleton"></span>
+      </span>
+      <span class="flow-kpi-delta" id="kpi-avg-duration-delta"></span>
       <div class="flow-kpi-icon" style="background:#faf5ff;">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#a855f7" stroke-width="1.8" stroke-linecap="round">
           <circle cx="9" cy="9" r="7.5"/>
@@ -98,92 +71,506 @@
       </div>
     </div>
 
-  </div>{# /kpi-grid #}
+  </div>
 
-  {# ── Main charts row ── #}
+  {# ── Донат + тренды ── #}
   <div class="flow-main-grid">
-    {# Donut #}
-    {% from "components/chart_donut.html" import render_donut %}
-    {{ render_donut(
-        donut_data=donut_data_example,
-        donut_title="Статусы запусков задач",
-        donut_subtitle="Всего запусков (24ч)",
-        donut_id="main_donut"
-    ) }}
 
-    {# Trend placeholder #}
-    <div class="flow-chart-card">
+    {# Донат — рендерится через JS после загрузки данных #}
+    <div class="flow-chart-card" id="donut-card">
       <div class="flow-chart-header">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="flow-chart-icon">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="flow-chart-icon">
+          <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="8" cy="8" r="3"   stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span class="flow-chart-title">Статусы запусков задач</span>
+      </div>
+      <div id="donut-placeholder" class="flow-trend-empty">
+        <span class="kpi-skeleton" style="width:180px;height:180px;border-radius:50%;"></span>
+      </div>
+      <div id="donut-container" style="display:none;"></div>
+    </div>
+
+    {# Тренды производительности #}
+    <div class="flow-chart-card" id="trends-card">
+      <div class="flow-chart-header">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="flow-chart-icon">
           <polyline points="1,12 5,7 9,9 13,3 15,5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span class="flow-chart-title">Тренды производительности</span>
       </div>
-      <div class="flow-trend-empty">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <div id="trends-placeholder" class="flow-trend-empty">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="opacity:.3;">
           <polyline points="4,36 14,22 22,28 32,12 44,18"/>
-          <polyline points="38,12 44,12 44,18"/>
         </svg>
-        <p>Аналитика производительности появится здесь</p>
+        <p>Загрузка...</p>
       </div>
+      <div id="trends-container" style="display:none;"></div>
     </div>
+
   </div>
 
-  {# ── Heatmap ── #}
-  {% from "components/chart_heatmap.html" import render_heatmap %}
-  <div style="margin-bottom: 16px;">
-    {{ render_heatmap(
-        heatmap_data=heatmap_data | default(none),
-        heatmap_title="Тепловая карта запусков задач"
-    ) }}
+  {# ── Тепловая карта ── #}
+  <div class="flow-chart-card" style="margin-bottom:16px;" id="heatmap-card">
+    <div class="flow-chart-header">
+      <span class="flow-chart-title">Тепловая карта запусков задач</span>
+    </div>
+    <div id="heatmap-placeholder" class="flow-trend-empty">
+      <p>Загрузка...</p>
+    </div>
+    <div id="heatmap-container" style="display:none;"></div>
   </div>
 
-  {# ── Histogram ── #}
-  {% from "components/chart_histogram.html" import render_histogram %}
-  {{ render_histogram(
-      histogram_data=histogram_data | default(histogram_data_example),
-      histogram_title="Распределение длительности запусков",
-      histogram_total=stats.total_count | default(458),
-      histogram_avg=(stats.avg_execution_duration | string + "с") if stats is defined else "94.3с",
-      histogram_id="main_hist"
-  ) }}
+  {# ── Гистограмма ── #}
+  <div class="flow-chart-card" id="histogram-card">
+    <div class="flow-chart-header">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="flow-chart-icon">
+        <rect x="1" y="8" width="3" height="7" rx="0.5"/><rect x="5" y="5" width="3" height="10" rx="0.5"/>
+        <rect x="9" y="2" width="3" height="13" rx="0.5"/><rect x="13" y="6" width="2" height="9" rx="0.5"/>
+      </svg>
+      <span class="flow-chart-title">Распределение длительности запусков</span>
+    </div>
+    <div id="histogram-placeholder" class="flow-trend-empty"><p>Загрузка...</p></div>
+    <div id="histogram-container" style="display:none;"></div>
+  </div>
 
 </div>
+
+<style>
+.kpi-skeleton {
+  display: inline-block;
+  width: 60px; height: 28px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: kpi-shimmer 1.4s infinite;
+  border-radius: 6px; vertical-align: middle;
+}
+@keyframes kpi-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+</style>
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  document.getElementById('logoutBtn')?.addEventListener('click', async () => {
-    await fetch('/auth/logout', { method: 'POST' });
-    window.location.href = '/login';
+/* ── Утилиты ──────────────────────────────────────────────── */
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value ?? '—';
+}
+
+function fmtDuration(sec) {
+  if (sec == null) return '—';
+  const s = Math.round(sec);
+  if (s < 60)   return s + 'с';
+  if (s < 3600) { const m = Math.floor(s/60), r = s%60; return r ? `${m}м ${r}с` : `${m}м`; }
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  return m ? `${h}ч ${m}м` : `${h}ч`;
+}
+
+function fmtDelta(pct) {
+  if (pct == null) return { text: '', cls: '' };
+  const sign = pct > 0 ? '+' : '';
+  return { text: `${sign}${pct}% со вчера`, cls: pct >= 0 ? 'up' : 'down' };
+}
+
+function applyDelta(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const { text, cls } = fmtDelta(pct);
+  el.textContent = text;
+  el.className = 'flow-kpi-delta ' + cls;
+}
+
+function showEl(id)  { const e = document.getElementById(id); if (e) e.style.display = ''; }
+function hideEl(id)  { const e = document.getElementById(id); if (e) e.style.display = 'none'; }
+
+/* ── 1. KPI Summary ───────────────────────────────────────── */
+async function loadSummary() {
+  try {
+    const res = await fetch('/api/dashboard/summary');
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+
+    setText('kpi-active-runs',     d.active_runs     ?? '—');
+    setText('kpi-completed-today', d.completed_today ?? '—');
+    setText('kpi-errors-today',    d.errors_today    ?? '—');
+    setText('kpi-avg-duration',    d.avg_duration_seconds != null
+      ? fmtDuration(d.avg_duration_seconds) : '—');
+
+    applyDelta('kpi-active-runs-delta',      d.active_runs_delta_percent);
+    applyDelta('kpi-completed-today-delta',  d.completed_today_delta_percent);
+    applyDelta('kpi-errors-today-delta',     d.errors_today_delta_percent);
+    applyDelta('kpi-avg-duration-delta',     d.avg_duration_seconds_delta_percent);
+
+  } catch (e) {
+    console.warn('Summary error:', e);
+    ['kpi-active-runs','kpi-completed-today','kpi-errors-today','kpi-avg-duration']
+      .forEach(id => setText(id, '—'));
+  }
+}
+
+/* ── 2. Донат: статусы запусков ───────────────────────────── */
+const STATUS_COLORS = {
+  SUCCEED:     '#22c55e', EXECUTION:  '#3b82f6', QUEUED:      '#93c5fd',
+  WAITING:     '#d1d5db', ERROR:      '#ef4444', TEMP_ERROR:  '#f59e0b',
+  INTERRUPTED: '#f97316', CANCELLED:  '#9ca3af',
+};
+const STATUS_LABELS = {
+  SUCCEED: 'Успешно', EXECUTION: 'Выполняется', QUEUED: 'В очереди',
+  WAITING: 'Ожидает', ERROR: 'Ошибка', TEMP_ERROR: 'Временная ошибка',
+  INTERRUPTED: 'Прервано', CANCELLED: 'Отменено',
+};
+
+async function loadDonut() {
+  try {
+    const res = await fetch('/api/dashboard/run-statuses');
+    if (!res.ok) throw new Error(res.status);
+    const items = await res.json();  // [{status, run_count, percentage}, ...]
+
+    const donutData = items.map(item => ({
+      label: STATUS_LABELS[item.status] || item.status,
+      value: item.run_count,
+      color: STATUS_COLORS[item.status] || '#9ca3af',
+    }));
+
+    /* Динамически вызываем макрос через API рендера */
+    const container = document.getElementById('donut-container');
+    if (!container) return;
+
+    /* Строим SVG донат прямо в JS (тот же алгоритм что в chart_donut.html) */
+    renderDonutInto('donut-container', donutData, 'Всего запусков (24ч)', 'dash_donut');
+
+    hideEl('donut-placeholder');
+    showEl('donut-container');
+  } catch (e) {
+    console.warn('Donut error:', e);
+    document.getElementById('donut-placeholder').innerHTML =
+      '<p style="color:#9ca3af;font-size:13px;">Нет данных</p>';
+  }
+}
+
+function renderDonutInto(containerId, data, subtitle, id) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const cx = 110, cy = 110, R = 96, r = 62, GAP = 0.018;
+
+  let arcs = '';
+  let angle = -Math.PI / 2;
+  data.forEach(item => {
+    const sweep = (item.value / total) * (2 * Math.PI) - GAP;
+    if (sweep <= 0) return;
+    const polar = (a) => [cx + R * Math.cos(a), cy + R * Math.sin(a)];
+    const polarI = (a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    const [ox1,oy1] = polar(angle + GAP/2);
+    const [ox2,oy2] = polar(angle + sweep + GAP/2);
+    const [ix1,iy1] = polarI(angle + sweep + GAP/2);
+    const [ix2,iy2] = polarI(angle + GAP/2);
+    const large = sweep > Math.PI ? 1 : 0;
+    arcs += `<path d="M${ox1} ${oy1} A${R} ${R} 0 ${large} 1 ${ox2} ${oy2} L${ix1} ${iy1} A${r} ${r} 0 ${large} 0 ${ix2} ${iy2} Z" fill="${item.color}"/>`;
+    angle += sweep + GAP;
   });
 
-  (async () => {
-    const [summaryRes, statusesRes, durationsRes] = await Promise.all([
-      fetch('/api/dashboard/summary'),
-      fetch('/api/dashboard/run-statuses'),
-      fetch('/api/dashboard/duration-distribution')
-    ]);
+  let legendHtml = '';
+  data.forEach(item => {
+    const pct = total > 0 ? (item.value / total * 100).toFixed(1) : '0';
+    legendHtml += `
+      <div style="display:flex;align-items:center;gap:5px;font-size:13px;">
+        <span style="width:9px;height:9px;border-radius:50%;background:${item.color};flex-shrink:0;"></span>
+        <span style="color:#6b7280;">${item.label}:</span>
+        <span style="font-weight:600;color:#111827;">${item.value}</span>
+        <span style="color:#9ca3af;font-size:12px;">(${pct}%)</span>
+      </div>`;
+  });
 
-    const summary = await summaryRes.json();
-    const statuses = await statusesRes.json();
-    const durations = await durationsRes.json();
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <div style="position:relative;width:220px;height:220px;flex-shrink:0;">
+        <svg id="${id}_canvas" viewBox="0 0 220 220" width="220" height="220">
+          ${arcs}
+        </svg>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;">
+          <span style="display:block;font-size:32px;font-weight:700;color:#111827;line-height:1;">${total}</span>
+          <span style="display:block;font-size:11px;color:#9ca3af;margin-top:4px;">${subtitle}</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">${legendHtml}</div>
+    </div>`;
+}
 
-    const kpis = document.querySelectorAll('.flow-kpi-card .flow-kpi-value');
-    if (kpis.length >= 4) {
-      kpis[0].textContent = summary.execution_count ?? 0;
-      kpis[1].textContent = summary.succeed_count ?? 0;
-      kpis[2].textContent = summary.error_count ?? 0;
-      kpis[3].textContent = `${Math.round(summary.avg_execution_duration ?? 0)}с`;
+/* ── 3. Тренды производительности ─────────────────────────── */
+async function loadTrends() {
+  try {
+    const res = await fetch('/api/dashboard/performance-trends?period=day');
+    if (!res.ok) throw new Error(res.status);
+    const items = await res.json(); // [{period, completed_count, avg_duration_seconds}]
+
+    if (!items.length) throw new Error('empty');
+
+    const completedPoints = items.map(i => ({
+      label: new Date(i.period).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }),
+      value: i.completed_count || 0,
+    }));
+    const durationPoints = items.map(i => ({
+      label: new Date(i.period).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }),
+      value: Math.round(i.avg_duration_seconds || 0),
+    }));
+
+    /* Строим через существующие макросы — вставляем HTML и триггерим init */
+    const container = document.getElementById('trends-container');
+    container.innerHTML = `
+      <div class="lc-wrap" style="margin-bottom:16px;">
+        <div class="lc-subtitle">Количество выполненных задач</div>
+        <div class="lc-canvas-wrap" style="height:140px;">
+          <canvas id="trend_completed_canvas"></canvas>
+        </div>
+      </div>
+      <div class="lc-wrap">
+        <div class="lc-subtitle">Средняя длительность (сек)</div>
+        <div class="lc-canvas-wrap" style="height:120px;">
+          <canvas id="trend_duration_canvas"></canvas>
+        </div>
+      </div>`;
+
+    hideEl('trends-placeholder');
+    showEl('trends-container');
+
+    drawLineChart('trend_completed_canvas', completedPoints, '#6366f1', true);
+    drawLineChart('trend_duration_canvas',  durationPoints,  '#a855f7', false);
+
+  } catch (e) {
+    document.getElementById('trends-placeholder').innerHTML =
+      '<p style="color:#9ca3af;font-size:13px;">Нет данных за последние 24ч</p>';
+  }
+}
+
+function drawLineChart(canvasId, points, color, fill) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !points.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const PAD = { top:10, right:10, bottom:26, left:38 };
+
+  function render() {
+    const W = canvas.parentElement.clientWidth;
+    const H = parseInt(canvas.parentElement.style.height) || 140;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+    const vals = points.map(p => p.value);
+    const yMin = 0, yMax = Math.max(...vals) * 1.15 || 10;
+
+    const toX = i  => PAD.left + (i / (points.length - 1)) * cW;
+    const toY = v  => PAD.top  + cH - ((v - yMin) / (yMax - yMin)) * cH;
+
+    /* Сетка */
+    const step = Math.ceil(yMax / 4 / 10) * 10 || 1;
+    ctx.strokeStyle = 'rgba(156,163,175,.18)'; ctx.lineWidth = 1;
+    ctx.fillStyle = '#9ca3af'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+    for (let v = 0; v <= yMax; v += step) {
+      const y = toY(v);
+      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+      ctx.fillText(Math.round(v), PAD.left - 5, y + 3.5);
     }
 
-    if (window.updateDonutChart && statuses?.items) {
-      window.updateDonutChart('main_donut', statuses.items);
+    /* X метки */
+    ctx.textAlign = 'center'; ctx.fillStyle = '#9ca3af';
+    const xStep = Math.max(1, Math.ceil(points.length / 7));
+    points.forEach((p, i) => {
+      if (i % xStep === 0 || i === points.length - 1)
+        ctx.fillText(p.label, toX(i), H - 4);
+    });
+
+    const pts = points.map((p, i) => ({ x: toX(i), y: toY(p.value) }));
+
+    /* Catmull-Rom */
+    function catmull(ctx, pts) {
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[Math.max(i-1,0)], p1 = pts[i],
+              p2 = pts[i+1], p3 = pts[Math.min(i+2,pts.length-1)];
+        const cp1x = p1.x + (p2.x-p0.x)/6, cp1y = p1.y + (p2.y-p0.y)/6;
+        const cp2x = p2.x - (p3.x-p1.x)/6, cp2y = p2.y - (p3.y-p1.y)/6;
+        ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,p2.x,p2.y);
+      }
     }
-    if (window.updateHistogramChart && durations?.buckets) {
-      window.updateHistogramChart('main_hist', durations.buckets);
+
+    if (fill) {
+      const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+      grad.addColorStop(0, color + '33'); grad.addColorStop(1, color + '05');
+      ctx.beginPath(); catmull(ctx, pts);
+      ctx.lineTo(pts[pts.length-1].x, PAD.top+cH);
+      ctx.lineTo(pts[0].x, PAD.top+cH); ctx.closePath();
+      ctx.fillStyle = grad; ctx.fill();
     }
-  })();
+
+    ctx.beginPath(); catmull(ctx, pts);
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+
+    pts.forEach(p => {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI*2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+  }
+
+  render();
+  window.addEventListener('resize', render);
+}
+
+/* ── 4. Тепловая карта ────────────────────────────────────── */
+async function loadHeatmap() {
+  try {
+    const res = await fetch('/api/dashboard/run-heatmap');
+    if (!res.ok) throw new Error(res.status);
+    const items = await res.json(); // [{day_of_week, hour_of_day, run_count}]
+
+    /* Строим матрицу 7×24 */
+    const matrix = Array.from({length:7}, () => new Array(24).fill(0));
+    items.forEach(item => {
+      const d = (item.day_of_week - 1 + 7) % 7; // ISO: 1=Пн → 0
+      matrix[d][item.hour_of_day] = item.run_count;
+    });
+
+    const heatmapContainer = document.getElementById('heatmap-container');
+    heatmapContainer.dataset.heatmapMatrix = JSON.stringify(matrix);
+
+    /* Запускаем рендер тепловой карты через глобальную функцию если она есть */
+    renderHeatmapMatrix(heatmapContainer, matrix);
+
+    hideEl('heatmap-placeholder');
+    showEl('heatmap-container');
+  } catch (e) {
+    document.getElementById('heatmap-placeholder').innerHTML =
+      '<p style="color:#9ca3af;font-size:13px;">Нет данных за последние 7 дней</p>';
+  }
+}
+
+function renderHeatmapMatrix(container, matrix) {
+  const days  = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const maxVal = Math.max(...matrix.flat(), 1);
+
+  function intensityToColor(v) {
+    if (v <= 0) return '#e5e7eb';
+    const stops = [[52,211,153],[251,191,36],[249,115,22],[239,68,68]];
+    const t = Math.min(v / maxVal, 1);
+    const seg = t * (stops.length - 1);
+    const i = Math.floor(seg), f = seg - i;
+    const c1 = stops[Math.min(i, stops.length-1)];
+    const c2 = stops[Math.min(i+1, stops.length-1)];
+    return `rgb(${Math.round(c1[0]+(c2[0]-c1[0])*f)},${Math.round(c1[1]+(c2[1]-c1[1])*f)},${Math.round(c1[2]+(c2[2]-c1[2])*f)})`;
+  }
+
+  const hourLabels = [0,3,6,9,12,15,18,21];
+  let html = '<div style="overflow-x:auto;"><div style="min-width:500px;">';
+
+  /* Подписи часов */
+  html += '<div style="display:flex;margin-left:28px;margin-bottom:4px;">';
+  for (let h = 0; h < 24; h++) {
+    html += `<div style="flex:1;font-size:10px;color:#9ca3af;text-align:left;${hourLabels.includes(h)?'':'visibility:hidden;'}">
+      ${hourLabels.includes(h) ? h + ':00' : ''}
+    </div>`;
+  }
+  html += '</div>';
+
+  /* Строки */
+  for (let d = 0; d < 7; d++) {
+    html += `<div style="display:flex;align-items:center;gap:2px;margin-bottom:2px;">
+      <div style="width:24px;font-size:11px;color:#9ca3af;text-align:right;padding-right:4px;flex-shrink:0;">${days[d]}</div>`;
+    for (let h = 0; h < 24; h++) {
+      const v = matrix[d][h];
+      html += `<div title="${days[d]} ${h}:00 — ${v} запусков"
+                    style="flex:1;height:18px;border-radius:3px;background:${intensityToColor(v)};cursor:default;transition:transform .1s;"
+                    onmouseenter="this.style.transform='scale(1.3)'"
+                    onmouseleave="this.style.transform=''"></div>`;
+    }
+    html += '</div>';
+  }
+
+  /* Легенда */
+  html += '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;">';
+  html += '<span style="font-size:11px;color:#9ca3af;">Меньше</span>';
+  [0.08, 0.3, 0.55, 0.78, 1.0].forEach(t => {
+    html += `<div style="width:14px;height:14px;border-radius:3px;background:${intensityToColor(Math.round(t*maxVal))};"></div>`;
+  });
+  html += '<span style="font-size:11px;color:#9ca3af;">Больше</span></div>';
+  html += '</div></div>';
+
+  container.innerHTML = html;
+}
+
+/* ── 5. Гистограмма ───────────────────────────────────────── */
+async function loadHistogram() {
+  try {
+    const res = await fetch('/api/dashboard/duration-distribution');
+    if (!res.ok) throw new Error(res.status);
+    const items = await res.json(); // [{duration_bucket, run_count}]
+
+    if (!items.length) throw new Error('empty');
+
+    const data = items.map(i => ({ label: i.duration_bucket, value: i.run_count }));
+    const total = data.reduce((s, i) => s + i.value, 0);
+
+    const container = document.getElementById('histogram-container');
+    const maxVal = Math.max(...data.map(d => d.value), 1);
+    const step = Math.max(Math.ceil(maxVal / 4 / 10) * 10, 1);
+
+    let barsHtml = '';
+    data.forEach(item => {
+      const pct = (item.value / maxVal * 100).toFixed(1);
+      barsHtml += `<div class="hist-bar-col">
+        <div class="hist-bar-wrap">
+          <div class="hist-bar" style="height:${pct}%;background:#3b82f6;">
+            <div class="hist-tooltip">${item.label}: <strong>${item.value}</strong></div>
+          </div>
+        </div>
+      </div>`;
+    });
+
+    let gridHtml = '';
+    for (let v = 0; v <= maxVal; v += step) {
+      const pct = (v / maxVal * 100).toFixed(1);
+      gridHtml += `<div class="hist-gridline" style="bottom:${pct}%">
+        <span class="hist-y-label">${Math.round(v)}</span>
+      </div>`;
+    }
+
+    container.innerHTML = `
+      <div class="hist-inner">
+        <div class="hist-chart-area">
+          ${gridHtml}
+          <div class="hist-bars-row">${barsHtml}</div>
+        </div>
+        <div class="hist-x-axis">
+          ${data.map(d => `<div class="hist-x-label">${d.label}</div>`).join('')}
+        </div>
+      </div>
+      <div class="hist-footer">
+        <span>Всего проанализировано запусков: <strong>${total}</strong></span>
+      </div>`;
+
+    hideEl('histogram-placeholder');
+    showEl('histogram-container');
+  } catch (e) {
+    document.getElementById('histogram-placeholder').innerHTML =
+      '<p style="color:#9ca3af;font-size:13px;">Нет данных</p>';
+  }
+}
+
+/* ── Запускаем всё параллельно ────────────────────────────── */
+Promise.all([
+  loadSummary(),
+  loadDonut(),
+  loadTrends(),
+  loadHeatmap(),
+  loadHistogram(),
+]);
 </script>
 {% endblock %}

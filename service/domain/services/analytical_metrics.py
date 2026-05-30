@@ -11,11 +11,17 @@ from service.domain.schemas.analytical_metrics import (
     TaskRunStatistics,
 )
 from service.ports.outbound.repo.analytical_metrics import AnalyticalMetricsProviderI
+from service.ports.outbound.repo.task import TaskStatisticsProvider
 
 
 class AnalyticalMetricsService:
-    def __init__(self, analytical_metrics_provider: AnalyticalMetricsProviderI):
+    def __init__(self, analytical_metrics_provider: AnalyticalMetricsProviderI,
+                 task_statistics_provider: TaskStatisticsProvider,):
         self._analytical_metrics_provider = analytical_metrics_provider
+        self._task_statistics_provider = task_statistics_provider
+
+    async def get_groups_statistics(self):
+        return await self._task_statistics_provider.provide_groups_statistics()
 
     async def get_dashboard_summary(self) -> DashboardSummaryWithDelta:
         current = await self._analytical_metrics_provider.get_dashboard_summary(day_offset=0)

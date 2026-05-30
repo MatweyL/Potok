@@ -29,7 +29,7 @@ from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAMonit
 from service.adapters.outbound.repo.sa.impls.payload import SAPayloadRepo
 from service.adapters.outbound.repo.sa.impls.project import SAProjectRepo
 from service.adapters.outbound.repo.sa.impls.refresh_token import SARefreshTokenRepo
-from service.adapters.outbound.repo.sa.impls.task import SATaskRepo, SATaskProvider
+from service.adapters.outbound.repo.sa.impls.task import SATaskRepo, SATaskProvider, SATaskStatisticsProvider
 from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
 from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
 from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider, \
@@ -169,7 +169,10 @@ async def main():
     task_run_metrics_provider = SATaskRunMetricsProvider(database)
     task_provider = SATaskProvider(database)
     analytical_metrics_provider = SAAnalyticalMetricsProvider(database)
-    analytical_metrics_service = AnalyticalMetricsService(analytical_metrics_provider)
+
+    task_statistics_provider = SATaskStatisticsProvider(database)
+    analytical_metrics_service = AnalyticalMetricsService(analytical_metrics_provider, task_statistics_provider)
+
 
     rmq_producer_connection = AioPikaRMQProducerConnection.from_settings(settings.rmq_producer_connection)
     rmq_producer = AioPikaRMQProducer.from_settings(settings.rmq_producer_task_run, rmq_producer_connection)

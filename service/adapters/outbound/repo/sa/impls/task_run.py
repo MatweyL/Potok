@@ -255,7 +255,57 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
                     task_run_grouped_avg_metrics.avg_temp_error_count = cnt
                 elif status == TaskRunStatus.INTERRUPTED:
                     task_run_grouped_avg_metrics.avg_interrupted_count = cnt
+            # Отдельный запрос для avg_execution_duration — проще и надёжнее
+            duration_query = text(f"""
+                SELECT
+                    tr.group_name,
+                    AVG(
+                        EXTRACT(EPOCH FROM (
+                            tr.status_updated_at
+                            - (
+                                SELECT trl.status_updated_at
+                                FROM task_run_status_log trl
+                                WHERE trl.task_run_id = tr.id
+                                  AND trl.status = 'EXECUTION'
+                                ORDER BY trl.status_updated_at ASC
+                                LIMIT 1
+                            )
+                        ))
+                    ) AS avg_execution_duration,
+                    AVG(
+                        EXTRACT(EPOCH FROM (
+                            (
+                                SELECT trl.status_updated_at
+                                FROM task_run_status_log trl
+                                WHERE trl.task_run_id = tr.id
+                                  AND trl.status = 'EXECUTION'
+                                ORDER BY trl.status_updated_at ASC
+                                LIMIT 1
+                            )
+                            - tr.loaded_at
+                        ))
+                    ) AS avg_queued_duration
+                FROM task_run tr
+                WHERE tr.status_updated_at > :bound_datetime
+                  AND tr.status = 'SUCCEED'
+                  {group_name_predicate}
+                GROUP BY tr.group_name
+            """)
+            duration_result = await session.execute(duration_query, query_kwargs)
+            duration_rows = duration_result.fetchall()
 
+            for row in duration_rows:
+                gname = row[0]
+                if gname not in grouped_avg_metrics_by_name:
+                    grouped_avg_metrics_by_name[gname] = TaskRunGroupedAvgMetrics(
+                        group_name=gname,
+                        period_s=period_s
+                    )
+                m = grouped_avg_metrics_by_name[gname]
+                if row[1] is not None:
+                    m.avg_execution_duration = float(row[1])
+                if row[2] is not None:
+                    m.avg_queued_duration = float(row[2])
             return TaskRunAvgMetrics(grouped_avg_metrics_by_name=grouped_avg_metrics_by_name)
 
 

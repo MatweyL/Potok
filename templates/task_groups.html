@@ -1,105 +1,37 @@
 {% extends "base.html" %}
 {% set active_nav = 'task_groups' %}
 {% block title %}Группы задач — Поток{% endblock %}
-{% block extra_css %}
-
-<style>
-.tgl-page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.tgl-page-subtitle {
-  font-size: 13.5px;
-  color: var(--flow-text-muted, #6b7280);
-  margin: 0;
-}
-
-/* Карточки: 2 колонки */
-.tgl-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-@media (max-width: 720px) {
-  .tgl-grid { grid-template-columns: 1fr; }
-}
-
-/* Пустое состояние */
-.tgl-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 64px 24px;
-  background: var(--flow-surface, #fff);
-  border: 1px dashed var(--flow-border, #e5e7eb);
-  border-radius: var(--flow-radius, 12px);
-  color: var(--flow-text-muted, #9ca3af);
-  text-align: center;
-}
-.tgl-empty-icon { opacity: .4; }
-.tgl-empty-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--flow-text, #374151);
-  margin-top: 4px;
-}
-.tgl-empty-sub { font-size: 13px; }
-</style>
-{% endblock %}
 
 {% block body %}
 {% from "components/task_group_card.html" import render_task_group_card %}
 
-{#
-  Ожидаемые переменные из view:
-    groups        — список объектов группы задач
-    groups_stats  — dict { group_id: stats_dict } — статистика по каждой группе
-    summary       — dict {
-                      total_groups:    int,
-                      total_tasks:     int,
-                      active_runs:     int,
-                      avg_success_rate: float (0-100)
-                    }
-#}
-
-{# Fallback-данные для демо (удали в проде) #}
-{% if not summary is defined %}
-  {% set summary = {
-    "total_groups":     groups | length if groups is defined else 0,
-    "total_tasks":      0,
-    "active_runs":      0,
-    "avg_success_rate": none
-  } %}
-{% endif %}
-
 <div class="flow-page">
 
-  {# ── Заголовок страницы ── #}
-  <div class="tgl-page-header">
+  {# ── Заголовок ── #}
+  <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
     <div>
-      <h1 class="flow-page-title" style="margin-bottom: 4px;">Группы задач</h1>
-      <p class="tgl-page-subtitle">Управление группами и шаблонами задач</p>
+      <h1 class="flow-page-title" style="margin-bottom:4px;">Группы задач</h1>
+      <p style="font-size:13.5px;color:var(--flow-text-muted,#6b7280);margin:0;">
+        Управление группами и шаблонами задач
+      </p>
     </div>
-    <a href="/task-groups/create" class="flow-btn-primary">
+    <button class="flow-btn-primary" id="openCreateModal">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M7 2v10M2 7h10" stroke="white" stroke-width="2" stroke-linecap="round"/>
       </svg>
       Создать группу
-    </a>
+    </button>
   </div>
 
   {# ── KPI-плашки ── #}
-  <div class="flow-kpi-grid" style="margin-bottom: 24px;">
+  <div class="flow-kpi-grid" style="margin-bottom:24px;">
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Всего групп</span>
-      <span class="flow-kpi-value">{{ summary.total_groups }}</span>
-      <div class="flow-kpi-icon" style="background: #eff6ff;">
+      <span class="flow-kpi-value" id="kpi-total-groups">
+        {{ groups | length if groups is defined else '—' }}
+      </span>
+      <div class="flow-kpi-icon" style="background:#eff6ff;">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <path d="M3 8C3 6.9 3.9 6 5 6h10c1.1 0 2 .9 2 2s-.9 2-2 2H5c-1.1 0-2-.9-2-2z" fill="#2563eb" opacity=".3"/>
           <path d="M3 12c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2s-.9 2-2 2H5c-1.1 0-2-.9-2-2z" fill="#2563eb" opacity=".65"/>
@@ -110,8 +42,10 @@
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Всего задач</span>
-      <span class="flow-kpi-value">{{ summary.total_tasks }}</span>
-      <div class="flow-kpi-icon" style="background: #faf5ff;">
+      <span class="flow-kpi-value" id="kpi-total-tasks">
+        <span class="kpi-skeleton"></span>
+      </span>
+      <div class="flow-kpi-icon" style="background:#faf5ff;">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="7.5" stroke="#a855f7" stroke-width="1.8"/>
           <polyline points="7,10 9,12 13,8" stroke="#a855f7" stroke-width="1.8"
@@ -122,13 +56,15 @@
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Активных запусков</span>
-      <span class="flow-kpi-value">{{ summary.active_runs }}</span>
-      <div class="flow-kpi-icon" style="background: #f0fdf4;">
+      <span class="flow-kpi-value" id="kpi-active-runs">
+        <span class="kpi-skeleton"></span>
+      </span>
+      <div class="flow-kpi-icon" style="background:#f0fdf4;">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <polyline points="2,14 6,9 10,12 14,5 18,8"
                     stroke="#22c55e" stroke-width="1.8"
                     stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <polyline points="14,8 18,8 18,12" stroke="#22c55e" stroke-width="1.8"
+          <polyline points="14,5 18,5 18,9" stroke="#22c55e" stroke-width="1.8"
                     stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </svg>
       </div>
@@ -136,12 +72,10 @@
 
     <div class="flow-kpi-card">
       <span class="flow-kpi-label">Средний успех</span>
-      <span class="flow-kpi-value">
-        {% if summary.avg_success_rate is not none %}
-          {{ "%.1f"|format(summary.avg_success_rate) }}%
-        {% else %}—{% endif %}
+      <span class="flow-kpi-value" id="kpi-avg-success">
+        <span class="kpi-skeleton"></span>
       </span>
-      <div class="flow-kpi-icon" style="background: #fff7ed;">
+      <div class="flow-kpi-icon" style="background:#fff7ed;">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="7.5" stroke="#f97316" stroke-width="1.8"/>
           <line x1="10" y1="6" x2="10" y2="10.5" stroke="#f97316" stroke-width="1.8" stroke-linecap="round"/>
@@ -152,65 +86,318 @@
 
   </div>
 
-  {# ── Сетка карточек групп ── #}
+  {# ── Сетка карточек ── #}
   {% if groups is defined and groups %}
-  <div class="tgl-grid">
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">
     {% for group in groups %}
-      {% set grp_stats = groups_stats[group.id] if groups_stats is defined and group.id in groups_stats else none %}
-      {% set grp_project = project_by_task_group_name[group.name] if project_by_task_group_name is defined else none %}
-      <div>
-        {{ render_task_group_card(
-            group        = group,
-            stats        = grp_stats,
-            project      = grp_project,
-            show_project = true
-        ) }}
-      </div>
+      {% set grp_stats = task_group_statistics_by_name[group.name]
+                   if task_group_statistics_by_name is defined and group.name in task_group_statistics_by_name
+                   else none %}
+      {% set grp_project = project_by_task_group_name[group.name]
+                           if project_by_task_group_name is defined and group.name in project_by_task_group_name
+                           else none %}
+      {{ render_task_group_card(
+          group        = group,
+          stats        = grp_stats,
+          project      = grp_project,
+          show_project = true
+      ) }}
     {% endfor %}
   </div>
 
   {% else %}
-  {# Пустое состояние #}
-  <div class="tgl-empty">
-    <div class="tgl-empty-icon">
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-        <path d="M6 16C6 13.8 7.8 12 10 12h20c2.2 0 4 1.8 4 4s-1.8 4-4 4H10c-2.2 0-4-1.8-4-4z"
-              fill="currentColor" opacity=".2"/>
-        <path d="M6 24c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4s-1.8 4-4 4H10c-2.2 0-4-1.8-4-4z"
-              fill="currentColor" opacity=".5"/>
-        <path d="M6 32c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4s-1.8 4-4 4H10c-2.2 0-4-1.8-4-4z"
-              fill="currentColor" opacity=".8"/>
-      </svg>
-    </div>
-    <div class="tgl-empty-title">Групп задач пока нет</div>
-    <div class="tgl-empty-sub">Создайте первую группу, чтобы начать управлять задачами</div>
-    <a href="/task-groups/create" class="flow-btn-primary" style="margin-top: 4px;">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+              gap:10px;padding:64px 24px;text-align:center;
+              background:#fff;border:1px dashed var(--flow-border,#e5e7eb);
+              border-radius:var(--flow-radius,12px);color:var(--flow-text-muted,#9ca3af);">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="opacity:.35;">
+      <path d="M6 16C6 13.8 7.8 12 10 12h20c2.2 0 4 1.8 4 4s-1.8 4-4 4H10c-2.2 0-4-1.8-4-4z" fill="currentColor" opacity=".3"/>
+      <path d="M6 24c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4s-1.8 4-4 4H10c-2.2 0-4-1.8-4-4z" fill="currentColor" opacity=".6"/>
+      <path d="M6 32c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4s-1.8 4-4 4H10c-2.2 0-4-1.8-4-4z" fill="currentColor"/>
+    </svg>
+    <div style="font-size:16px;font-weight:600;color:#374151;">Групп задач пока нет</div>
+    <div style="font-size:13px;">Создайте первую группу, чтобы начать управлять задачами</div>
+    <button class="flow-btn-primary" id="openCreateModalEmpty" style="margin-top:4px;">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M7 2v10M2 7h10" stroke="white" stroke-width="2" stroke-linecap="round"/>
       </svg>
       Создать группу
-    </a>
+    </button>
   </div>
   {% endif %}
 
 </div>
 
-{% endblock %}
+{# ── Модалка создания группы ── #}
+<div class="algo-modal-backdrop" id="createGroupModal" style="display:none;">
+  <div class="algo-modal" style="max-width:540px;">
+    <div class="algo-modal-header">
+      <span class="algo-modal-title">Создать группу задач</span>
+      <button class="algo-modal-close" id="closeCreateModal">×</button>
+    </div>
+    <div class="algo-modal-body">
 
+      <div class="algo-form-field">
+        <label class="algo-form-label">Название <span style="color:#dc2626;">*</span></label>
+        <input type="text" id="newGroupTitle" class="algo-form-input"
+               placeholder="Мониторинг API" maxlength="255"/>
+      </div>
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">
+          Короткое имя <span style="color:#dc2626;">*</span>
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;">— системный идентификатор, только латиница и точки</span>
+        </label>
+        <input type="text" id="newGroupName" class="algo-form-input"
+               placeholder="api.monitoring" maxlength="100"
+               style="font-family:ui-monospace,monospace;"/>
+      </div>
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">Описание</label>
+        <textarea id="newGroupDescription" class="algo-form-textarea"
+                  rows="3" maxlength="1000"
+                  placeholder="Краткое описание назначения группы"></textarea>
+      </div>
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">
+          Аргументы выполнения
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;">(JSON-объект, необязательно)</span>
+        </label>
+        <textarea id="newGroupExecArgs" class="algo-form-textarea"
+                  rows="3" placeholder='{}'
+                  style="font-family:ui-monospace,monospace;font-size:12.5px;"></textarea>
+        <span id="newGroupExecArgsError"
+              style="font-size:12px;color:#dc2626;display:none;margin-top:2px;"></span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;
+                      font-size:13.5px;color:#374151;">
+          <input type="checkbox" id="newGroupQueuePerPriority"
+                 style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb;"/>
+          Отдельные очереди на приоритет
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;
+                      font-size:13.5px;color:#374151;">
+          <input type="checkbox" id="newGroupIsActive" checked
+                 style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb;"/>
+          Группа активна
+        </label>
+      </div>
+
+      <div id="createGroupError"
+           style="font-size:12.5px;color:#dc2626;background:#fef2f2;
+                  border:1px solid #fecaca;border-radius:8px;
+                  padding:8px 12px;display:none;"></div>
+    </div>
+    <div class="algo-modal-footer">
+      <button class="btn btn-secondary btn-sm" id="cancelCreateModal">Отмена</button>
+      <button class="btn btn-primary btn-sm px-4" id="saveGroupBtn">Создать</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.kpi-skeleton {
+  display: inline-block;
+  width: 60px; height: 28px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: kpi-shimmer 1.4s infinite;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+@keyframes kpi-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.algo-modal-backdrop {
+  position:fixed;inset:0;background:rgba(0,0,0,.35);
+  z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.algo-modal {
+  background:#fff;border-radius:14px;width:100%;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden;
+}
+.algo-modal-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px 14px;border-bottom:1px solid #e5e7eb;
+}
+.algo-modal-title  { font-size:15px;font-weight:600;color:#111827; }
+.algo-modal-close  {
+  width:28px;height:28px;border:none;background:none;cursor:pointer;
+  border-radius:6px;color:#6b7280;font-size:20px;display:flex;align-items:center;justify-content:center;
+  transition:background .12s;
+}
+.algo-modal-close:hover { background:#f3f4f6; }
+.algo-modal-body   {
+  padding:18px 20px;display:flex;flex-direction:column;gap:14px;
+  overflow-y:auto;max-height:70vh;
+}
+.algo-modal-footer {
+  display:flex;justify-content:flex-end;gap:8px;
+  padding:14px 20px;border-top:1px solid #e5e7eb;
+}
+.algo-form-field   { display:flex;flex-direction:column;gap:5px; }
+.algo-form-label   { font-size:13px;font-weight:500;color:#374151; }
+.algo-form-input,.algo-form-textarea {
+  width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+  font-size:13.5px;color:#111827;background:#fff;outline:none;
+  transition:border-color .15s,box-shadow .15s;font-family:inherit;box-sizing:border-box;
+}
+.algo-form-input:focus,.algo-form-textarea:focus {
+  border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.1);
+}
+.algo-form-textarea { resize:vertical;min-height:72px; }
+</style>
+
+{% endblock %}
 
 {% block extra_js %}
 <script>
+/* ── KPI: загружаем summary + считаем total_tasks из карточек ── */
 (async () => {
-  const summaryRes = await fetch('/api/dashboard/summary');
-  const summary = await summaryRes.json();
+  function set(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value ?? '—';
+  }
 
-  const cards = document.querySelectorAll('.flow-kpi-card .flow-kpi-value');
-  if (cards.length >= 4) {
-    cards[0].textContent = cards[0].textContent || '0';
-    cards[1].textContent = summary.total_tasks ?? cards[1].textContent;
-    cards[2].textContent = summary.execution_count ?? cards[2].textContent;
-    cards[3].textContent = summary.success_rate ? `${summary.success_rate.toFixed(1)}%` : cards[3].textContent;
+  try {
+    const res = await fetch('/api/dashboard/summary');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+
+    set('kpi-active-runs', d.active_runs ?? '—');
+
+    /* success_rate считаем из completed_today / (completed_today + errors_today) */
+    const completed = d.completed_today ?? 0;
+    const errors    = d.errors_today    ?? 0;
+    const total     = completed + errors;
+    if (total > 0) {
+      set('kpi-avg-success', ((completed / total) * 100).toFixed(1) + '%');
+    } else {
+      set('kpi-avg-success', '—');
+    }
+
+  } catch (e) {
+    console.warn('KPI summary error:', e);
+    ['kpi-active-runs', 'kpi-avg-success'].forEach(id => set(id, '—'));
+  }
+
+  /* total_tasks — считаем из данных групп, переданных сервером */
+  try {
+    const res = await fetch('/api/task-groups');
+    if (res.ok) {
+      const d = await res.json();
+      set('kpi-total-tasks', d.total_tasks_count ?? '—');
+    }
+  } catch (_) {
+    /* Если эндпоинта нет — просто оставляем скелетон или '—' */
+    set('kpi-total-tasks', '—');
   }
 })();
+
+/* ── Модалка создания группы ── */
+const modal     = document.getElementById('createGroupModal');
+const openModal  = () => { modal.style.display = 'flex'; };
+const closeModal = () => {
+  modal.style.display = 'none';
+  document.getElementById('createGroupError').style.display = 'none';
+};
+
+document.getElementById('openCreateModal')?.addEventListener('click', openModal);
+document.getElementById('openCreateModalEmpty')?.addEventListener('click', openModal);
+document.getElementById('closeCreateModal')?.addEventListener('click', closeModal);
+document.getElementById('cancelCreateModal')?.addEventListener('click', closeModal);
+modal?.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+/* Авто-генерация short name из title */
+document.getElementById('newGroupTitle')?.addEventListener('input', function () {
+  const nameEl = document.getElementById('newGroupName');
+  if (nameEl && !nameEl.dataset.edited) {
+    nameEl.value = this.value
+      .toLowerCase()
+      .replace(/[^a-zа-яёa-z0-9\s.]/gi, '')
+      .trim()
+      .replace(/\s+/g, '.')
+      .replace(/[а-яёa-z]/gi, c => c)   /* оставляем как есть */
+      .slice(0, 100);
+  }
+});
+document.getElementById('newGroupName')?.addEventListener('input', function () {
+  this.dataset.edited = '1';
+});
+
+/* Сохранение */
+document.getElementById('saveGroupBtn')?.addEventListener('click', async function () {
+  const errEl    = document.getElementById('createGroupError');
+  const argsErrEl = document.getElementById('newGroupExecArgsError');
+  errEl.style.display     = 'none';
+  argsErrEl.style.display = 'none';
+
+  const title = document.getElementById('newGroupTitle').value.trim();
+  const name  = document.getElementById('newGroupName').value.trim();
+  if (!title) {
+    errEl.textContent   = 'Укажите название группы';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!name) {
+    errEl.textContent   = 'Укажите короткое имя группы';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  let executionArguments = null;
+  const rawArgs = document.getElementById('newGroupExecArgs').value.trim();
+  if (rawArgs && rawArgs !== '{}') {
+    try {
+      executionArguments = JSON.parse(rawArgs);
+      if (typeof executionArguments !== 'object' || executionArguments === null)
+        throw new Error('Ожидается JSON-объект');
+    } catch (e) {
+      document.getElementById('newGroupExecArgs').style.borderColor = '#dc2626';
+      argsErrEl.textContent   = 'Ошибка JSON: ' + e.message;
+      argsErrEl.style.display = 'block';
+      return;
+    }
+  }
+
+  this.disabled    = true;
+  const orig       = this.textContent;
+  this.textContent = 'Создание…';
+
+  try {
+    const res = await fetch('/task-groups', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        name,
+        description:         document.getElementById('newGroupDescription').value.trim() || null,
+        execution_arguments: executionArguments,
+        queue_per_priority:  document.getElementById('newGroupQueuePerPriority').checked,
+        is_active:           document.getElementById('newGroupIsActive').checked,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || data.error || `Ошибка ${res.status}`);
+    }
+
+    closeModal();
+    window.location.reload();
+  } catch (e) {
+    errEl.textContent   = 'Не удалось создать группу: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    this.disabled    = false;
+    this.textContent = orig;
+  }
+});
 </script>
 {% endblock %}
