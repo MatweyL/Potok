@@ -1,4 +1,5 @@
 from abc import ABC
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from service.domain.schemas.task_detailed import TaskDetailed
@@ -88,6 +89,9 @@ class UpdateTaskGroupUCRq(UCRequest):
     is_active: Optional[bool] = None
     execution_arguments: Optional[Dict[str, Any]] = None
     queue_per_priority: Optional[bool] = None
+    time_interval_max_period: float | None = None
+    time_interval_first_left_bound_at: datetime | None = None
+    time_interval_first_left_bound_depth: float | None = None
 
 
 class UpdateTaskGroupUCRs(UCResponse):
@@ -115,6 +119,12 @@ class UpdateTaskGroupUC(TaskGroupUC):
             updates['execution_arguments'] = request.execution_arguments
         if request.queue_per_priority is not None:
             updates['queue_per_priority'] = request.queue_per_priority
+        if request.time_interval_max_period is not None:
+            updates['time_interval_max_period'] = request.time_interval_max_period
+        if request.time_interval_first_left_bound_at is not None:
+            updates['time_interval_first_left_bound_at'] = request.time_interval_first_left_bound_at
+        if request.time_interval_first_left_bound_depth is not None:
+            updates['time_interval_first_left_bound_depth'] = request.time_interval_first_left_bound_depth
 
         if not updates:
             # Нечего обновлять — возвращаем как есть

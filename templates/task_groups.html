@@ -186,7 +186,32 @@
           Группа активна
         </label>
       </div>
+      <div style="text-align: center;font-weight:500">Параметры задач с типом "Временной интервал"</div>
+      <div class="algo-form-field">
+        <label class="algo-form-label">
+          Максимальный размер интервала
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;"> в секундах</span>
+        </label>
+        <input type="number" id="newTimeIntervalMaxPeriod" class="algo-form-input"
+               placeholder="86400"/>
+      </div>
 
+      <div class="algo-form-field">
+        <label class="algo-form-label">
+          Крайняя левая дата для первого сбора
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;"> более приоритетно, чем глубина</span>
+        </label>
+        <input type="datetime" id="newTimeIntervalFirstLeftBoundAt" class="algo-form-input"/>
+      </div>
+
+      <div class="algo-form-field">
+        <label class="algo-form-label">
+          Максимальная глубина первого сбора
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;"> в секундах</span>
+        </label>
+        <input type="number" id="newTimeIntervalFirstLeftBoundDepth" class="algo-form-input"
+               placeholder="86400"/>
+      </div>
       <div id="createGroupError"
            style="font-size:12.5px;color:#dc2626;background:#fef2f2;
                   border:1px solid #fecaca;border-radius:8px;
@@ -330,7 +355,17 @@ document.getElementById('newGroupTitle')?.addEventListener('input', function () 
 document.getElementById('newGroupName')?.addEventListener('input', function () {
   this.dataset.edited = '1';
 });
+const toFloatOrNull = (value) => {
+  const trimmed = value.trim();
 
+  if (trimmed === '') {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(trimmed);
+
+  return Number.isFinite(parsed) ? parsed : null;
+};
 /* Сохранение */
 document.getElementById('saveGroupBtn')?.addEventListener('click', async function () {
   const errEl    = document.getElementById('createGroupError');
@@ -374,14 +409,17 @@ document.getElementById('saveGroupBtn')?.addEventListener('click', async functio
     const res = await fetch('/task-groups', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify({task_group_body: {
         title,
         name,
         description:         document.getElementById('newGroupDescription').value.trim() || null,
         execution_arguments: executionArguments,
         queue_per_priority:  document.getElementById('newGroupQueuePerPriority').checked,
         is_active:           document.getElementById('newGroupIsActive').checked,
-      }),
+        time_interval_max_period: toFloatOrNull(document.getElementById('newTimeIntervalMaxPeriod').value),
+        time_interval_first_left_bound_at:   document.getElementById('newTimeIntervalFirstLeftBoundAt').value.trim() || null,
+        time_interval_first_left_bound_depth: toFloatOrNull(document.getElementById('newTimeIntervalFirstLeftBoundDepth').value),
+      }}),
     });
 
     if (!res.ok) {

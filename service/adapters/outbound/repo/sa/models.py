@@ -116,6 +116,10 @@ class TaskGroup(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
     queue_per_priority: Mapped[bool] = mapped_column(Boolean, nullable=False)
     execution_arguments: Mapped[Dict] = mapped_column(JSONWithDatetime, nullable=True)
 
+    time_interval_max_period: Mapped[float] = mapped_column(FLOAT, nullable=True,)
+    time_interval_first_left_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True,)
+    time_interval_first_left_bound_depth : Mapped[float] = mapped_column(FLOAT, nullable=True, server_default="86400")
+
 
 class TaskGroupByProject(Base, TablenameMixin, LoadTimestampMixin):
     group_id: Mapped[int] = mapped_column(BIGINT, ForeignKey("task_group.id"), primary_key=True)

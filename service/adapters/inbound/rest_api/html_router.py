@@ -125,12 +125,6 @@ async def get_project_task_groups(request: Request, project_id: int):
     return task_groups
 
 
-@router.get("/task-groups/without-project")
-async def get_task_groups_without_project(request: Request):
-    rs = await request.app.state.use_case_facade.get_task_groups_without_project()
-    task_groups = rs.task_groups if rs.task_groups else []
-    return task_groups
-
 
 @router.post("/projects/task-group/bind")
 async def add_task_group_to_project(request: Request, rq: AddTaskGroupToProjectUCRq):
@@ -165,59 +159,6 @@ async def update_project(request: Request, project_id: int, rq: UpdateProjectUCR
     rs = await request.app.state.use_case_facade.update_project(rq)
     return rs
 
-
-@router.get("/task-groups")
-async def task_groups_page(request: Request):
-    all_task_group_statistics_rs = await request.app.state.use_case_facade.get_all_task_group_statistics(
-        GetAllTaskGroupStatisticsUCRq())
-    task_groups_rs = await request.app.state.use_case_facade.get_all_task_group(GetAllTaskGroupUCRq())
-    all_task_group_by_project_detailed_rs = await request.app.state.use_case_facade.get_all_task_group_by_project_detailed()
-
-    return templates.TemplateResponse(
-        request=request, name="task_groups.html",
-        context={"groups": task_groups_rs.task_groups,
-                 "task_group_statistics_by_name": all_task_group_statistics_rs.task_group_statistics_by_name,
-                 "project_by_task_group_name": all_task_group_by_project_detailed_rs.project_by_task_group_name, }
-    )
-
-
-@router.get("/task-groups/json")
-async def task_groups_json(request: Request):
-    rs = await request.app.state.use_case_facade.get_all_task_group(GetAllTaskGroupUCRq())
-    return rs
-
-
-@router.get("/task-groups/{task_group_id}")
-async def task_group_page(request: Request, task_group_id: int):
-    task_group_rs = await request.app.state.use_case_facade.get_task_group(
-        GetTaskGroupUCRq(task_group_id=task_group_id))
-    task_group_statistics_rs = await request.app.state.use_case_facade.get_task_group_statistics(
-        GetTaskGroupStatisticsUCRq(task_group_id=task_group_id))
-    project_rs = await request.app.state.use_case_facade.get_project_by_task_group_uc(
-        GetProjectByTaskGroupUCRq(task_group_id=task_group_id))
-
-    status_metrics = await request.app.state.analytical_metrics_service.get_run_status_distribution(group_id=task_group_id)
-    speed_metrics = await request.app.state.analytical_metrics_service.get_task_group_processing_speed(group_id=task_group_id)
-    duration_metrics = await request.app.state.analytical_metrics_service.get_duration_distribution(group_id=task_group_id)
-    print(speed_metrics)
-    return templates.TemplateResponse(
-        request=request, name="task_group_2.html",
-        context={
-            "task_group": task_group_rs.task_group,
-            "task_group_statistics": task_group_statistics_rs.task_group_statistics,
-            "project": project_rs.project,
-            "status_metrics": status_metrics,
-            "speed_metrics": speed_metrics,
-            "duration_metrics": duration_metrics,
-        }
-    )
-
-
-
-@router.put("/task-groups/{task_group_id}")
-async def update_group(request: Request, task_group_id: int, rq: UpdateTaskGroupUCRq):
-    update_rs = await request.app.state.use_case_facade.update_task_group(rq)
-    return update_rs
 
 
 @router.get("/tasks", response_class=HTMLResponse)

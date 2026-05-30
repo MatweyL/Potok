@@ -18,6 +18,7 @@ from .annotations import HTTPMethod, EveryType
 from .html.analytical_metrics import analytical_metrics_router
 from .html.monitoring_algorithms import monitoring_algorithms_router
 from .html.payloads import payloads_router
+from .html.task_groups import task_groups_router
 from .html.tasks import tasks_router
 from .html.users import users_router
 from .html_router import router as html_router
@@ -72,6 +73,7 @@ class FastAPIServer(Startable):
         self._app.include_router(payloads_router)
         self._app.include_router(monitoring_algorithms_router)
         self._app.include_router(analytical_metrics_router)
+        self._app.include_router(task_groups_router)
         self._app.mount("/static", StaticFiles(directory=get_project_root().joinpath('static')), name="static")
         handle_422_exceptions(self._app)
 

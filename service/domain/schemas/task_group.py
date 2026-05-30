@@ -39,13 +39,13 @@ class TaskGroupBody(BaseModel):
                                      default=True)
 
     time_interval_max_period: float | None = Field(description="Максимальный размер временного"
-                                                               " интервала для сбора данных", default=None)
-    time_interval_first_left_bound_at: datetime | None = Field(description="Минимальная левая дата сбора при первом сборе",
+                                                               " интервала для сбора данных, секунды", default=None)
+    time_interval_first_left_bound_at: datetime | None = Field(description="Минимальная левая дата сбора при первом сборе, более приоритетно",
                                                                default=None)
     time_interval_first_left_bound_depth: float | None = Field(description="Как глубоко относительно текущей даты будем"
-                                                                           " собирать источник при первом сборе",
-                                                               default=None)
-
+                                                                           " собирать источник при первом сборе, секунды",
+                                                               default=86400)  # В модели тоже установлено по умолчанию 86400
+    # TODO: добавить поле для выбора использования поля time_interval_first_left_bound_at или time_interval_first_left_bound_depth
 
 class TaskGroup(TaskGroupPK, TaskGroupBody):
     pass

@@ -12,7 +12,7 @@
     show_project — показывать привязку к проекту (по умолчанию false)
 #}
 
-{% macro render_task_group_card(group, stats=none, project=none, show_project=false) %}
+{% macro render_task_group_card(group, stats=none, project=none, show_project=false, detach_project_id=none) %}
 
 {# Вычисляем процент успеха #}
 {% set success_rate = none %}
@@ -63,16 +63,16 @@
     <div class="tgc-metrics">
 
       <div class="tgc-metric">
-        <div class="tgc-metric-label">Задач</div>
+        <div class="tgc-metric-label">Запусков задач</div>
         <div class="tgc-metric-value">
-          {{ stats.total_count if stats and stats.total_count is not none else '—' }}
+          {{ stats.total_count if stats and stats.total_count is not none else '0' }}
         </div>
       </div>
 
       <div class="tgc-metric">
         <div class="tgc-metric-label">Активных</div>
         <div class="tgc-metric-value tgc-metric-value--accent">
-          {{ stats.execution_count if stats and stats.execution_count is not none else '—' }}
+          {{ stats.execution_count if stats and stats.execution_count is not none else '0' }}
         </div>
       </div>
 
@@ -82,7 +82,7 @@
           {% if success_rate is not none %}
             {{ "%.1f"|format(success_rate) }}%
           {% else %}
-            —
+            0
           {% endif %}
         </div>
       </div>
@@ -93,17 +93,37 @@
           {% if stats and stats.avg_execution_duration is not none %}
             {{ "%.0f"|format(stats.avg_execution_duration) }}с
           {% else %}
-            —
+            0
           {% endif %}
         </div>
       </div>
 
     </div>{# /metrics #}
 
-    {# ── Статус-бейдж (опц., если нужен) ── #}
-    {% if not group.is_active %}
-    <div class="tgc-inactive-badge">Не активна</div>
-    {% endif %}
+    {# ── Статус-бейдж + кнопка отвязки ── #}
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+      {% if not group.is_active %}
+      <div class="tgc-inactive-badge">Не активна</div>
+      {% else %}
+      <div></div>
+      {% endif %}
+
+      {% if detach_project_id is not none %}
+      <button data-detach-group-id="{{ group.id }}"
+              style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;
+                     border:1px solid #fca5a5;background:#fff;color:#ef4444;
+                     border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;
+                     transition:background .15s;"
+              onmouseenter="this.style.background='#fef2f2'"
+              onmouseleave="this.style.background='#fff'">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round">
+          <line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/>
+        </svg>
+        Отвязать
+      </button>
+      {% endif %}
+    </div>
 
   </div>
 </div>

@@ -96,7 +96,7 @@
     </p>
 
     {# Параметры в одну строку с бейджами #}
-    <div class="d-flex align-items-center gap-3 flex-wrap pb-3 mb-3" style="border-bottom:1px solid var(--flow-border,#e5e7eb);">
+    <div class="d-flex align-items-center gap-3 flex-wrap pb-3 mb-3">
       <div style="font-size:12.5px;color:#6b7280;">
         Очередь по приоритету:
         {% if task_group.queue_per_priority %}
@@ -118,10 +118,70 @@
         {% endif %}
       </div>
     </div>
+    {# ── Параметры временного интервала ── #}
+    {% if task_group.time_interval_max_period is not none
+       or task_group.time_interval_first_left_bound_at is not none
+       or task_group.time_interval_first_left_bound_depth is not none %}
+    <div style="border-top:1px solid var(--flow-border,#e5e7eb);padding-top:14px;">
+
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;
+                  letter-spacing:.06em;margin-bottom:10px;">
+        Временной интервал
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+
+        {# Макс. размер интервала #}
+        <div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;">
+          <div style="font-size:10.5px;color:#9ca3af;text-transform:uppercase;
+                      letter-spacing:.05em;margin-bottom:4px;">Макс. интервал</div>
+          {% if task_group.time_interval_max_period is not none %}
+            <div style="font-size:14px;font-weight:700;color:#111827;line-height:1.2;"
+                 data-fmt-sec="{{ task_group.time_interval_max_period }}">
+              {{ task_group.time_interval_max_period | int }}с
+            </div>
+          {% else %}
+            <div style="font-size:13px;color:#d1d5db;font-style:italic;">не задан</div>
+          {% endif %}
+        </div>
+
+        {# Дата первого сбора #}
+        <div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;">
+          <div style="font-size:10.5px;color:#9ca3af;text-transform:uppercase;
+                      letter-spacing:.05em;margin-bottom:4px;">Дата первого сбора</div>
+          {% if task_group.time_interval_first_left_bound_at is not none %}
+            <div style="font-size:12.5px;font-weight:600;color:#111827;font-family:ui-monospace,monospace;line-height:1.3;">
+              {{ task_group.time_interval_first_left_bound_at.strftime('%d.%m.%Y') }}<br>
+              <span style="color:#6b7280;font-weight:400;">
+                {{ task_group.time_interval_first_left_bound_at.strftime('%H:%M:%S') }}
+              </span>
+            </div>
+          {% else %}
+            <div style="font-size:13px;color:#d1d5db;font-style:italic;">не задана</div>
+          {% endif %}
+        </div>
+
+        {# Глубина первого сбора #}
+        <div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;">
+          <div style="font-size:10.5px;color:#9ca3af;text-transform:uppercase;
+                      letter-spacing:.05em;margin-bottom:4px;">Глубина первого сбора</div>
+          {% if task_group.time_interval_first_left_bound_depth is not none %}
+            <div style="font-size:14px;font-weight:700;color:#111827;line-height:1.2;"
+                 data-fmt-sec="{{ task_group.time_interval_first_left_bound_depth }}">
+              {{ task_group.time_interval_first_left_bound_depth | int }}с
+            </div>
+          {% else %}
+            <div style="font-size:13px;color:#d1d5db;font-style:italic;">не задана</div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+    {% endif %}
 
     {# Аргументы выполнения — аккордеон #}
     {% if task_group.execution_arguments %}
-    <details>
+    <details style="margin-top: 20px;">
       <summary style="font-size:12.5px;color:#6b7280;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:6px;">
         <span style="font-size:10px;">▶</span> Аргументы выполнения
       </summary>
@@ -247,6 +307,51 @@
           Группа активна
         </label>
       </div>
+      {# ── Параметры временного интервала ── #}
+      <div style="border-top:1px solid var(--flow-border,#e5e7eb);padding-top:14px;margin-top:2px;">
+        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;
+                    letter-spacing:.06em;margin-bottom:12px;">
+          Параметры временного интервала
+        </div>
+
+        <div class="algo-form-field">
+          <label class="algo-form-label">
+            Максимальный размер интервала
+            <span style="font-weight:400;color:#9ca3af;font-size:12px;">— макс. длина одного сбора</span>
+          </label>
+          <input type="number" id="editTimeIntervalMaxPeriod" class="algo-form-input"
+                 value="{{ task_group.time_interval_max_period if task_group.time_interval_max_period is not none else '' }}"
+                 placeholder="86400 (1 день)"/>
+          {% if task_group.time_interval_max_period %}
+          <span style="font-size:12px;color:#6b7280;" id="maxPeriodHint">
+            {{ task_group.time_interval_max_period | float }}
+            <span id="hintMaxPeriod" style="font-size:12px;color:#6b7280;min-height:16px;"></span>
+          </span>
+          {% endif %}
+        </div>
+
+        <div class="algo-form-field">
+          <label class="algo-form-label">
+            Левая граница первого сбора
+            <span style="font-weight:400;color:#9ca3af;font-size:12px;">— абсолютная дата (приоритетнее глубины)</span>
+          </label>
+          <input type="datetime-local" id="editTimeIntervalFirstLeftBoundAt" class="algo-form-input"
+                 value="{{ task_group.time_interval_first_left_bound_at.strftime('%Y-%m-%dT%H:%M')
+                          if task_group.time_interval_first_left_bound_at else '' }}"/>
+        </div>
+
+        <div class="algo-form-field">
+          <label class="algo-form-label">
+            Глубина первого сбора
+            <span style="font-weight:400;color:#9ca3af;font-size:12px;">— относительная (сек от текущего момента)</span>
+          </label>
+          <input type="number" id="editTimeIntervalFirstLeftBoundDepth" class="algo-form-input"
+                 value="{{ task_group.time_interval_first_left_bound_depth if task_group.time_interval_first_left_bound_depth is not none else '' }}"
+                 placeholder="86400 (1 день назад)"/>
+          <span id="hintDepth" style="font-size:12px;color:#6b7280;min-height:16px;"></span>
+        </div>
+      </div>
+
 
       <div id="editError" style="font-size:12.5px;color:#dc2626;display:none;margin-top:4px;"></div>
     </div>
@@ -261,6 +366,44 @@
 
 {% block extra_js %}
 <script>
+
+  function fmtSec(sec) {
+  if (!sec) return '';
+  const s = Math.round(sec);
+  if (s < 60)   return s + ' сек';
+  if (s < 3600) { const m = Math.floor(s/60), r = s%60; return r ? `${m} мин ${r} сек` : `${m} мин`; }
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  if (h < 24)   return m ? `${h} ч ${m} мин` : `${h} ч`;
+  const d = Math.floor(h/24), hh = h%24;
+  return hh ? `${d} д ${hh} ч` : `${d} д`;
+}
+
+function attachDurationHint(inputId, hintId) {
+  const inp  = document.getElementById(inputId);
+  const hint = document.getElementById(hintId);
+  if (!inp || !hint) return;
+  const update = () => { hint.textContent = fmtSec(parseFloat(inp.value)) || ''; };
+  inp.addEventListener('input', update);
+  update();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  /* Форматируем секунды в читаемый вид на самой странице */
+  document.querySelectorAll('[data-fmt-sec]').forEach(el => {
+    const sec = parseFloat(el.dataset.fmtSec);
+    if (!isNaN(sec)) el.textContent = fmtSec(sec);
+  });
+
+  /* Форматируем секунды на странице */
+  document.querySelectorAll('[data-fmt-sec]').forEach(el => {
+    const sec = parseFloat(el.dataset.fmtSec);
+    if (!isNaN(sec)) el.textContent = fmtSec(sec);
+  });
+
+  attachDurationHint('editTimeIntervalMaxPeriod',         'hintMaxPeriod');
+  attachDurationHint('editTimeIntervalFirstLeftBoundDepth','hintDepth');
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   const groupId = {{ task_group.id }};
   const modal   = document.getElementById('editTaskGroupModal');
@@ -274,6 +417,17 @@ document.addEventListener('DOMContentLoaded', () => {
     .forEach(el => el.addEventListener('click', () => { modal.style.display = 'none'; }));
   modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
 
+const toFloatOrNull = (value) => {
+  const trimmed = value.trim();
+
+  if (trimmed === '') {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(trimmed);
+
+  return Number.isFinite(parsed) ? parsed : null;
+};
   /* Сохранение */
   saveBtn?.addEventListener('click', async () => {
     errEl.style.display = 'none';
@@ -299,6 +453,9 @@ document.addEventListener('DOMContentLoaded', () => {
       execution_arguments: executionArguments,
       queue_per_priority: document.getElementById('editQueuePerPriority').checked,
       is_active:          document.getElementById('editIsActive').checked,
+        time_interval_max_period: toFloatOrNull(document.getElementById('editTimeIntervalMaxPeriod').value),
+        time_interval_first_left_bound_at:   document.getElementById('editTimeIntervalFirstLeftBoundAt').value.trim() || null,
+        time_interval_first_left_bound_depth: toFloatOrNull(document.getElementById('editTimeIntervalFirstLeftBoundDepth').value),
     };
 
     saveBtn.disabled    = true;

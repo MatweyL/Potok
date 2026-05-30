@@ -1,48 +1,85 @@
 {% extends "base.html" %}
-
+{% set active_nav = 'projects' %}
 {% block title %}Проекты — Поток{% endblock %}
 
 {% block body %}
 <div class="flow-page">
 
-  <div class="proj-page-header">
+  {# ── Заголовок ── #}
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
     <h1 class="flow-page-title" style="margin-bottom:0;">Проекты</h1>
-    <button class="proj-create-btn" data-flow-open="createProjectModal">
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <line x1="7.5" y1="2" x2="7.5" y2="13"/><line x1="2" y1="7.5" x2="13" y2="7.5"/>
+    <button id="openCreateModal"
+            style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;
+                   background:var(--flow-primary,#2563eb);color:#fff;border:none;
+                   border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;
+                   transition:background .15s;"
+            onmouseenter="this.style.background='#1d4ed8'"
+            onmouseleave="this.style.background='var(--flow-primary,#2563eb)'">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 2v10M2 7h10" stroke="white" stroke-width="2" stroke-linecap="round"/>
       </svg>
       Создать проект
     </button>
   </div>
 
-  <div id="projectsGrid" class="proj-grid">
+  {# ── Сетка проектов ── #}
+  {% if projects %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;"
+       id="projectsGrid">
     {% for project in projects %}
-    <div class="proj-card{% if loop.index > 3 %} proj-card--hidden{% endif %}" data-project-id="{{ project.id }}">
+    <div class="flow-chart-card" style="display:flex;flex-direction:column;gap:14px;"
+         data-project-id="{{ project.id }}">
 
-      <div class="proj-card-header">
-        <a href="/projects/{{ project.id }}" class="proj-card-title">{{ project.title }}</a>
-        <span class="proj-card-id">ID {{ project.id }}</span>
+      {# Шапка карточки #}
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+        <div>
+          <a href="/projects/{{ project.id }}"
+             style="font-size:16px;font-weight:700;color:#111827;text-decoration:none;line-height:1.3;"
+             onmouseenter="this.style.color='#2563eb'"
+             onmouseleave="this.style.color='#111827'">{{ project.title }}</a>
+          {% if project.description %}
+          <p style="font-size:13px;color:#6b7280;margin:4px 0 0;line-height:1.5;
+                    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+            {{ project.description }}
+          </p>
+          {% endif %}
+        </div>
+        <span style="font-size:11px;color:#9ca3af;background:#f3f4f6;padding:2px 8px;
+                     border-radius:20px;white-space:nowrap;flex-shrink:0;">ID {{ project.id }}</span>
       </div>
 
-      <p class="proj-card-desc">{{ project.description or "Описание отсутствует" }}</p>
-
-      <div class="proj-groups-section">
-        <div class="proj-groups-label">Группы задач</div>
-        <div class="proj-groups-list" data-project-id="{{ project.id }}">
-          <span class="proj-groups-loading">
-            <svg class="proj-spin" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6366f1" stroke-width="2">
-              <circle cx="7" cy="7" r="5" stroke-opacity=".25"/><path d="M7 2a5 5 0 0 1 5 5" stroke-linecap="round"/>
+      {# Группы задач #}
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1;">
+        <div style="font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.05em;">
+          Группы задач
+        </div>
+        <div class="proj-groups-list" data-project-id="{{ project.id }}"
+             style="display:flex;flex-direction:column;gap:6px;">
+          {# Заполняется через JS #}
+          <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#9ca3af;">
+            <svg class="proj-spin" width="14" height="14" viewBox="0 0 14 14" fill="none"
+                 stroke="#6366f1" stroke-width="2">
+              <circle cx="7" cy="7" r="5" stroke-opacity=".25"/>
+              <path d="M7 2a5 5 0 0 1 5 5" stroke-linecap="round"/>
             </svg>
             Загрузка...
-          </span>
+          </div>
         </div>
       </div>
 
+      {# Кнопка привязки #}
       <button class="proj-attach-btn"
-              data-flow-open="attachTaskGroupModal"
               data-project-id="{{ project.id }}"
-              data-project-title="{{ project.title }}">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              data-project-title="{{ project.title }}"
+              style="display:inline-flex;align-items:center;justify-content:center;gap:6px;
+                     padding:8px 14px;background:#f0f9ff;color:#0ea5e9;
+                     border:1px solid #bae6fd;border-radius:8px;font-size:13px;
+                     font-weight:500;cursor:pointer;width:100%;
+                     transition:background .15s,border-color .15s;"
+              onmouseenter="this.style.background='#e0f2fe';this.style.borderColor='#7dd3fc'"
+              onmouseleave="this.style.background='#f0f9ff';this.style.borderColor='#bae6fd'">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/>
         </svg>
         Привязать группу
@@ -52,350 +89,372 @@
     {% endfor %}
   </div>
 
-  {% if projects | length > 3 %}
-  <div style="text-align:center;margin-top:12px;">
-    <button class="proj-expand-btn" id="expandProjectsBtn">
-      <svg id="expandIcon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .25s;">
-        <polyline points="2,5 7,10 12,5"/>
-      </svg>
-      Раскрыть ещё {{ projects | length - 3 }}
-    </button>
+  {% else %}
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+              gap:10px;padding:64px 24px;text-align:center;background:#fff;
+              border:1px dashed #e5e7eb;border-radius:14px;color:#9ca3af;">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="opacity:.35;">
+      <rect x="4" y="8" width="32" height="24" rx="3" stroke="currentColor" stroke-width="2"/>
+      <path d="M4 14h32" stroke="currentColor" stroke-width="2"/>
+    </svg>
+    <div style="font-size:16px;font-weight:600;color:#374151;">Проектов пока нет</div>
+    <div style="font-size:13px;">Создайте первый проект</div>
   </div>
   {% endif %}
 
 </div>
 
-<!-- Modal: Создать проект -->
-<div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Создать проект</h5>
-        <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
+{# ── Модалка: Создать проект ── #}
+<div id="createProjectModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+            z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:460px;
+              box-shadow:0 24px 64px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:18px 20px 16px;border-bottom:1px solid #e5e7eb;">
+      <span style="font-size:15px;font-weight:600;color:#111827;">Создать проект</span>
+      <button id="closeCreateModal"
+              style="width:28px;height:28px;border:none;background:none;cursor:pointer;
+                     border-radius:6px;color:#6b7280;font-size:20px;line-height:1;
+                     display:flex;align-items:center;justify-content:center;"
+              onmouseenter="this.style.background='#f3f4f6'"
+              onmouseleave="this.style.background='none'">×</button>
+    </div>
+
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:13px;font-weight:500;color:#374151;">
+          Название <span style="color:#dc2626;">*</span>
+        </label>
+        <input id="projectTitle" type="text" maxlength="255" placeholder="Название проекта"
+               style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+                      font-size:13.5px;color:#111827;outline:none;font-family:inherit;
+                      box-sizing:border-box;width:100%;transition:border-color .15s,box-shadow .15s;"
+               onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.1)'"
+               onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow=''"/>
       </div>
-      <div class="modal-body">
-        <form id="createProjectForm">
-          <div class="mb-3">
-            <label for="projectTitle" class="form-label">Название <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="projectTitle" required maxlength="255">
-          </div>
-          <div class="mb-3">
-            <label for="projectDescription" class="form-label">Описание</label>
-            <textarea class="form-control" id="projectDescription" rows="3" maxlength="1000"></textarea>
-          </div>
-        </form>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:13px;font-weight:500;color:#374151;">Описание</label>
+        <textarea id="projectDescription" rows="3" maxlength="1000"
+                  placeholder="Краткое описание проекта"
+                  style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+                         font-size:13.5px;color:#111827;outline:none;font-family:inherit;
+                         box-sizing:border-box;width:100%;resize:vertical;min-height:80px;
+                         transition:border-color .15s,box-shadow .15s;"
+                  onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.1)'"
+                  onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow=''"></textarea>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
-        <button type="button" class="btn btn-primary" id="createProjectBtn">Создать</button>
-      </div>
+      <div id="createProjectError"
+           style="font-size:12.5px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;
+                  border-radius:8px;padding:8px 12px;display:none;"></div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #e5e7eb;">
+      <button id="cancelCreateModal"
+              style="padding:7px 16px;border:1px solid #e5e7eb;border-radius:8px;
+                     background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">
+        Отмена
+      </button>
+      <button id="createProjectBtn"
+              style="padding:7px 20px;border:none;border-radius:8px;background:#2563eb;
+                     color:#fff;font-size:13px;font-weight:600;cursor:pointer;"
+              onmouseenter="this.style.background='#1d4ed8'"
+              onmouseleave="this.style.background='#2563eb'">
+        Создать
+      </button>
     </div>
   </div>
 </div>
 
-<!-- Modal: Привязать группу задач -->
-<div class="modal fade" id="attachTaskGroupModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Привязать группу задач</h5>
-        <button type="button" class="btn-close" data-flow-close aria-label="Закрыть"></button>
+{# ── Модалка: Привязать группу ── #}
+<div id="attachTaskGroupModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+            z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:460px;
+              box-shadow:0 24px 64px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:18px 20px 16px;border-bottom:1px solid #e5e7eb;">
+      <span style="font-size:15px;font-weight:600;color:#111827;">Привязать группу задач</span>
+      <button id="closeAttachModal"
+              style="width:28px;height:28px;border:none;background:none;cursor:pointer;
+                     border-radius:6px;color:#6b7280;font-size:20px;line-height:1;
+                     display:flex;align-items:center;justify-content:center;"
+              onmouseenter="this.style.background='#f3f4f6'"
+              onmouseleave="this.style.background='none'">×</button>
+    </div>
+
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:12px;">
+      <input type="hidden" id="attachProjectId"/>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:13px;font-weight:500;color:#374151;">Доступные группы задач</label>
+        <select id="taskGroupSelect" multiple size="8"
+                style="width:100%;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;
+                       color:#111827;padding:4px;box-sizing:border-box;outline:none;
+                       font-family:inherit;background:#fff;min-height:160px;"
+                onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.1)'"
+                onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow=''">
+          <option disabled>Загрузка...</option>
+        </select>
+        <span style="font-size:12px;color:#9ca3af;">
+          Удерживайте
+          <kbd style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;
+                      padding:1px 5px;font-size:11px;font-family:inherit;">Ctrl</kbd>
+          для выбора нескольких групп
+        </span>
       </div>
-      <div class="modal-body">
-        <input type="hidden" id="attachProjectId">
-        <div class="mb-3">
-          <label for="taskGroupSelect" class="form-label">Доступные группы задач</label>
-          <select class="form-select" id="taskGroupSelect" multiple size="6">
-            <option value="">Загрузка списка...</option>
-          </select>
-          <div class="form-text">Удерживайте <kbd>Ctrl</kbd> (или <kbd>Cmd</kbd>) для выбора нескольких групп</div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-flow-close>Отмена</button>
-        <button type="button" class="btn btn-primary" id="attachTaskGroupBtn">Привязать</button>
-      </div>
+      <div id="attachError"
+           style="font-size:12.5px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;
+                  border-radius:8px;padding:8px 12px;display:none;"></div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #e5e7eb;">
+      <button id="cancelAttachModal"
+              style="padding:7px 16px;border:1px solid #e5e7eb;border-radius:8px;
+                     background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">
+        Отмена
+      </button>
+      <button id="attachTaskGroupBtn"
+              style="padding:7px 20px;border:none;border-radius:8px;background:#2563eb;
+                     color:#fff;font-size:13px;font-weight:600;cursor:pointer;"
+              onmouseenter="this.style.background='#1d4ed8'"
+              onmouseleave="this.style.background='#2563eb'">
+        Привязать
+      </button>
     </div>
   </div>
 </div>
 
 <style>
-/* ── Projects page ──────────────────────────────────────── */
-.proj-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.proj-create-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  background: #6366f1;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background .18s, transform .15s;
-}
-.proj-create-btn:hover { background: #4f46e5; transform: translateY(-1px); }
-
-.proj-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-}
-
-.proj-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.05);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  transition: box-shadow .2s, transform .2s;
-}
-.proj-card:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,.09);
-  transform: translateY(-2px);
-}
-.proj-card--hidden { display: none; }
-
-.proj-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-.proj-card-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #111827;
-  text-decoration: none;
-  line-height: 1.3;
-}
-.proj-card-title:hover { color: #6366f1; }
-.proj-card-id {
-  font-size: 11px;
-  color: #9ca3af;
-  background: #f3f4f6;
-  padding: 2px 7px;
-  border-radius: 20px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.proj-card-desc {
-  font-size: 13px;
-  color: #6b7280;
-  line-height: 1.5;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.proj-groups-section { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.proj-groups-label { font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
-
-.proj-groups-loading {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #9ca3af;
-}
-.proj-spin { animation: proj-rotate 1s linear infinite; }
 @keyframes proj-rotate { to { transform: rotate(360deg); } }
-
-.proj-group-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 13px;
-}
-.proj-group-item-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.proj-group-item-name {
-  font-weight: 600;
-  color: #111827;
-  text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.proj-group-item-name:hover { color: #6366f1; }
-.proj-group-item-sub { font-size: 11px; color: #9ca3af; }
-
-.proj-group-detach {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 9px;
-  border: 1px solid #fca5a5;
-  background: #fff;
-  color: #ef4444;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background .15s, color .15s;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.proj-group-detach:hover { background: #fef2f2; }
-
-.proj-group-empty { font-size: 13px; color: #9ca3af; font-style: italic; }
-
-.proj-attach-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: #f0f9ff;
-  color: #0ea5e9;
-  border: 1px solid #bae6fd;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  width: 100%;
-  justify-content: center;
-  transition: background .15s, border-color .15s;
-}
-.proj-attach-btn:hover { background: #e0f2fe; border-color: #7dd3fc; }
-
-/* Expand button */
-.proj-expand-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 20px;
-  background: #fff;
-  color: #6366f1;
-  border: 1.5px solid #c7d2fe;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background .15s, border-color .15s;
-}
-.proj-expand-btn:hover { background: #eef2ff; border-color: #a5b4fc; }
+.proj-spin { animation: proj-rotate 1s linear infinite; }
 </style>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
+
   const API = {
-    getTaskGroups: (id) => `/projects/${id}/task-groups`,
+    getTaskGroups:     id => `/projects/${id}/task-groups`,
     getAvailableGroups: '/task-groups/without-project',
-    bind: '/projects/task-group/bind',
-    unbind: '/projects/task-group/unbind',
-    create: '/projects/create'
+    bind:              '/projects/task-group/bind',
+    unbind:            '/projects/task-group/unbind',
+    create:            '/projects/create',
   };
+
+  const GROUPS_VISIBLE = 3;
+
+  /* ── Утилиты ──────────────────────────────────────────────── */
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  function openModal(id) {
+    const m = document.getElementById(id);
+    if (m) m.style.display = 'flex';
+  }
+  function closeModal(id) {
+    const m = document.getElementById(id);
+    if (m) m.style.display = 'none';
+  }
+
+  /* Закрытие по клику на backdrop */
+  ['createProjectModal', 'attachTaskGroupModal'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', e => {
+      if (e.target.id === id) closeModal(id);
+    });
+  });
 
   /* ── Загрузка групп для всех карточек ── */
   document.querySelectorAll('.proj-groups-list').forEach(el => {
-    fetchTaskGroups(el.dataset.projectId, el);
+    loadGroups(el.dataset.projectId, el);
   });
 
-  function fetchTaskGroups(projectId, container) {
+  function loadGroups(projectId, container) {
     fetch(API.getTaskGroups(projectId))
       .then(r => r.json())
-      .then(groups => renderTaskGroups(projectId, container, groups))
-      .catch(() => { container.innerHTML = '<span class="text-danger" style="font-size:13px;">Ошибка загрузки</span>'; });
+      .then(groups => renderGroups(projectId, container, groups))
+      .catch(() => {
+        container.innerHTML = '<span style="font-size:13px;color:#ef4444;">Ошибка загрузки</span>';
+      });
   }
 
-  function renderTaskGroups(projectId, container, groups) {
+  function renderGroups(projectId, container, groups) {
     container.innerHTML = '';
+
     if (!groups || !groups.length) {
-      container.innerHTML = '<span class="proj-group-empty">Нет привязанных групп</span>';
+      container.innerHTML = '<span style="font-size:13px;color:#9ca3af;font-style:italic;">Нет привязанных групп</span>';
       return;
     }
-    groups.forEach(g => {
+
+    function makeGroupItem(g) {
       const badge = g.is_active
-        ? '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dcfce7;color:#16a34a;">Активна</span>'
-        : '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#f3f4f6;color:#9ca3af;">Не активна</span>';
-      const div = document.createElement('div');
-      div.className = 'proj-group-item';
-      div.innerHTML = `
-        <div class="proj-group-item-info">
-          <a href="/task-groups/${g.id}" class="proj-group-item-name">${esc(g.title)}</a>
-          <span class="proj-group-item-sub">${esc(g.name)} ${badge}</span>
+        ? '<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:#dcfce7;color:#16a34a;">Активна</span>'
+        : '<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:#f3f4f6;color:#9ca3af;">Не активна</span>';
+
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;' +
+        'padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;';
+      item.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+          <a href="/task-groups/${g.id}"
+             style="font-size:13px;font-weight:600;color:#111827;text-decoration:none;
+                    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+             onmouseenter="this.style.color='#2563eb'"
+             onmouseleave="this.style.color='#111827'">${esc(g.title)}</a>
+          <span style="font-size:11px;color:#9ca3af;">${esc(g.name)} ${badge}</span>
         </div>
-        <button class="proj-group-detach" data-project-id="${projectId}" data-group-id="${g.id}" title="Отвязать">
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="1" y1="1" x2="10" y2="10"/><line x1="10" y1="1" x2="1" y2="10"/>
+        <button data-project-id="${projectId}" data-group-id="${g.id}"
+                style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+                       border:1px solid #fca5a5;background:#fff;color:#ef4444;
+                       border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;
+                       flex-shrink:0;transition:background .15s;"
+                onmouseenter="this.style.background='#fef2f2'"
+                onmouseleave="this.style.background='#fff'">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/>
           </svg>
           Отвязать
         </button>`;
-      container.appendChild(div);
-    });
-    container.querySelectorAll('.proj-group-detach').forEach(btn => btn.addEventListener('click', handleDetach));
+
+      item.querySelector('button').addEventListener('click', handleDetach);
+      return item;
+    }
+
+    const visible = groups.slice(0, GROUPS_VISIBLE);
+    const hidden  = groups.slice(GROUPS_VISIBLE);
+
+    visible.forEach(g => container.appendChild(makeGroupItem(g)));
+
+    if (hidden.length) {
+      const hiddenWrap = document.createElement('div');
+      hiddenWrap.style.cssText = 'display:none;flex-direction:column;gap:6px;';
+      hidden.forEach(g => hiddenWrap.appendChild(makeGroupItem(g)));
+      container.appendChild(hiddenWrap);
+
+      const btn = document.createElement('button');
+      btn.style.cssText = 'display:inline-flex;align-items:center;gap:5px;margin-top:2px;' +
+        'padding:5px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:20px;' +
+        'font-size:12.5px;font-weight:500;color:#6366f1;cursor:pointer;align-self:flex-start;' +
+        'transition:background .15s,border-color .15s;';
+      btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+        style="transition:transform .2s;"><polyline points="2,4 6,8 10,4"/></svg>
+        Ещё ${hidden.length}`;
+
+      let open = false;
+      btn.addEventListener('click', () => {
+        open = !open;
+        hiddenWrap.style.display = open ? 'flex' : 'none';
+        btn.querySelector('svg').style.transform = open ? 'rotate(180deg)' : '';
+        btn.childNodes[1].textContent = open ? ' Свернуть' : ` Ещё ${hidden.length}`;
+      });
+      btn.addEventListener('mouseenter', () => { btn.style.background='#eef2ff';btn.style.borderColor='#c7d2fe'; });
+      btn.addEventListener('mouseleave', () => { btn.style.background='#f9fafb';btn.style.borderColor='#e5e7eb'; });
+      container.appendChild(btn);
+    }
   }
 
+  /* ── Отвязать с двойным нажатием ── */
   function handleDetach(e) {
     const btn = e.currentTarget;
-    if (!confirm('Отвязать группу задач от проекта?')) return;
+    if (!btn.dataset.confirming) {
+      btn.dataset.confirming = '1';
+      const origHtml = btn.innerHTML;
+      btn.dataset.origHtml = origHtml;
+      btn.textContent = 'Подтвердить?';
+      btn.style.background = '#fef2f2';
+
+      const reset = () => {
+        delete btn.dataset.confirming;
+        btn.innerHTML = origHtml;
+        btn.style.background = '#fff';
+        document.removeEventListener('click', outside);
+      };
+      const outside = ev => { if (!btn.contains(ev.target)) reset(); };
+      setTimeout(() => document.addEventListener('click', outside), 50);
+      return;
+    }
+
+    delete btn.dataset.confirming;
     btn.disabled = true;
+    btn.textContent = '...';
+
     fetch(API.unbind, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: +btn.dataset.projectId, task_group_id: +btn.dataset.groupId })
+      body: JSON.stringify({ project_id: +btn.dataset.projectId, task_group_id: +btn.dataset.groupId }),
     })
     .then(r => r.json())
     .then(() => {
-      const c = document.querySelector(`.proj-groups-list[data-project-id="${btn.dataset.projectId}"]`);
-      if (c) fetchTaskGroups(btn.dataset.projectId, c);
+      const container = document.querySelector(`.proj-groups-list[data-project-id="${btn.dataset.projectId}"]`);
+      if (container) loadGroups(btn.dataset.projectId, container);
     })
-    .catch(() => { alert('Ошибка при отвязке'); btn.disabled = false; });
+    .catch(() => { btn.disabled = false; btn.textContent = 'Отвязать'; });
   }
 
-  /* ── Expand кнопка ── */
-  const expandBtn = document.getElementById('expandProjectsBtn');
-  let expanded = false;
-  expandBtn?.addEventListener('click', function() {
-    expanded = !expanded;
-    document.querySelectorAll('.proj-card--hidden').forEach(c => {
-      c.style.display = expanded ? '' : 'none';
+  /* ── Модалка: Создать проект ── */
+  document.getElementById('openCreateModal')
+    ?.addEventListener('click', () => {
+      document.getElementById('projectTitle').value = '';
+      document.getElementById('projectDescription').value = '';
+      document.getElementById('createProjectError').style.display = 'none';
+      openModal('createProjectModal');
     });
-    // переключаем классы
-    if (expanded) {
-      document.querySelectorAll('.proj-card').forEach(c => c.classList.remove('proj-card--hidden'));
-      expandBtn.querySelector('svg').style.transform = 'rotate(180deg)';
-      expandBtn.childNodes[1].textContent = ' Свернуть';
-    } else {
-      let idx = 0;
-      document.querySelectorAll('.proj-card').forEach(c => {
-        idx++;
-        if (idx > 3) c.classList.add('proj-card--hidden');
+  document.getElementById('closeCreateModal')?.addEventListener('click', () => closeModal('createProjectModal'));
+  document.getElementById('cancelCreateModal')?.addEventListener('click', () => closeModal('createProjectModal'));
+
+  document.getElementById('createProjectBtn')?.addEventListener('click', async function () {
+    const title = document.getElementById('projectTitle').value.trim();
+    const desc  = document.getElementById('projectDescription').value.trim();
+    const errEl = document.getElementById('createProjectError');
+    errEl.style.display = 'none';
+
+    if (!title) {
+      errEl.textContent = 'Введите название проекта';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    this.disabled = true;
+    const orig = this.textContent;
+    this.textContent = 'Создание…';
+
+    try {
+      const res = await fetch(API.create, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description: desc || null }),
       });
-      expandBtn.querySelector('svg').style.transform = '';
-      const total = document.querySelectorAll('.proj-card').length;
-      expandBtn.childNodes[1].textContent = ` Раскрыть ещё ${total - 3}`;
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `Ошибка ${res.status}`);
+      closeModal('createProjectModal');
+      window.location.reload();
+    } catch (e) {
+      errEl.textContent = 'Ошибка: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      this.disabled = false;
+      this.textContent = orig;
     }
   });
 
-  /* ── Модальное: привязать группу ── */
-  const attachModal = document.getElementById('attachTaskGroupModal');
-  attachModal?.addEventListener('show.bs.modal', function(e) {
-    const projectId = e.relatedTarget?.dataset?.projectId;
-    if (projectId) document.getElementById('attachProjectId').value = projectId;
+  /* ── Модалка: Привязать группу (делегирование) ── */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.proj-attach-btn');
+    if (!btn) return;
+    document.getElementById('attachProjectId').value = btn.dataset.projectId;
+    document.getElementById('attachError').style.display = 'none';
     loadAvailableGroups();
+    openModal('attachTaskGroupModal');
   });
+
+  document.getElementById('closeAttachModal')?.addEventListener('click', () => closeModal('attachTaskGroupModal'));
+  document.getElementById('cancelAttachModal')?.addEventListener('click', () => closeModal('attachTaskGroupModal'));
 
   function loadAvailableGroups() {
     const sel = document.getElementById('taskGroupSelect');
@@ -405,7 +464,10 @@ document.addEventListener('DOMContentLoaded', function() {
       .then(r => r.json())
       .then(groups => {
         sel.innerHTML = '';
-        if (!groups?.length) { sel.innerHTML = '<option disabled>Нет доступных групп</option>'; return; }
+        if (!groups?.length) {
+          sel.innerHTML = '<option disabled>Нет доступных групп</option>';
+          return;
+        }
         groups.forEach(g => {
           const o = document.createElement('option');
           o.value = g.id;
@@ -413,85 +475,46 @@ document.addEventListener('DOMContentLoaded', function() {
           sel.appendChild(o);
         });
         sel.disabled = false;
-      });
+      })
+      .catch(() => { sel.innerHTML = '<option disabled>Ошибка загрузки</option>'; });
   }
 
-  document.getElementById('attachTaskGroupBtn')?.addEventListener('click', function() {
+  document.getElementById('attachTaskGroupBtn')?.addEventListener('click', async function () {
     const projectId = document.getElementById('attachProjectId').value;
     const sel = document.getElementById('taskGroupSelect');
-    const ids = Array.from(sel.selectedOptions).filter(o => o.value).map(o => +o.value);
-    if (!ids.length) { alert('Выберите хотя бы одну группу'); return; }
-    const btn = this;
-    btn.disabled = true; btn.textContent = 'Привязываю...';
-    fetch(API.bind, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: +projectId, task_group_ids: ids })
-    })
-    .then(r => r.json())
-    .then(() => {
-      document.getElementById('attachTaskGroupModal')?.classList.remove('is-open');
-      const c = document.querySelector(`.proj-groups-list[data-project-id="${projectId}"]`);
-      if (c) fetchTaskGroups(projectId, c);
-    })
-    .catch(() => alert('Ошибка при привязке'))
-    .finally(() => { btn.disabled = false; btn.textContent = 'Привязать'; });
+    const ids = Array.from(sel.selectedOptions).map(o => +o.value).filter(Boolean);
+    const errEl = document.getElementById('attachError');
+    errEl.style.display = 'none';
+
+    if (!ids.length) {
+      errEl.textContent = 'Выберите хотя бы одну группу';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    this.disabled = true;
+    const orig = this.textContent;
+    this.textContent = 'Привязываю…';
+
+    try {
+      const res = await fetch(API.bind, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: +projectId, task_group_ids: ids }),
+      });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      closeModal('attachTaskGroupModal');
+      const container = document.querySelector(`.proj-groups-list[data-project-id="${projectId}"]`);
+      if (container) loadGroups(projectId, container);
+    } catch (e) {
+      errEl.textContent = 'Ошибка: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      this.disabled = false;
+      this.textContent = orig;
+    }
   });
 
-  /* ── Создать проект ── */
-  document.getElementById('createProjectBtn')?.addEventListener('click', function() {
-    const title = document.getElementById('projectTitle').value.trim();
-    const desc  = document.getElementById('projectDescription').value.trim();
-    if (!title) { alert('Введите название проекта'); return; }
-    const btn = this; btn.disabled = true; btn.textContent = 'Создаю...';
-    fetch(API.create, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description: desc })
-    })
-    .then(r => r.json())
-    .then(data => {
-      document.getElementById('createProjectModal')?.classList.remove('is-open');
-      document.getElementById('createProjectForm').reset();
-      addProjectCard(data.id, title, desc);
-    })
-    .catch(() => alert('Ошибка при создании'))
-    .finally(() => { btn.disabled = false; btn.textContent = 'Создать'; });
-  });
-
-  function addProjectCard(id, title, desc) {
-    const grid = document.getElementById('projectsGrid');
-    const card = document.createElement('div');
-    card.className = 'proj-card';
-    card.dataset.projectId = id;
-    card.innerHTML = `
-      <div class="proj-card-header">
-        <a href="/projects/${id}" class="proj-card-title">${esc(title)}</a>
-        <span class="proj-card-id">ID ${id}</span>
-      </div>
-      <p class="proj-card-desc">${esc(desc || 'Описание отсутствует')}</p>
-      <div class="proj-groups-section">
-        <div class="proj-groups-label">Группы задач</div>
-        <div class="proj-groups-list" data-project-id="${id}">
-          <span class="proj-group-empty">Нет привязанных групп</span>
-        </div>
-      </div>
-      <button class="proj-attach-btn" data-flow-open="attachTaskGroupModal"
-              data-project-id="${id}" data-project-title="${esc(title)}">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/>
-        </svg>
-        Привязать группу
-      </button>`;
-    grid.insertBefore(card, grid.firstChild);
-  }
-
-  function esc(s) {
-    if (!s) return '';
-    const d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
-  }
 });
 </script>
 {% endblock %}

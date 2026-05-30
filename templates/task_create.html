@@ -1,150 +1,303 @@
 {% extends "base.html" %}
-{% block title %}Поток — Новая задача{% endblock %}
-{% block extra_css %}{% endblock %}
+{% set active_nav = 'create_tasks' %}
+{% block title %}Новая задача — Поток{% endblock %}
+
 {% block body %}
+<div class="flow-page" style="max-width:800px;">
 
-<div class="container py-4" style="max-width: 760px">
-
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="/tasks">Задачи</a></li>
-      <li class="breadcrumb-item active">Новая задача</li>
-    </ol>
+  {# Хлебные крошки #}
+  <nav style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:8px;">
+    <a href="/tasks" class="text-decoration-none text-primary">Задачи</a>
+    <span style="color:#d1d5db;">›</span>
+    <span style="color:#6b7280;">Новая задача</span>
   </nav>
 
-  <h1 class="fs-4 fw-bold mb-4">Новая задача</h1>
+  <h1 class="flow-page-title">Новая задача</h1>
 
-  <div id="alertBox" class="alert d-none mb-4" role="alert"></div>
+  {# Алерт #}
+  <div id="alertBox" style="display:none;padding:12px 16px;border-radius:8px;
+       font-size:13.5px;font-weight:500;margin-bottom:16px;"></div>
 
-  <div class="card shadow-sm">
-    <div class="card-body p-4">
+  {# ── Конфигурация ── #}
+  <div class="flow-chart-card mb-3">
+    <div class="flow-chart-header" style="margin-bottom:20px;">
+      <span class="flow-chart-title">Конфигурация</span>
+    </div>
 
-      <!-- Конфигурация -->
-      <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Конфигурация</h6>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
 
-      <div class="row g-3 mb-4">
-
-        <div class="col-12">
-          <label class="form-label">Группа задач <span class="text-danger">*</span></label>
-          <select id="groupId" class="form-select">
-            <option value="">Загрузка...</option>
-          </select>
-          <div id="groupDetails" class="form-text"></div>
-        </div>
-
-        <div class="col-sm-6">
-          <label class="form-label">Алгоритм мониторинга <span class="text-danger">*</span></label>
-          <select id="algorithmId" class="form-select">
-            <option value="">Загрузка...</option>
-          </select>
-          <div id="algoDetails" class="form-text"></div>
-        </div>
-
-        <div class="col-sm-6">
-          <label class="form-label">Приоритет</label>
-          <select id="priority" class="form-select">
-            <option value="LOWEST">Нижайший</option>
-            <option value="LOW">Низкий</option>
-            <option value="MEDIUM" selected>Средний</option>
-            <option value="HIGH">Высокий</option>
-            <option value="HIGHEST">Наивысший</option>
-          </select>
-        </div>
-
-        <div class="col-sm-6">
-          <label class="form-label">Тип задачи</label>
-          <select id="taskType" class="form-select">
-            <option value="UNDEFINED" selected>Не задан</option>
-            <option value="TIME_INTERVAL">Временной интервал</option>
-            <option value="PAGINATION">Пагинация</option>
-          </select>
-        </div>
-
-        <div class="col-12">
-          <label class="form-label">
-            Аргументы выполнения
-            <span class="text-muted small fw-normal">(JSON-объект, необязательно)</span>
-          </label>
-          <textarea id="executionArguments" class="form-control font-monospace" rows="2"
-            placeholder='{"key": "value"}'></textarea>
-          <div id="execArgsError" class="form-text text-danger d-none">Невалидный JSON</div>
-        </div>
-
+      {# Группа задач #}
+      <div style="grid-column:span 2;" class="tc-field">
+        <label class="tc-label">Группа задач <span style="color:#dc2626;">*</span></label>
+        <select id="groupId" class="tc-select">
+          <option value="">Загрузка...</option>
+        </select>
+        <span id="groupDetails" class="tc-hint"></span>
       </div>
 
-      <!-- Payload -->
-      <h6 class="text-muted text-uppercase small fw-semibold mb-3 border-bottom pb-2">Полезная нагрузка</h6>
+      {# Алгоритм мониторинга #}
+      <div style="grid-column:span 2;" class="tc-field">
+        <label class="tc-label">Алгоритм мониторинга <span style="color:#dc2626;">*</span></label>
+        <div style="display:flex;align-items:stretch;gap:10px;">
+          <select id="algorithmId" class="tc-select" style="flex:1;">
+            <option value="">Загрузка...</option>
+          </select>
+          {# Превью выбранного алгоритма #}
+          <div id="algoPreview"
+               style="min-width:200px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+                      background:#f9fafb;display:flex;align-items:center;">
+            <span style="font-size:12px;color:#9ca3af;font-style:italic;">Выберите алгоритм</span>
+          </div>
+        </div>
+        <span id="algoDetails" class="tc-hint"></span>
+      </div>
 
-      <div class="mb-1">
-        <label class="form-label">
-          JSON-массив payload-ов <span class="text-danger">*</span>
+      {# Приоритет #}
+      <div class="tc-field">
+        <label class="tc-label">Приоритет</label>
+        <select id="priority" class="tc-select">
+          <option value="LOWEST">Нижайший</option>
+          <option value="LOW">Низкий</option>
+          <option value="MEDIUM" selected>Средний</option>
+          <option value="HIGH">Высокий</option>
+          <option value="HIGHEST">Наивысший</option>
+        </select>
+      </div>
+
+      {# Тип задачи #}
+      <div class="tc-field">
+        <label class="tc-label">Тип задачи</label>
+        <select id="taskType" class="tc-select">
+          <option value="UNDEFINED" selected>Не задан</option>
+          <option value="TIME_INTERVAL">Временной интервал</option>
+          <option value="PAGINATION">Пагинация</option>
+        </select>
+      </div>
+
+      {# Аргументы выполнения #}
+      <div style="grid-column:span 2;" class="tc-field">
+        <label class="tc-label">
+          Аргументы выполнения
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;">(JSON-объект, необязательно)</span>
         </label>
-        <textarea id="payloads" class="form-control font-monospace" rows="8"
-          placeholder='[&#10;  {"username": "alice"},&#10;  {"username": "bob"}&#10;]'></textarea>
-        <div id="payloadsError" class="form-text text-danger d-none"></div>
-        <div id="payloadsInfo" class="form-text"></div>
-      </div>
-
-      <!-- Кнопки -->
-      <div class="d-flex justify-content-end mt-4 pt-3 border-top">
-        <a href="/tasks" class="btn btn-outline-secondary me-2">Отмена</a>
-        <button type="button" class="btn btn-primary" id="submitBtn">Создать</button>
+        <textarea id="executionArguments" class="tc-textarea" rows="2"
+                  placeholder='{"key": "value"}'></textarea>
+        <span id="execArgsError" class="tc-hint" style="color:#dc2626;display:none;">Невалидный JSON</span>
       </div>
 
     </div>
   </div>
+
+  {# ── Полезная нагрузка ── #}
+  <div class="flow-chart-card mb-4">
+    <div class="flow-chart-header" style="margin-bottom:20px;">
+      <span class="flow-chart-title">Полезная нагрузка</span>
+    </div>
+
+    <div class="tc-field">
+      <label class="tc-label">
+        JSON-массив payload-ов <span style="color:#dc2626;">*</span>
+      </label>
+      <textarea id="payloads" class="tc-textarea" rows="10"
+                placeholder='[&#10;  {"username": "alice"},&#10;  {"username": "bob"}&#10;]'></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+        <span id="payloadsError" class="tc-hint" style="color:#dc2626;display:none;"></span>
+        <span id="payloadsInfo" class="tc-hint" style="color:#16a34a;margin-left:auto;"></span>
+      </div>
+    </div>
+  </div>
+
+  {# ── Кнопки ── #}
+  <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;">
+    <a href="/tasks"
+       style="padding:8px 18px;border:1px solid #e5e7eb;border-radius:8px;
+              background:#fff;color:#374151;font-size:13.5px;font-weight:500;
+              text-decoration:none;cursor:pointer;">
+      Отмена
+    </a>
+    <button id="submitBtn"
+            style="padding:8px 24px;border:none;border-radius:8px;background:#2563eb;
+                   color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;
+                   transition:background .15s;"
+            onmouseenter="this.style.background='#1d4ed8'"
+            onmouseleave="this.style.background='#2563eb'">
+      Создать задачи
+    </button>
+  </div>
+
 </div>
+
+<style>
+.tc-field { display:flex;flex-direction:column;gap:5px; }
+.tc-label { font-size:13px;font-weight:500;color:#374151; }
+.tc-hint  { font-size:12px;color:#6b7280; }
+
+.tc-select, .tc-textarea {
+  padding:8px 12px;
+  border:1px solid #e5e7eb;
+  border-radius:8px;
+  font-size:13.5px;
+  color:#111827;
+  background:#fff;
+  outline:none;
+  font-family:inherit;
+  box-sizing:border-box;
+  width:100%;
+  transition:border-color .15s, box-shadow .15s;
+}
+.tc-select:focus, .tc-textarea:focus {
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,.1);
+}
+.tc-textarea { resize:vertical; }
+
+/* Превью алгоритма */
+.algo-preview-badge {
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:6px;
+  font-size:11px;font-weight:700;letter-spacing:.04em;
+}
+.algo-preview-badge--periodic { background:#dbeafe;color:#1d4ed8; }
+.algo-preview-badge--single   { background:#ede9fe;color:#6d28d9; }
+
+.algo-preview-param {
+  font-size:13px;font-weight:700;color:#111827;
+  font-family:ui-monospace,monospace;
+}
+.algo-preview-noise {
+  font-size:12px;color:#6b7280;font-family:ui-monospace,monospace;
+}
+.algo-preview-pill {
+  font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:20px;
+  background:#f3f4f6;color:#374151;font-family:ui-monospace,monospace;
+}
+.algo-preview-instant {
+  font-size:11.5px;font-weight:500;padding:1px 7px;border-radius:20px;
+  background:#fef9c3;color:#a16207;
+}
+</style>
 {% endblock %}
+
 {% block extra_js %}
 <script>
-// ── Группы задач ──────────────────────────────────────
+/* ── Утилиты ──────────────────────────────────────────── */
+let algorithms = [];
+
+function fmtDuration(sec) {
+  if (!sec) return '0с';
+  if (sec < 60)   return sec + 'с';
+  if (sec < 3600) { const m = Math.floor(sec/60), s = sec%60; return s ? `${m}м ${s}с` : `${m}м`; }
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return m ? `${h}ч ${m}м` : `${h}ч`;
+}
+
+function showAlert(msg, type) {
+  const el = document.getElementById('alertBox');
+  el.textContent = msg;
+  el.style.display = 'block';
+  if (type === 'success') {
+    el.style.background = '#f0fdf4'; el.style.color = '#15803d'; el.style.border = '1px solid #bbf7d0';
+  } else {
+    el.style.background = '#fef2f2'; el.style.color = '#dc2626'; el.style.border = '1px solid #fecaca';
+  }
+  el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+/* ── Рендер превью алгоритма ──────────────────────────── */
+function renderAlgoPreview(algo) {
+  const el = document.getElementById('algoPreview');
+  if (!algo) {
+    el.innerHTML = '<span style="font-size:12px;color:#9ca3af;font-style:italic;">Выберите алгоритм</span>';
+    return;
+  }
+
+  let html = '<div style="display:inline-flex;align-items:center;flex-wrap:wrap;gap:5px;">';
+
+  if (algo.type === 'PERIODIC') {
+    html += `<span class="algo-preview-badge algo-preview-badge--periodic">
+      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+        <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M5 3v2l1.5 1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      PERIODIC
+    </span>`;
+    html += `<span class="algo-preview-param">${fmtDuration(algo.timeout)}</span>`;
+    if (algo.timeout_noize) {
+      html += `<span class="algo-preview-noise">± ${fmtDuration(algo.timeout_noize)}</span>`;
+    } else {
+      html += `<span style="font-size:11px;color:#d1d5db;font-style:italic;">без шума</span>`;
+    }
+
+  } else if (algo.type === 'SINGLE') {
+    html += `<span class="algo-preview-badge algo-preview-badge--single">
+      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+        <path d="M2 8L2 2L8 8L8 2" stroke="currentColor" stroke-width="1.4"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      SINGLE
+    </span>`;
+    if (algo.timeouts && algo.timeouts.length > 0) {
+      algo.timeouts.forEach(t => {
+        html += `<span class="algo-preview-pill">${fmtDuration(t)}</span>`;
+      });
+    } else {
+      html += `<span class="algo-preview-instant">мгновенно</span>`;
+    }
+    if (algo.timeout_noize) {
+      html += `<span class="algo-preview-noise">± ${fmtDuration(algo.timeout_noize)}</span>`;
+    }
+  }
+
+  html += '</div>';
+  if (algo.title || algo.description) {
+    const sub = [algo.title, algo.description].filter(Boolean).join(' — ');
+    html += `<div style="font-size:11px;color:#9ca3af;margin-top:3px;">${sub}</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+/* ── Загрузка групп ───────────────────────────────────── */
 async function loadGroups() {
   try {
     const res = await fetch('/task-groups/json');
     const data = await res.json();
     const groups = data.task_groups || [];
-
     const sel = document.getElementById('groupId');
     sel.innerHTML = '';
-
     if (!groups.length) {
       sel.innerHTML = '<option value="">Нет доступных групп</option>';
       return;
     }
-
     groups.forEach(g => {
       const opt = document.createElement('option');
       opt.value = g.id;
-      opt.textContent = `${g.title}`;
+      opt.textContent = g.title;
       opt.dataset.name = g.name;
       sel.appendChild(opt);
     });
-
     updateGroupDetails();
   } catch {
-    document.getElementById('groupId').innerHTML =
-      '<option value="">Ошибка загрузки</option>';
+    document.getElementById('groupId').innerHTML = '<option value="">Ошибка загрузки</option>';
   }
 }
 
 function updateGroupDetails() {
   const sel = document.getElementById('groupId');
-  const selected = sel.options[sel.selectedIndex];
-  const el = document.getElementById('groupDetails');
-  if (!selected || !selected.value) { el.textContent = ''; return; }
-  el.innerHTML = `Системное имя: <code>${selected.dataset.name}</code>`;
+  const opt = sel.options[sel.selectedIndex];
+  const el  = document.getElementById('groupDetails');
+  el.innerHTML = opt?.value
+    ? `Системное имя: <code style="font-size:11.5px;background:#f3f4f6;padding:1px 5px;border-radius:4px;">${opt.dataset.name}</code>`
+    : '';
 }
-
 document.getElementById('groupId').addEventListener('change', updateGroupDetails);
 
-// ── Алгоритмы мониторинга ─────────────────────────────
-let algorithms = [];
-
+/* ── Загрузка алгоритмов ──────────────────────────────── */
 async function loadAlgorithms() {
   try {
-    const res = await fetch('/monitoring-algorithms/json');
+    const res  = await fetch('/monitoring-algorithms/json');
     const data = await res.json();
-    algorithms = data.monitoring_algorithms || [];
+    algorithms = data.items || [];
 
     const sel = document.getElementById('algorithmId');
     sel.innerHTML = '';
@@ -155,135 +308,128 @@ async function loadAlgorithms() {
     }
 
     algorithms.forEach(a => {
-      const opt = document.createElement('option');
-      opt.value = a.id;
-      opt.textContent = `#${a.id} — ${a.type}`;
+      const opt  = document.createElement('option');
+      opt.value  = a.id;
+      /* Формируем читаемый лейбл */
+      let label  = `#${a.id}`;
+      if (a.title) label += ` — ${a.title}`;
+      label += ` [${a.type}`;
+      if (a.type === 'PERIODIC') {
+        label += `: ${fmtDuration(a.timeout)}`;
+        if (a.timeout_noize) label += ` ±${fmtDuration(a.timeout_noize)}`;
+      } else if (a.type === 'SINGLE') {
+        label += a.timeouts?.length ? `: ${a.timeouts.length + 1} запуск.` : ': мгновенно';
+      }
+      label += ']';
+      opt.textContent = label;
       sel.appendChild(opt);
     });
 
-    updateAlgoDetails();
+    updateAlgoPreview();
   } catch {
-    document.getElementById('algorithmId').innerHTML =
-      '<option value="">Ошибка загрузки</option>';
+    document.getElementById('algorithmId').innerHTML = '<option value="">Ошибка загрузки</option>';
   }
 }
 
-function updateAlgoDetails() {
-  const id = parseInt(document.getElementById('algorithmId').value);
-  const algo = algorithms.find(a => a.id === id);
-  const el = document.getElementById('algoDetails');
-  if (!algo) { el.textContent = ''; return; }
-
-  if (algo.type === 'PERIODIC') {
-    el.textContent = `Период: ${algo.timeout}с` +
-      (algo.timeout_noize ? ` ± ${algo.timeout_noize}с` : '');
-  } else if (algo.type === 'SINGLE') {
-    el.textContent = `Запусков: ${(algo.timeouts?.length ?? 0) + 1}`;
-  } else {
-    el.textContent = '';
-  }
+function updateAlgoPreview() {
+  const id   = parseInt(document.getElementById('algorithmId').value);
+  const algo = algorithms.find(a => a.id === id) || null;
+  renderAlgoPreview(algo);
 }
+document.getElementById('algorithmId').addEventListener('change', updateAlgoPreview);
 
-document.getElementById('algorithmId').addEventListener('change', updateAlgoDetails);
-
-// ── Подсчёт payload-ов на лету ────────────────────────
+/* ── Счётчик payload-ов ───────────────────────────────── */
 document.getElementById('payloads').addEventListener('input', () => {
-  const errEl = document.getElementById('payloadsError');
+  const raw    = document.getElementById('payloads').value.trim();
+  const errEl  = document.getElementById('payloadsError');
   const infoEl = document.getElementById('payloadsInfo');
-  const raw = document.getElementById('payloads').value.trim();
-
-  if (!raw) { errEl.classList.add('d-none'); infoEl.textContent = ''; return; }
-
+  if (!raw) { errEl.style.display = 'none'; infoEl.textContent = ''; return; }
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) throw new Error();
-    errEl.classList.add('d-none');
-    infoEl.textContent = `${parsed.length} payload${parsed.length === 1 ? '' : '-ов'}`;
+    errEl.style.display = 'none';
+    infoEl.textContent  = `${parsed.length} payload-ов`;
   } catch {
-    errEl.textContent = 'Должен быть JSON-массив';
-    errEl.classList.remove('d-none');
-    infoEl.textContent = '';
+    errEl.textContent   = 'Должен быть JSON-массив';
+    errEl.style.display = 'block';
+    infoEl.textContent  = '';
   }
 });
 
-// ── Отправка ──────────────────────────────────────────
-document.getElementById('submitBtn').addEventListener('click', async () => {
-  const groupId = parseInt(document.getElementById('groupId').value);
-  if (!groupId) return showAlert('Выберите группу задач', 'danger');
-
+/* ── Отправка ─────────────────────────────────────────── */
+document.getElementById('submitBtn').addEventListener('click', async function () {
+  const groupId     = parseInt(document.getElementById('groupId').value);
   const algorithmId = parseInt(document.getElementById('algorithmId').value);
-  if (!algorithmId) return showAlert('Выберите алгоритм мониторинга', 'danger');
 
-  // execution_arguments
+  if (!groupId)     return showAlert('Выберите группу задач', 'error');
+  if (!algorithmId) return showAlert('Выберите алгоритм мониторинга', 'error');
+
+  /* Аргументы выполнения */
   const execRaw = document.getElementById('executionArguments').value.trim();
   let executionArguments = null;
+  const execErrEl = document.getElementById('execArgsError');
   if (execRaw) {
-    try { executionArguments = JSON.parse(execRaw); }
-    catch {
-      document.getElementById('execArgsError').classList.remove('d-none');
-      return showAlert('Невалидный JSON в аргументах выполнения', 'danger');
+    try {
+      executionArguments = JSON.parse(execRaw);
+      execErrEl.style.display = 'none';
+    } catch {
+      execErrEl.style.display = 'block';
+      return showAlert('Невалидный JSON в аргументах выполнения', 'error');
     }
   }
-  document.getElementById('execArgsError').classList.add('d-none');
 
-  // payloads
+  /* Payload-ы */
   const payloadsRaw = document.getElementById('payloads').value.trim();
-  if (!payloadsRaw) return showAlert('Введите payload-ы', 'danger');
+  if (!payloadsRaw) return showAlert('Введите payload-ы', 'error');
 
   let payloads;
+  const payErrEl = document.getElementById('payloadsError');
   try {
     payloads = JSON.parse(payloadsRaw);
     if (!Array.isArray(payloads) || !payloads.length) throw new Error();
+    payErrEl.style.display = 'none';
   } catch {
-    document.getElementById('payloadsError').textContent = 'Должен быть непустой JSON-массив';
-    document.getElementById('payloadsError').classList.remove('d-none');
+    payErrEl.textContent   = 'Должен быть непустой JSON-массив';
+    payErrEl.style.display = 'block';
     return;
   }
-  document.getElementById('payloadsError').classList.add('d-none');
 
   const body = {
     payloads: payloads.map(data => ({ data })),
     task_configuration: {
-      group_id: groupId,
+      group_id:                groupId,
       monitoring_algorithm_id: algorithmId,
-      priority: document.getElementById('priority').value,
-      type: document.getElementById('taskType').value,
-      execution_arguments: executionArguments,
-    }
+      priority:                document.getElementById('priority').value,
+      type:                    document.getElementById('taskType').value,
+      execution_arguments:     executionArguments,
+    },
   };
 
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = true;
-  btn.textContent = 'Создание...';
+  this.disabled    = true;
+  const orig       = this.textContent;
+  this.textContent = 'Создание…';
 
   try {
-    const res = await fetch('/tasks/create', {
-      method: 'POST',
+    const res  = await fetch('/tasks/create', {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body:    JSON.stringify(body),
     });
     const data = await res.json();
 
     if (data.success) {
       showAlert(`Создано задач: ${data.tasks?.length ?? '?'}`, 'success');
-      setTimeout(() => window.location.href = '/tasks', 1200);
+      setTimeout(() => window.location.href = '/tasks', 1400);
     } else {
-      showAlert(data.error || 'Ошибка при создании', 'danger');
+      showAlert(data.error || 'Ошибка при создании', 'error');
     }
   } catch {
-    showAlert('Сетевая ошибка', 'danger');
+    showAlert('Сетевая ошибка', 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Создать';
+    this.disabled    = false;
+    this.textContent = orig;
   }
 });
-
-function showAlert(msg, type) {
-  const el = document.getElementById('alertBox');
-  el.className = `alert alert-${type} mb-4`;
-  el.textContent = msg;
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
 
 loadGroups();
 loadAlgorithms();
