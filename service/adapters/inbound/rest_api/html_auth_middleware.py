@@ -1,6 +1,3 @@
-
-# service/ports/inbound/http/middleware/auth_middleware.py
-
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
@@ -9,34 +6,59 @@ from service.domain.use_cases.external.auth.get_me import GetMeUCRq
 from service.domain.use_cases.external.auth.refresh_token import RefreshTokenUCRq
 from service.ports.common.logs import logger
 
-# Роуты которые НЕ требуют авторизации
 PUBLIC_PATHS = {"/login", "/auth/login", "/auth/logout", "/", "/static"}
+
+# Пути, с которых авторизованного пользователя редиректим на дашборд
+AUTH_REDIRECT_PATHS = {"/login", }
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # пропускаем публичные пути и статику
-        if any(request.url.path == p for p in PUBLIC_PATHS):
-            logger.info(f"pass route: {request.url.path}")
+        path = request.url.path
 
+        # ── Для страниц логина и лендинга — проверяем токен
+        # Если валиден — сразу на дашборд
+        if path in AUTH_REDIRECT_PATHS:
+            token = request.cookies.get("access_token")
+            if token:
+                try:
+                    payload = request.app.state.token_service.decode_token(token)
+                    user_id = int(payload.get("sub"))
+                    get_me_rs = await request.app.state.auth_facade.get_me(
+                        GetMeUCRq(user_id=user_id)
+                    )
+                    if get_me_rs.success:
+                        logger.info(f"already authenticated, redirect to dashboard")
+                        return RedirectResponse(url="/dashboard", status_code=302)
+                except ValueError:
+                    pass
+
+            # Токена нет или невалиден — пропускаем на логин/лендинг
             return await call_next(request)
-        logger.info(f"auth check route: {request.url.path}")
 
+        # ── Остальные публичные пути (статика, /auth/login и т.д.) ──
+        if any(path == p or path.startswith("/static") for p in PUBLIC_PATHS):
+            logger.info(f"pass route: {path}")
+            return await call_next(request)
+
+        logger.info(f"auth check route: {path}")
+
+        # ── Проверяем access token ──
         token = request.cookies.get("access_token")
-        # access валиден — пускаем
         if token:
             try:
                 payload = request.app.state.token_service.decode_token(token)
                 logger.info(f"token is valid")
                 user_id = int(payload.get("sub"))
-                get_me_uc_rs = await request.app.state.auth_facade.get_me(GetMeUCRq(user_id=user_id))
-                request.state.user = get_me_uc_rs.app_user_dto
+                get_me_rs = await request.app.state.auth_facade.get_me(
+                    GetMeUCRq(user_id=user_id)
+                )
+                request.state.user = get_me_rs.app_user_dto
                 return await call_next(request)
             except ValueError as e:
                 logger.info(f"token not valid: {e}")
-                pass
 
-        # access протух — пробуем refresh
+        # ── Пробуем refresh ──
         refresh = request.cookies.get("refresh_token")
         logger.info(f"try refresh")
 
@@ -59,4 +81,5 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 return response
         else:
             logger.info("no refresh, redirect to login")
+
         return RedirectResponse(url="/login", status_code=302)

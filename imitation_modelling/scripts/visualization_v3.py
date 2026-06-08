@@ -24,6 +24,9 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 
+from imitation_modelling.scripts.find_best_config import  compute_metrics_with_sys_key, \
+    find_best_adaptive
+
 try:
     from tqdm import tqdm
 except ImportError:
@@ -50,7 +53,11 @@ ALGO_COLORS = {
 ALGO_ORDER = ["CONSTANT_SIZE", "AIMD", "MOVING_PID", "MOVING_PID_V2",
               "GRADIENT_ASCENT", "ADAPTIVE_MODEL"]
 
-TARGET_ALGOS = {"AIMD", "CONSTANT_SIZE", "ADAPTIVE_MODEL", "GRADIENT_ASCENT"}
+TARGET_ALGOS = {
+    "AIMD",
+    "CONSTANT_SIZE",
+    "ADAPTIVE_MODEL",
+    "GRADIENT_ASCENT"}
 
 # Метрики, по которым проверяем выбросы (IQR-метод, отдельно внутри каждого алгоритма)
 OUTLIER_METRICS = ["overload_count", "avg_util", "total_time", "tries_mean"]
@@ -613,6 +620,14 @@ if __name__ == "__main__":
         print("Нет данных после фильтрации — проверьте INPUT_DIR и MAX_DURATION_SEC")
         exit(1)
 
+    # Ищем лучший алгоритм
+    # Пересчитываем метрики с sys_key (нужен для сравнения на одной системе)
+    records_with_sys = [compute_metrics_with_sys_key(r) for r in runs]
+    records_with_sys = remove_outliers_iqr(records_with_sys)
+
+    find_best_adaptive(records_with_sys, top_n=5)
+
+    exit(0)
     from collections import Counter
     algo_counts = Counter(r["params"]["task_batch_provider_params"]["type"] for r in runs)
     print("\nПрошло фильтр по алгоритмам:")

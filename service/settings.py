@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from service.adapters.inbound.consumer.settings import RMQConsumerSettings, RMQConsumerConnectionSettings
 from service.adapters.inbound.rest_api.settings import FastAPIServerSettings
 from service.adapters.outbound.producer.settings import RMQProducerSettings, RMQProducerConnectionSettings
+from service.domain.schemas.enums import BalancingAlgorithmType
 from service.ports.outbound.dto import URI
 
 
@@ -44,6 +45,8 @@ class ServiceSettings(BaseSettings):
     use_ch_task_run_time_interval_progress_repo: bool = False
     use_ch_task_run_time_interval_execution_bounds_repo: bool = False
     use_ch_time_interval_task_progress_repo: bool = False
+
+    balancing_algorithm_type: BalancingAlgorithmType = BalancingAlgorithmType.ADAPTIVE_MODEL
 
     def ch_uri_as_params(self) -> Dict[str, Any]:
         uri = URI.from_str(self.ch_uri)

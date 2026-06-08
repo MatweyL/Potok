@@ -42,7 +42,9 @@ from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatus
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
 from service.di import set_use_case_facade
+from service.domain.schemas.enums import BalancingAlgorithmType
 from service.domain.services.analytical_metrics import AnalyticalMetricsService
+from service.domain.services.balancing_algorithm.adaptive_model import AdaptiveModelBalancingAlgorithm
 from service.domain.services.balancing_algorithm.aimd import AIMDBalancingAlgorithm
 from service.domain.services.balancing_algorithm.constant import ConstantBalancingAlgorithm
 from service.domain.services.execution_bounds_provider import DefaultExecutionBoundsProvider
@@ -195,6 +197,15 @@ async def main():
                                                       task_run_metrics_provider, 10, 500,
                                                       50, 0.5,
                                                       600)
+    adaptive_model_balancing_algorithm = AdaptiveModelBalancingAlgorithm(task_group_repo,task_run_metrics_provider,)
+    if settings.balancing_algorithm_type == BalancingAlgorithmType.AIMD:
+        balancing_algorithm = aimd_balancing_algorithm
+    elif settings.balancing_algorithm_type == BalancingAlgorithmType.CONSTANT_SIZE:
+        balancing_algorithm = constant_balancing_algorithm
+    elif settings.balancing_algorithm_type == BalancingAlgorithmType.ADAPTIVE_MODEL:
+        balancing_algorithm = adaptive_model_balancing_algorithm
+    else:
+        raise RuntimeError("Not specified balancing_algorithm_type in env")
     # USE CASE: external
     create_monitoring_algorithm_uc = CreateMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                                  periodic_monitoring_algorithm_repo,
@@ -297,7 +308,7 @@ async def main():
                                                               task_run_status_log_repo,
                                                               transaction_factory,
                                                               waiting_task_run_provider,
-                                                              aimd_balancing_algorithm, )
+                                                              balancing_algorithm, )
     send_task_runs_to_execution_uc = SendTaskRunsToExecutionUC(task_runs_producer, queue_creator)
     retrieve_and_send_task_runs_uc = RetrieveAndSendTaskRunsUC(retrieve_waiting_task_runs_uc,
                                                                send_task_runs_to_execution_uc)

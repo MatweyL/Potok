@@ -3,113 +3,129 @@
 {% block navbar %}{% endblock %}
 
 {% block body %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light py-5">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-12 col-md-8 col-lg-5 col-xl-4">
+<div style="height:100vh;display:flex;align-items:center;justify-content:center;
+            background:var(--flow-bg,#f9fafb);padding:24px;overflow:hidden;">
 
-                <!-- Карточка входа -->
-                <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
-                    <div class="card-body p-4 p-md-5">
+  <div style="width:100%;max-width:400px;">
 
-                        <!-- Логотип / Заголовок -->
-                        <div class="text-center mb-4">
-                            <h1 class="h2 fw-bold text-primary mb-1">Поток</h1>
-                            <p class="text-muted">Войдите в аккаунт</p>
-                        </div>
-
-                        <form id="loginForm">
-                            <div class="mb-3">
-                                <label for="username" class="form-label fw-medium">Логин или email</label>
-                                <input
-                                    type="text"
-                                    id="username"
-                                    name="username"
-                                    class="form-control form-control-lg rounded-3"
-                                    placeholder="username или email"
-                                    autocomplete="username"
-                                    required>
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="password" class="form-label fw-medium">Пароль</label>
-                                <input
-                                    type="password"
-                                    id="password"
-                                    name="password"
-                                    class="form-control form-control-lg rounded-3"
-                                    placeholder="••••••••"
-                                    autocomplete="current-password"
-                                    required>
-                            </div>
-
-                            <!-- Сообщение об ошибке -->
-                            <div id="errorMsg" class="alert alert-danger d-none rounded-3 py-2 small"></div>
-
-                            <button
-                                type="submit"
-                                id="submitBtn"
-                                class="btn btn-primary btn-lg w-100 rounded-3 fw-semibold py-3 mb-3">
-                                Войти
-                            </button>
-
-                        </form>
-                    </div>
-                </div>
-
-            </div>
-        </div>
+    {# ── Логотип ── #}
+    <div style="text-align:center;margin-bottom:32px;">
+      <div style="display:inline-flex;align-items:center;justify-content:center;
+                  width:52px;height:52px;border-radius:14px;
+                  background:linear-gradient(135deg,#2563eb 0%,#6366f1 100%);
+                  margin-bottom:16px;box-shadow:0 6px 20px rgba(37,99,235,.3);">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+          <path d="M6 24 L10 16 L15 20 L21 10 L26 14" stroke="white" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="26" cy="14" r="2.5" fill="white"/>
+          <circle cx="6"  cy="24" r="2.5" fill="white"/>
+        </svg>
+      </div>
+      <h1 style="font-size:26px;font-weight:800;color:#0f172a;letter-spacing:-.5px;margin:0 0 6px;">
+        Поток
+      </h1>
+      <p style="font-size:14px;color:#94a3b8;margin:0;">Войдите в аккаунт</p>
     </div>
+
+    {# ── Карточка формы ── #}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;">
+
+      <form id="loginForm">
+
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;">
+          <label for="username"
+                 style="font-size:13px;font-weight:600;color:#374151;">Логин</label>
+          <input type="text" id="username" name="username"
+                 autocomplete="username" required
+                 placeholder="username"
+                 style="padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;
+                        font-size:14px;color:#111827;outline:none;font-family:inherit;
+                        transition:border-color .15s,box-shadow .15s;background:#fff;"
+                 onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.12)'"
+                 onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow=''"/>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:24px;">
+          <label for="password"
+                 style="font-size:13px;font-weight:600;color:#374151;">Пароль</label>
+          <input type="password" id="password" name="password"
+                 autocomplete="current-password" required
+                 placeholder="••••••••"
+                 style="padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;
+                        font-size:14px;color:#111827;outline:none;font-family:inherit;
+                        transition:border-color .15s,box-shadow .15s;background:#fff;"
+                 onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.12)'"
+                 onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow=''"/>
+        </div>
+
+        <div id="errorMsg"
+             style="display:none;font-size:13px;color:#dc2626;background:#fef2f2;
+                    border:1px solid #fecaca;border-radius:8px;
+                    padding:10px 14px;margin-bottom:18px;"></div>
+
+        <button type="submit" id="submitBtn"
+                style="width:100%;padding:12px;border:none;border-radius:10px;
+                       background:linear-gradient(135deg,#2563eb 0%,#6366f1 100%);
+                       color:#fff;font-size:15px;font-weight:600;cursor:pointer;
+                       box-shadow:0 4px 14px rgba(37,99,235,.35);
+                       transition:transform .15s,box-shadow .15s;font-family:inherit;"
+                onmouseenter="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 20px rgba(37,99,235,.4)'"
+                onmouseleave="this.style.transform='';this.style.boxShadow='0 4px 14px rgba(37,99,235,.35)'">
+          Войти
+        </button>
+
+      </form>
+    </div>
+
+    <p style="text-align:center;margin-top:20px;font-size:12.5px;color:#94a3b8;">
+      <a href="/" style="color:#94a3b8;text-decoration:none;"
+         onmouseenter="this.style.color='#2563eb'"
+         onmouseleave="this.style.color='#94a3b8'">← Назад</a>
+    </p>
+
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    const form = document.getElementById('loginForm');
-    const errorMsg = document.getElementById('errorMsg');
-    const submitBtn = document.getElementById('submitBtn');
+const form      = document.getElementById('loginForm');
+const errorMsg  = document.getElementById('errorMsg');
+const submitBtn = document.getElementById('submitBtn');
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  errorMsg.style.display = 'none';
+  errorMsg.textContent   = '';
 
-        // Сброс ошибок
-        errorMsg.classList.add('d-none');
-        errorMsg.textContent = '';
+  submitBtn.disabled     = true;
+  submitBtn.textContent  = 'Вход…';
 
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `
-            <span class="flow-spinner flow-spinner--sm me-2" role="status"></span>
-            Вход...
-        `;
-
-        try {
-            const res = await fetch('/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    username: form.username.value.trim(),
-                    password: form.password.value,
-                }),
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                window.__accessToken = data.access_token;
-                window.location.href = '/projects';
-            } else {
-                errorMsg.textContent = data.error || 'Неверный логин или пароль';
-                errorMsg.classList.remove('d-none');
-            }
-        } catch (err) {
-            errorMsg.textContent = 'Нет связи с сервером. Проверьте подключение к интернету.';
-            errorMsg.classList.remove('d-none');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Войти';
-        }
+  try {
+    const res  = await fetch('/auth/login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        username: form.username.value.trim(),
+        password: form.password.value,
+      }),
     });
+    const data = await res.json();
+
+    if (data.success) {
+      window.__accessToken  = data.access_token;
+      window.location.href  = '/projects';
+    } else {
+      errorMsg.textContent   = data.error || 'Неверный логин или пароль';
+      errorMsg.style.display = 'block';
+    }
+  } catch {
+    errorMsg.textContent   = 'Нет связи с сервером';
+    errorMsg.style.display = 'block';
+  } finally {
+    submitBtn.disabled    = false;
+    submitBtn.textContent = 'Войти';
+  }
+});
 </script>
 {% endblock %}

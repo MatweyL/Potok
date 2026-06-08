@@ -54,10 +54,6 @@ def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html")
 
 
-@router.get("/dashboard", response_class=HTMLResponse)
-def dashboard_page(request: Request):
-    return templates.TemplateResponse(request=request, name="dashboard.html")
-
 
 
 @router.post("/auth/login")
@@ -159,14 +155,42 @@ async def update_project(request: Request, project_id: int, rq: UpdateProjectUCR
     rs = await request.app.state.use_case_facade.update_project(rq)
     return rs
 
+@router.get("/dashboard")
+async def dashboard(request: Request):
+    analytics = request.app.state.analytical_metrics_service
+    summary  = await analytics.get_dashboard_summary()
+    statuses = await analytics.get_run_status_distribution()
+    heatmap  = await analytics.get_run_heatmap()
+    trends   = await analytics.get_performance_trends(period="day")
+    duration = await analytics.get_duration_distribution()
 
+    STATUS_COLORS = {
+        'SUCCEED': '#16a34a', 'EXECUTION': '#2563eb', 'QUEUED': '#60a5fa',
+        'WAITING': '#9ca3af', 'ERROR': '#dc2626', 'TEMP_ERROR': '#f59e0b',
+        'INTERRUPTED': '#f97316', 'CANCELLED': '#94a3b8',
+    }
 
-@router.get("/tasks", response_class=HTMLResponse)
-def tasks_page(request: Request):
-    return templates.TemplateResponse(request=request, name="tasks.html")
+    # Матрица тепловой карты 7×24 (пн=0)
+    matrix = [[0]*24 for _ in range(7)]
+    for item in heatmap:
+        d = (item.day_of_week - 1) % 7
+        matrix[d][item.hour_of_day] = item.run_count
 
-
-
+    return templates.TemplateResponse("dashboard.html", {
+        "request":         request,
+        "summary":         summary,
+        "donut_data":      [{"label": s.status, "value": s.run_count,
+                             "color": STATUS_COLORS.get(s.status, '#64748b')}
+                            for s in statuses],
+        "heatmap_matrix":  matrix,
+        "histogram_data":  [{"label": d.duration_bucket, "value": d.run_count}
+                            for d in duration],
+        "histogram_total": sum(d.run_count for d in duration),
+        "trend_completed": [{"label": t.period.strftime("%H:%M"),
+                             "value": t.completed_count} for t in trends],
+        "trend_duration":  [{"label": t.period.strftime("%H:%M"),
+                             "value": int(t.avg_duration_seconds or 0)} for t in trends],
+    })
 
 
 

@@ -49,3 +49,9 @@ class MonitoringAlgorithmType(str, enum.Enum):
 class AppUserRole(str, enum.Enum):
     ADMIN = "ADMIN"
     OPERATOR = "OPERATOR"
+
+
+class BalancingAlgorithmType(str, enum.Enum):
+    CONSTANT_SIZE = "CONSTANT_SIZE"
+    AIMD = "AIMD"
+    ADAPTIVE_MODEL = "ADAPTIVE_MODEL"

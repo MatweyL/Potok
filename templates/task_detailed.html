@@ -45,7 +45,7 @@
 
   {# ── Хлебные крошки ── #}
   <nav style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:8px;flex-wrap:wrap;">
-    <a href="/tasks" class="text-decoration-none text-primary">Задачи</a>
+    <a href="/tasks/{{ task_group.id }}" class="text-decoration-none text-primary">Задачи</a>
     {% if task_group %}
     <span style="color:#d1d5db;">›</span>
     <a href="/task-groups/{{ task_group.id }}" class="text-decoration-none text-primary">{{ task_group.name }}</a>

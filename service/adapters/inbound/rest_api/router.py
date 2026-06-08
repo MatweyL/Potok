@@ -14,10 +14,10 @@ from service.domain.use_cases.external.task_group import CreateTaskGroupUCRq
 from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
 from service.ports.outbound.repo.fields import PaginationQuery
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api/v1", tags=["Управление задачами"])
 
 
-@router.get("/health", tags=["Health"])
+@router.get("/health", tags=["Проверка работоспособности сервиса"])
 async def health_check():
     return {"status": "ok"}
 

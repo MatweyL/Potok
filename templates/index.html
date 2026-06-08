@@ -1,43 +1,76 @@
 {% extends "base.html" %}
-{% block title %}Поток{% endblock %}
+{% block title %}Поток — система мониторинга задач{% endblock %}
 {% block navbar %}{% endblock %}
 
 {% block body %}
-<div class="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-  <div style="max-width: 640px; width: 100%; padding: 2rem 1rem;">
+<div style="height:100vh;display:flex;align-items:center;justify-content:center;
+            padding:24px;background:var(--flow-bg,#f9fafb);overflow:hidden;">
 
-    <div class="text-center mb-5">
-      <h1 class="fw-bold display-6">Поток</h1>
-      <p class="text-muted">Система управления задачами</p>
-    </div>
+  <div style="width:100%;max-width:860px;display:grid;
+              grid-template-columns:1fr 1fr;gap:40px;align-items:center;">
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-header bg-white fw-semibold">
-        Поддерживает
-        <span class="badge bg-success ms-2">✓ готово</span>
+    {# ── Левая колонка: заголовок + кнопка ── #}
+    <div>
+      <div style="display:inline-flex;align-items:center;justify-content:center;
+                  width:52px;height:52px;border-radius:14px;
+                  background:linear-gradient(135deg,#2563eb 0%,#6366f1 100%);
+                  margin-bottom:20px;box-shadow:0 6px 20px rgba(37,99,235,.3);">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+          <path d="M6 24 L10 16 L15 20 L21 10 L26 14" stroke="white" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="26" cy="14" r="2.5" fill="white"/>
+          <circle cx="6"  cy="24" r="2.5" fill="white"/>
+        </svg>
       </div>
-      <ul class="list-group list-group-flush">
-        <li class="list-group-item">Создание разных <strong>алгоритмов мониторинга</strong></li>
-        <li class="list-group-item">Приоритезацию задач <span class="text-muted small">(каждый приоритет отправляется в свою очередь)</span></li>
-        <li class="list-group-item">Два типа задач: <code>«Без типа»</code> и <code>«Временной интервал»</code></li>
-        <li class="list-group-item">Отслеживание прогресса для задач типа <code>«Временной интервал»</code></li>
-        <li class="list-group-item">Историзм статусов задач</li>
-        <li class="list-group-item">Балансировка нагрузки</li>
-      </ul>
+
+      <h1 style="font-size:38px;font-weight:800;color:#0f172a;letter-spacing:-1px;
+                 line-height:1.1;margin:0 0 12px;">Поток</h1>
+
+      <p style="font-size:15.5px;color:#475569;line-height:1.65;margin:0 0 28px;">
+        Платформа для управления очередями задач мониторинга.
+        Собирайте данные по расписанию, отслеживайте прогресс
+        и масштабируйтесь без боли.
+      </p>
+
+      <a href="/login"
+         style="display:inline-flex;align-items:center;gap:8px;
+                padding:12px 28px;border-radius:10px;
+                background:linear-gradient(135deg,#2563eb 0%,#6366f1 100%);
+                color:#fff;font-size:15px;font-weight:600;text-decoration:none;
+                box-shadow:0 4px 16px rgba(37,99,235,.35);
+                transition:transform .15s,box-shadow .15s;"
+         onmouseenter="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(37,99,235,.4)'"
+         onmouseleave="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(37,99,235,.35)'">
+        Войти в систему
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
     </div>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header bg-white fw-semibold">
-        В дальнейшем будет
-        <span class="badge bg-warning text-dark ms-2">◦ в планах</span>
+    {# ── Правая колонка: фичи ── #}
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      {% set features = [
+        ('⚡', 'Приоритезация', 'Пять уровней. Каждый — своя очередь. Важное выполняется первым.'),
+        ('🕐', 'Временные интервалы', 'Задачи TIME_INTERVAL разбиваются на отрезки и отслеживают прогресс сбора.'),
+        ('📊', 'Аналитика', 'Тренды, тепловые карты и распределение длительности в реальном времени.'),
+        ('✓',  'Уже работает',  'Алгоритмы PERIODIC и SINGLE, историзм статусов, балансировка нагрузки, привязка к проектам.'),
+      ] %}
+
+      {% for icon, title, desc in features %}
+      <div style="display:flex;align-items:flex-start;gap:14px;
+                  background:#fff;border:1px solid #e2e8f0;border-radius:12px;
+                  padding:14px 16px;">
+        <div style="font-size:20px;line-height:1;flex-shrink:0;margin-top:1px;">{{ icon }}</div>
+        <div>
+          <div style="font-size:13.5px;font-weight:700;color:#0f172a;margin-bottom:3px;">{{ title }}</div>
+          <div style="font-size:12.5px;color:#64748b;line-height:1.55;">{{ desc }}</div>
+        </div>
       </div>
-      <ul class="list-group list-group-flush">
-        <li class="list-group-item">Тип задачи <code>«Пагинация»</code> с отслеживанием прогресса</li>
-      </ul>
-    </div>
+      {% endfor %}
 
-    <div class="text-center">
-      <a href="/login" class="btn btn-primary px-5">Войти</a>
     </div>
   </div>
 </div>

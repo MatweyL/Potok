@@ -21,7 +21,7 @@
 {% set effective_duration_metrics = duration_metrics or [] %}
 
 {% set USE_MOCK_METRICS = false %}
-{% set task_per_second_scaler = 3600 %}
+{% set task_per_second_scaler = 1 %}
 
 {% if USE_MOCK_METRICS %}
   {% set effective_status_metrics = [
