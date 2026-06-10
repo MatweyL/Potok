@@ -14,6 +14,8 @@ from service.domain.schemas.monitoring_algorithm import MonitoringAlgorithmPK, M
 from service.domain.schemas.task import Task
 from service.ports.outbound.repo.monitoring_algorithm import MonitoringAlgorithmRepo
 
+MAX_DATETIME = datetime.max.replace(tzinfo=timezone.utc)
+
 
 class SAMonitoringAlgorithmRepo(AbstractSARepo):
     def to_model(self, obj: MonitoringAlgorithm) -> models.MonitoringAlgorithm:
@@ -168,7 +170,7 @@ class SASingleMonitoringAlgorithmRepo(AbstractSARepo, MonitoringAlgorithmRepo):
 
         if not algorithm.timeouts:
             # Одно выполнение: интервал от loaded_at до бесконечности
-            intervals.append((loaded_at, datetime.max))
+            intervals.append((loaded_at, MAX_DATETIME))
             return intervals
 
         cumulative_time = loaded_at
@@ -186,7 +188,7 @@ class SASingleMonitoringAlgorithmRepo(AbstractSARepo, MonitoringAlgorithmRepo):
             cumulative_time = right_bound
 
         # Последний интервал — после всех timeouts до бесконечности
-        intervals.append((cumulative_time, datetime.max))
+        intervals.append((cumulative_time, MAX_DATETIME))
 
         return intervals
 

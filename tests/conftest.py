@@ -13,7 +13,7 @@ from service.adapters.outbound.repo.sa.impls.task import SATaskRepo, SATaskProvi
 from service.adapters.outbound.repo.sa.impls.task_group import SATaskGroupRepo
 from service.adapters.outbound.repo.sa.impls.task_group_by_project import SATaskGroupByProjectRepo
 from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWaitingTaskRunProvider, \
-    SATaskRunMetricsProvider
+    SATaskRunMetricsProvider, SARecentTaskRunsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
     SATaskRunTimeIntervalExecutionBoundsRepo
@@ -158,6 +158,11 @@ def sa_task_run_metrics_provider(database):
 @pytest.fixture
 def sa_task_provider(database):
     return SATaskProvider(database)
+
+@pytest.fixture
+def recent_task_runs_provider(database):
+    return SARecentTaskRunsProvider(database)
+
 @pytest.fixture
 def actual_execution_bounds_provider(sa_time_interval_task_progress_repo):
     return ActualTimeIntervalExecutionBoundsProvider(sa_time_interval_task_progress_repo)

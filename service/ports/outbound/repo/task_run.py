@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Union
 
-from service.domain.schemas.task_run import TaskRun
+from service.domain.schemas.task_run import TaskRun, TaskRunTimeIntervalExecutionBounds
 from service.domain.schemas.task_run_metrics import TaskRunMetrics, TaskRunAvgMetrics, StatusMetrics, \
     TasksRunsStatusMetrics
 
@@ -36,4 +36,12 @@ class RecentTaskRunsProvider(ABC):
             task_ids: List[int],
             limit_per_task: int,
     ) -> List[TaskRun]:
+        pass
+
+
+class LatestTaskRunTimeIntervalExecutionBoundsProvider(ABC):
+    @abstractmethod
+    async def provide_latest_bounds_by_task_ids(
+            self, task_ids: List[int]
+    ) -> Dict[int, TaskRunTimeIntervalExecutionBounds]:
         pass

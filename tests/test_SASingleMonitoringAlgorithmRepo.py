@@ -3,11 +3,13 @@ from typing import List
 
 import pytest
 
+from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import MAX_DATETIME
 from service.domain.schemas.enums import TaskStatus, TaskType, MonitoringAlgorithmType
 from service.domain.schemas.monitoring_algorithm import SingleMonitoringAlgorithm, MonitoringAlgorithm
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task
 from service.domain.schemas.task_group import TaskGroup
+from tests.utils import make_utc_datetime
 
 
 # ---------------------------------------------------------------------------
@@ -70,16 +72,16 @@ class TestCalculateExecutionIntervals:
         algorithm = await _make_algorithm(timeouts=[])
         task = await _make_task(
             task_id=1,
-            loaded_at=datetime(2024, 1, 1, 0, 0, 0),
+            loaded_at=make_utc_datetime(2024, 1, 1, 0, 0, 0),
             status=TaskStatus.NEW,
-            status_updated_at=datetime(2024, 1, 1, 0, 0, 0),
+            status_updated_at=make_utc_datetime(2024, 1, 1, 0, 0, 0),
         )
 
         intervals = repo._calculate_execution_intervals(task, algorithm)
 
         assert len(intervals) == 1
-        assert intervals[0][0] == datetime(2024, 1, 1, 0, 0, 0)
-        assert intervals[0][1] == datetime.max
+        assert intervals[0][0] == make_utc_datetime(2024, 1, 1, 0, 0, 0)
+        assert intervals[0][1] == MAX_DATETIME
 
     @pytest.mark.asyncio
     async def test_single_timeout_creates_two_intervals(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
@@ -87,9 +89,9 @@ class TestCalculateExecutionIntervals:
         algorithm = await _make_algorithm(timeouts=[3600.0])  # 1 hour
         task = await _make_task(
             task_id=1,
-            loaded_at=datetime(2024, 1, 1, 0, 0, 0),
+            loaded_at=make_utc_datetime(2024, 1, 1, 0, 0, 0),
             status=TaskStatus.NEW,
-            status_updated_at=datetime(2024, 1, 1, 0, 0, 0),
+            status_updated_at=make_utc_datetime(2024, 1, 1, 0, 0, 0),
         )
 
         intervals = repo._calculate_execution_intervals(task, algorithm)
@@ -97,10 +99,10 @@ class TestCalculateExecutionIntervals:
         # Interval 0: [loaded_at, loaded_at + 3600s]
         # Interval 1: [loaded_at + 3600s, infinity]
         assert len(intervals) == 2
-        assert intervals[0][0] == datetime(2024, 1, 1, 0, 0, 0)
-        assert intervals[0][1] == datetime(2024, 1, 1, 1, 0, 0)
-        assert intervals[1][0] == datetime(2024, 1, 1, 1, 0, 0)
-        assert intervals[1][1] == datetime.max
+        assert intervals[0][0] == make_utc_datetime(2024, 1, 1, 0, 0, 0)
+        assert intervals[0][1] == make_utc_datetime(2024, 1, 1, 1, 0, 0)
+        assert intervals[1][0] == make_utc_datetime(2024, 1, 1, 1, 0, 0)
+        assert intervals[1][1] == MAX_DATETIME
 
     @pytest.mark.asyncio
     async def test_multiple_timeouts_creates_n_plus_one_intervals(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
@@ -108,9 +110,9 @@ class TestCalculateExecutionIntervals:
         algorithm = await _make_algorithm(timeouts=[100.0, 200.0, 300.0])
         task = await _make_task(
             task_id=1,
-            loaded_at=datetime(2024, 1, 1, 0, 0, 0),
+            loaded_at=make_utc_datetime(2024, 1, 1, 0, 0, 0),
             status=TaskStatus.NEW,
-            status_updated_at=datetime(2024, 1, 1, 0, 0, 0),
+            status_updated_at=make_utc_datetime(2024, 1, 1, 0, 0, 0),
         )
 
         intervals = repo._calculate_execution_intervals(task, algorithm)
@@ -119,20 +121,20 @@ class TestCalculateExecutionIntervals:
         assert len(intervals) == 4
 
         # Interval 0: [0, 100s]
-        assert intervals[0][0] == datetime(2024, 1, 1, 0, 0, 0)
-        assert intervals[0][1] == datetime(2024, 1, 1, 0, 1, 40)
+        assert intervals[0][0] == make_utc_datetime(2024, 1, 1, 0, 0, 0)
+        assert intervals[0][1] == make_utc_datetime(2024, 1, 1, 0, 1, 40)
 
         # Interval 1: [100s, 300s]
-        assert intervals[1][0] == datetime(2024, 1, 1, 0, 1, 40)
-        assert intervals[1][1] == datetime(2024, 1, 1, 0, 5, 0)
+        assert intervals[1][0] == make_utc_datetime(2024, 1, 1, 0, 1, 40)
+        assert intervals[1][1] == make_utc_datetime(2024, 1, 1, 0, 5, 0)
 
         # Interval 2: [300s, 600s]
-        assert intervals[2][0] == datetime(2024, 1, 1, 0, 5, 0)
-        assert intervals[2][1] == datetime(2024, 1, 1, 0, 10, 0)
+        assert intervals[2][0] == make_utc_datetime(2024, 1, 1, 0, 5, 0)
+        assert intervals[2][1] == make_utc_datetime(2024, 1, 1, 0, 10, 0)
 
         # Interval 3: [600s, infinity]
-        assert intervals[3][0] == datetime(2024, 1, 1, 0, 10, 0)
-        assert intervals[3][1] == datetime.max
+        assert intervals[3][0] == make_utc_datetime(2024, 1, 1, 0, 10, 0)
+        assert intervals[3][1] == MAX_DATETIME
 
 
 # ---------------------------------------------------------------------------
@@ -147,35 +149,35 @@ class TestFindCurrentInterval:
     async def test_finds_first_interval(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
         intervals = [
-            (datetime(2024, 1, 1, 0, 0, 0), datetime(2024, 1, 1, 1, 0, 0)),
-            (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 0, 0, 0), make_utc_datetime(2024, 1, 1, 1, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0)),
         ]
-        now = datetime(2024, 1, 1, 0, 30, 0)
+        now = make_utc_datetime(2024, 1, 1, 0, 30, 0)
 
         current = repo._find_current_interval(intervals, now)
 
-        assert current == (datetime(2024, 1, 1, 0, 0, 0), datetime(2024, 1, 1, 1, 0, 0))
+        assert current == (make_utc_datetime(2024, 1, 1, 0, 0, 0), make_utc_datetime(2024, 1, 1, 1, 0, 0))
 
     @pytest.mark.asyncio
     async def test_finds_second_interval(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
         intervals = [
-            (datetime(2024, 1, 1, 0, 0, 0), datetime(2024, 1, 1, 1, 0, 0)),
-            (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 0, 0, 0), make_utc_datetime(2024, 1, 1, 1, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0)),
         ]
-        now = datetime(2024, 1, 1, 1, 30, 0)
+        now = make_utc_datetime(2024, 1, 1, 1, 30, 0)
 
         current = repo._find_current_interval(intervals, now)
 
-        assert current == (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0))
+        assert current == (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0))
 
     @pytest.mark.asyncio
     async def test_returns_none_if_before_all_intervals(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
         intervals = [
-            (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0)),
         ]
-        now = datetime(2024, 1, 1, 0, 30, 0)
+        now = make_utc_datetime(2024, 1, 1, 0, 30, 0)
 
         current = repo._find_current_interval(intervals, now)
 
@@ -185,9 +187,9 @@ class TestFindCurrentInterval:
     async def test_returns_none_if_after_all_intervals(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
         intervals = [
-            (datetime(2024, 1, 1, 0, 0, 0), datetime(2024, 1, 1, 1, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 0, 0, 0), make_utc_datetime(2024, 1, 1, 1, 0, 0)),
         ]
-        now = datetime(2024, 1, 1, 2, 0, 0)
+        now = make_utc_datetime(2024, 1, 1, 2, 0, 0)
 
         current = repo._find_current_interval(intervals, now)
 
@@ -197,27 +199,27 @@ class TestFindCurrentInterval:
     async def test_left_bound_inclusive(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
         intervals = [
-            (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0)),
         ]
-        now = datetime(2024, 1, 1, 1, 0, 0)  # Exactly at left_bound
+        now = make_utc_datetime(2024, 1, 1, 1, 0, 0)  # Exactly at left_bound
 
         current = repo._find_current_interval(intervals, now)
 
-        assert current == (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0))
+        assert current == (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0))
 
     @pytest.mark.asyncio
     async def test_right_bound_exclusive(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
         intervals = [
-            (datetime(2024, 1, 1, 0, 0, 0), datetime(2024, 1, 1, 1, 0, 0)),
-            (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 0, 0, 0), make_utc_datetime(2024, 1, 1, 1, 0, 0)),
+            (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0)),
         ]
-        now = datetime(2024, 1, 1, 1, 0, 0)  # Exactly at right_bound of first interval
+        now = make_utc_datetime(2024, 1, 1, 1, 0, 0)  # Exactly at right_bound of first interval
 
         current = repo._find_current_interval(intervals, now)
 
         # Should find second interval
-        assert current == (datetime(2024, 1, 1, 1, 0, 0), datetime(2024, 1, 1, 2, 0, 0))
+        assert current == (make_utc_datetime(2024, 1, 1, 1, 0, 0), make_utc_datetime(2024, 1, 1, 2, 0, 0))
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +233,7 @@ class TestIsTaskReadyToExecute:
     @pytest.mark.asyncio
     async def test_new_task_in_current_interval_ready(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[3600.0])
         task = await _make_task(
             task_id=1,
@@ -239,7 +241,7 @@ class TestIsTaskReadyToExecute:
             status=TaskStatus.NEW,
             status_updated_at=loaded_at,
         )
-        now = datetime(2024, 1, 1, 0, 30, 0)  # In first interval
+        now = make_utc_datetime(2024, 1, 1, 0, 30, 0)  # In first interval
 
         ready = repo._is_task_ready_to_execute(task, algorithm, now)
 
@@ -248,15 +250,15 @@ class TestIsTaskReadyToExecute:
     @pytest.mark.asyncio
     async def test_succeed_task_status_updated_before_left_bound_ready(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[3600.0])  # Interval 1 starts at 01:00
         task = await _make_task(
             task_id=1,
             loaded_at=loaded_at,
             status=TaskStatus.SUCCEED,
-            status_updated_at=datetime(2024, 1, 1, 0, 30, 0),  # Before second interval
+            status_updated_at=make_utc_datetime(2024, 1, 1, 0, 30, 0),  # Before second interval
         )
-        now = datetime(2024, 1, 1, 1, 30, 0)  # In second interval
+        now = make_utc_datetime(2024, 1, 1, 1, 30, 0)  # In second interval
 
         ready = repo._is_task_ready_to_execute(task, algorithm, now)
 
@@ -265,15 +267,15 @@ class TestIsTaskReadyToExecute:
     @pytest.mark.asyncio
     async def test_succeed_task_status_updated_after_left_bound_not_ready(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[3600.0])
         task = await _make_task(
             task_id=1,
             loaded_at=loaded_at,
             status=TaskStatus.SUCCEED,
-            status_updated_at=datetime(2024, 1, 1, 1, 30, 0),  # After left_bound
+            status_updated_at=make_utc_datetime(2024, 1, 1, 1, 30, 0),  # After left_bound
         )
-        now = datetime(2024, 1, 1, 1, 45, 0)  # In second interval (starts at 01:00)
+        now = make_utc_datetime(2024, 1, 1, 1, 45, 0)  # In second interval (starts at 01:00)
 
         ready = repo._is_task_ready_to_execute(task, algorithm, now)
 
@@ -282,7 +284,7 @@ class TestIsTaskReadyToExecute:
     @pytest.mark.asyncio
     async def test_execution_status_not_ready(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[3600.0])
         task = await _make_task(
             task_id=1,
@@ -290,7 +292,7 @@ class TestIsTaskReadyToExecute:
             status=TaskStatus.EXECUTION,
             status_updated_at=loaded_at,
         )
-        now = datetime(2024, 1, 1, 0, 30, 0)
+        now = make_utc_datetime(2024, 1, 1, 0, 30, 0)
 
         ready = repo._is_task_ready_to_execute(task, algorithm, now)
 
@@ -299,7 +301,7 @@ class TestIsTaskReadyToExecute:
     @pytest.mark.asyncio
     async def test_finished_status_not_ready(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[3600.0])
         task = await _make_task(
             task_id=1,
@@ -307,7 +309,7 @@ class TestIsTaskReadyToExecute:
             status=TaskStatus.FINISHED,
             status_updated_at=loaded_at,
         )
-        now = datetime(2024, 1, 1, 0, 30, 0)
+        now = make_utc_datetime(2024, 1, 1, 0, 30, 0)
 
         ready = repo._is_task_ready_to_execute(task, algorithm, now)
 
@@ -316,7 +318,7 @@ class TestIsTaskReadyToExecute:
     @pytest.mark.asyncio
     async def test_no_current_interval_not_ready(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[3600.0])
         task = await _make_task(
             task_id=1,
@@ -324,7 +326,7 @@ class TestIsTaskReadyToExecute:
             status=TaskStatus.NEW,
             status_updated_at=loaded_at,
         )
-        now = datetime(2023, 12, 31, 23, 0, 0)  # Before loaded_at
+        now = make_utc_datetime(2023, 12, 31, 23, 0, 0)  # Before loaded_at
 
         ready = repo._is_task_ready_to_execute(task, algorithm, now)
 
@@ -343,41 +345,41 @@ class TestTaskExecutionScenarios:
     async def test_task_executes_in_all_intervals(self, _make_task, _make_algorithm,
                                                   sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[100.0, 200.0, 300.0])
 
         # Interval 0: NEW task ready immediately
         task = await _make_task(1, loaded_at, TaskStatus.NEW, loaded_at)  # id=1
-        now = datetime(2024, 1, 1, 0, 0, 30)
+        now = make_utc_datetime(2024, 1, 1, 0, 0, 30)
         assert repo._is_task_ready_to_execute(task, algorithm, now) is True
 
         # Interval 1
-        task = await _make_task(2, loaded_at, TaskStatus.SUCCEED, datetime(2024, 1, 1, 0, 0, 50))  # id=2
-        now = datetime(2024, 1, 1, 0, 2, 0)
+        task = await _make_task(2, loaded_at, TaskStatus.SUCCEED, make_utc_datetime(2024, 1, 1, 0, 0, 50))  # id=2
+        now = make_utc_datetime(2024, 1, 1, 0, 2, 0)
         assert repo._is_task_ready_to_execute(task, algorithm, now) is True
 
         # Interval 2
-        task = await _make_task(3, loaded_at, TaskStatus.SUCCEED, datetime(2024, 1, 1, 0, 2, 10))  # id=3
-        now = datetime(2024, 1, 1, 0, 6, 0)
+        task = await _make_task(3, loaded_at, TaskStatus.SUCCEED, make_utc_datetime(2024, 1, 1, 0, 2, 10))  # id=3
+        now = make_utc_datetime(2024, 1, 1, 0, 6, 0)
         assert repo._is_task_ready_to_execute(task, algorithm, now) is True
 
         # Interval 3
-        task = await _make_task(4, loaded_at, TaskStatus.SUCCEED, datetime(2024, 1, 1, 0, 6, 30))  # id=4
-        now = datetime(2024, 1, 1, 0, 11, 0)
+        task = await _make_task(4, loaded_at, TaskStatus.SUCCEED, make_utc_datetime(2024, 1, 1, 0, 6, 30))  # id=4
+        now = make_utc_datetime(2024, 1, 1, 0, 11, 0)
         assert repo._is_task_ready_to_execute(task, algorithm, now) is True
 
     @pytest.mark.asyncio
     async def test_empty_timeouts_executes_once(self, _make_task, _make_algorithm, sa_single_monitoring_algorithm_repo):
         repo = sa_single_monitoring_algorithm_repo
-        loaded_at = datetime(2024, 1, 1, 0, 0, 0)
+        loaded_at = make_utc_datetime(2024, 1, 1, 0, 0, 0)
         algorithm = await _make_algorithm(timeouts=[])
 
         # First execution: NEW task ready
         task = await _make_task(1, loaded_at, TaskStatus.NEW, loaded_at)  # id=1
-        now = datetime(2024, 1, 1, 0, 0, 30)
+        now = make_utc_datetime(2024, 1, 1, 0, 0, 30)
         assert repo._is_task_ready_to_execute(task, algorithm, now) is True
 
         # After execution, status → SUCCEED
-        task = await _make_task(2, loaded_at, TaskStatus.SUCCEED, datetime(2024, 1, 1, 0, 1, 0))  # id=2
-        now = datetime(2024, 1, 1, 0, 2, 0)
+        task = await _make_task(2, loaded_at, TaskStatus.SUCCEED, make_utc_datetime(2024, 1, 1, 0, 1, 0))  # id=2
+        now = make_utc_datetime(2024, 1, 1, 0, 2, 0)
         assert repo._is_task_ready_to_execute(task, algorithm, now) is False
