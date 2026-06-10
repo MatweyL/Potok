@@ -9,6 +9,7 @@ from service.domain.use_cases.external.monitoring_algorithm import (
     CreateMonitoringAlgorithmUCRq,
     GetAllMonitoringAlgorithmsUCRq,
 )
+from service.ports.outbound.repo.fields import PaginationQuery
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +130,7 @@ async def test_response_contains_request(create_monitoring_algorithm_uc):
 
 @pytest.mark.asyncio
 async def test_get_all_returns_empty_list_initially(get_all_monitoring_algorithms_uc):
-    request = GetAllMonitoringAlgorithmsUCRq()
+    request = GetAllMonitoringAlgorithmsUCRq(pagination=PaginationQuery())
     response = await get_all_monitoring_algorithms_uc.apply(request)
 
     assert response.success is True
@@ -157,7 +158,7 @@ async def test_get_all_returns_created_algorithms(
     assert response.success, response
 
     # Get all algorithms
-    request = GetAllMonitoringAlgorithmsUCRq()
+    request = GetAllMonitoringAlgorithmsUCRq(pagination=PaginationQuery())
     response = await get_all_monitoring_algorithms_uc.apply(request)
 
     assert response.success is True
@@ -184,7 +185,7 @@ async def test_get_all_filters_by_type(
         )
 
     # Get all - should return at least the periodic ones we created
-    request = GetAllMonitoringAlgorithmsUCRq()
+    request = GetAllMonitoringAlgorithmsUCRq(pagination=PaginationQuery())
     response = await get_all_monitoring_algorithms_uc.apply(request)
 
     assert response.success is True
@@ -198,7 +199,7 @@ async def test_get_all_filters_by_type(
 
 @pytest.mark.asyncio
 async def test_get_all_response_contains_request(get_all_monitoring_algorithms_uc):
-    request = GetAllMonitoringAlgorithmsUCRq()
+    request = GetAllMonitoringAlgorithmsUCRq(pagination=PaginationQuery())
     response = await get_all_monitoring_algorithms_uc.apply(request)
 
     assert response.request is request

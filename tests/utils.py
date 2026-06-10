@@ -36,5 +36,5 @@ async def create_tasks_runs(task_run_repo: Repo,
                                             status_updated_at=task.status_updated_at) for task in tasks])
 
 
-def make_utc_datetime(year, month, day, hour, minute, second) -> datetime:
+def make_utc_datetime(year, month, day, hour: int = 0, minute: int = 0, second: int = 0) -> datetime:
     return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)

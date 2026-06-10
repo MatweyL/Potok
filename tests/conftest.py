@@ -17,6 +17,7 @@ from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWa
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
     SATaskRunTimeIntervalExecutionBoundsRepo
+from service.adapters.outbound.repo.sa.impls.task_run_time_interval_progress import SATaskRunTimeIntervalProgressRepo
 from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
 from service.adapters.outbound.repo.sa.transaction import SATransactionFactory
@@ -122,6 +123,11 @@ def sa_time_interval_task_progress_repo(database):
 
 
 @pytest.fixture
+def sa_task_run_time_interval_progress_repo(database):
+    return SATaskRunTimeIntervalProgressRepo(database, models.TaskRunTimeIntervalProgress)
+
+
+@pytest.fixture
 def execution_bounds_provider(sa_task_run_time_interval_execution_bounds_repo):
     return DefaultExecutionBoundsProvider(sa_task_run_time_interval_execution_bounds_repo)
 
@@ -177,9 +183,8 @@ def create_task_runs_uc(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo,
                         sa_task_group_repo, ):
     return CreateTaskRunsUC(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo, sa_task_run_status_log_repo,
                             sa_task_run_time_interval_execution_bounds_repo,
-                            sa_transaction_factory, task_to_execute_provider_registry, execution_bounds_provider,
+                            sa_transaction_factory, task_to_execute_provider_registry,
                             payload_provider,
-                            actual_execution_bounds_provider,
                             sa_task_group_repo, )
 
 
@@ -195,9 +200,10 @@ def create_monitoring_algorithm_uc(sa_monitoring_algorithm_repo,
 
 
 @pytest.fixture
-def get_all_monitoring_algorithms_uc(sa_periodic_monitoring_algorithm_repo,
+def get_all_monitoring_algorithms_uc(sa_monitoring_algorithm_repo,
+                                     sa_periodic_monitoring_algorithm_repo,
                                      sa_single_monitoring_algorithm_repo) -> GetAllMonitoringAlgorithmsUC:
-    return GetAllMonitoringAlgorithmsUC([sa_periodic_monitoring_algorithm_repo, sa_single_monitoring_algorithm_repo, ])
+    return GetAllMonitoringAlgorithmsUC(sa_monitoring_algorithm_repo, [sa_periodic_monitoring_algorithm_repo, sa_single_monitoring_algorithm_repo, ])
 
 
 @pytest.fixture

@@ -45,9 +45,18 @@ def create_task_v2(sa_task_repo, sa_task_group_repo):
     async def _inner(payload: Payload, monitoring_algorithm: MonitoringAlgorithm,
                      status_update_elapsed_seconds: int = 100,
                      status: TaskStatus = TaskStatus.NEW,
-                     task_type: TaskType = TaskType.TIME_INTERVAL):
+                     task_type: TaskType = TaskType.TIME_INTERVAL,
+                     time_interval_max_period: int = None,
+                     time_interval_first_left_bound_depth: float = 86400,
+                     ):
         group_name = "test"
-        task_group = await sa_task_group_repo.create(TaskGroup(name=group_name, title='', description=''))
+        task_group = await sa_task_group_repo.create(
+            TaskGroup(
+                name=group_name, title='', description='',
+                time_interval_max_period=time_interval_max_period,
+                time_interval_first_left_bound_depth=time_interval_first_left_bound_depth
+            )
+        )
         t = Task(
             type=task_type,
             status=status,
@@ -89,13 +98,14 @@ def create_time_interval_task_progress(sa_time_interval_task_progress_repo,
 
 
 @pytest.mark.asyncio
-async def test_apply_one_task_two_runs(create_task_runs_uc, sa_task_run_repo, create_payload, create_task_v2,
-                                       create_periodic_monitoring_algorithm, ):  # NEW -> EXECUTION: 2 WAITING RUNS
+async def test_apply_one_task_three_runs(create_task_runs_uc, sa_task_run_repo, create_payload, create_task_v2,
+                                       create_periodic_monitoring_algorithm, ):  # NEW -> EXECUTION: 3 WAITING RUNS
+    """ Ожидаемое поведение: мы указали максимальный интервал, запуск должен быть меньше максимального времени """
     payload = await create_payload()
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
-    task = await create_task_v2(payload, monitoring_algorithm)
+    task = await create_task_v2(payload, monitoring_algorithm, time_interval_max_period=43200, time_interval_first_left_bound_depth=100_000)
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
-    assert response.task_runs_created == 8
+    assert response.task_runs_created == 3
     task_runs = await sa_task_run_repo.get_all()
     assert len(task_runs) == response.task_runs_created
 
@@ -109,11 +119,14 @@ async def test_apply_one_task_one_run(create_task_runs_uc, create_payload, creat
                                       sa_task_run_repo):
     payload = await create_payload()
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
-    task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.SUCCEED, )
+    task = await create_task_v2(payload, monitoring_algorithm, status=TaskStatus.SUCCEED,
+                                time_interval_max_period=100_000,
+                                time_interval_first_left_bound_depth=86400)
     time_interval_task_progress = await create_time_interval_task_progress(task)
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
     assert response.task_runs_created == 1
-    task_runs = await sa_task_run_repo.filter(FilterFieldsDNF.single('status', TaskRunStatus.SUCCEED, ConditionOperation.NE))
+    task_runs = await sa_task_run_repo.filter(
+        FilterFieldsDNF.single('status', TaskRunStatus.SUCCEED, ConditionOperation.NE))
 
     assert len(task_runs) == response.task_runs_created
     for task_run in task_runs:
@@ -150,11 +163,13 @@ async def test_apply_creates_status_logs_and_time_interval_execution_bounds(
 ):
     payload = await create_payload()
     monitoring_algorithm = await create_periodic_monitoring_algorithm()
-    task = await create_task_v2(payload, monitoring_algorithm)
+    task = await create_task_v2(payload, monitoring_algorithm,
+                                time_interval_max_period=100_000,
+                                time_interval_first_left_bound_depth=86_400)
 
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
 
-    assert response.task_runs_created == 8
+    assert response.task_runs_created == 1
     updated_task = await sa_task_repo.get(task)
     assert updated_task.status == TaskStatus.EXECUTION
 
@@ -218,7 +233,8 @@ async def test_apply_uses_time_interval_progress_to_cut_overlapping_bounds(
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
 
     assert response.task_runs_created == 1
-    task_runs = await sa_task_run_repo.filter(FilterFieldsDNF.single('status', TaskRunStatus.SUCCEED, ConditionOperation.NE))
+    task_runs = await sa_task_run_repo.filter(
+        FilterFieldsDNF.single('status', TaskRunStatus.SUCCEED, ConditionOperation.NE))
     assert len(task_runs) == 1
     assert task_runs[0].execution_bounds.left_bound_at == progress_right_bound_at
     assert task_runs[0].execution_bounds.right_bound_at > progress_right_bound_at
@@ -246,13 +262,15 @@ async def test_apply_skips_time_interval_run_when_latest_right_bound_is_not_less
     response = await create_task_runs_uc.apply(CreateTaskRunsUCRq())
 
     assert response.task_runs_created == 0
-    task_runs = await sa_task_run_repo.filter(FilterFieldsDNF.single('status', TaskRunStatus.SUCCEED, ConditionOperation.NE))
+    task_runs = await sa_task_run_repo.filter(
+        FilterFieldsDNF.single('status', TaskRunStatus.SUCCEED, ConditionOperation.NE))
     assert task_runs == []
     task_run_execution_bounds = await sa_task_run_time_interval_execution_bounds_repo.get_all()
     assert all(
         bounds.execution_bounds.right_bound_at > bounds.execution_bounds.left_bound_at
         for bounds in task_run_execution_bounds
     )
+
 
 @pytest_asyncio.fixture
 async def ch_client():
@@ -325,7 +343,7 @@ async def create_task_runs_uc_with_clickhouse_time_interval_tables(
         sa_task_group_repo,
     )
 
-
+@pytest.mark.skip  # FIXME: test method when clickhouse is not working
 @pytest.mark.asyncio
 async def test_apply_can_use_real_clickhouse_time_interval_tables(
         create_task_runs_uc_with_clickhouse_time_interval_tables,

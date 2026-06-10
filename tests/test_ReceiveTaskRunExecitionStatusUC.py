@@ -17,6 +17,7 @@ from service.domain.use_cases.internal.receive_task_run_execution_status import 
     ReceiveTaskRunExecutionStatusUC,
     ReceiveTaskRunExecutionStatusUCRq,
 )
+from tests.utils import make_utc_datetime
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +50,7 @@ def _make_task(task_id: int = 1, group_id: int = 1) -> Task:
         id=task_id,
         type=TaskType.TIME_INTERVAL,
         status=TaskStatus.NEW,
-        status_updated_at=datetime(2024, 1, 1),
+        status_updated_at=make_utc_datetime(2024, 1, 1),
         payload_id=1,
         monitoring_algorithm_id=1,
         group_id=group_id,
@@ -67,7 +68,7 @@ def _make_task_run(
         id=task_run_id,
         task_id=task_id,
         status=status,
-        status_updated_at=datetime(2024, 6, 1),
+        status_updated_at=make_utc_datetime(2024, 6, 1),
         execution_arguments={},
         group_name='test'
     )
@@ -91,7 +92,7 @@ def _make_command_response(
         status=status,
         description=description,
         result=result,
-        created_at=created_at or datetime(2024, 6, 15, 12, 0, 0),
+        created_at=created_at or make_utc_datetime(2024, 6, 15, 12, 0, 0),
     )
 
 
@@ -101,11 +102,13 @@ def receive_task_run_execution_status_uc(
         sa_task_run_status_log_repo,
         sa_time_interval_task_progress_repo,
         sa_transaction_factory,
+sa_task_run_time_interval_progress_repo,
 ) -> ReceiveTaskRunExecutionStatusUC:
     return ReceiveTaskRunExecutionStatusUC(
         task_run_repo=sa_task_run_repo,
         task_run_status_log_repo=sa_task_run_status_log_repo,
         time_interval_task_progress_repo=sa_time_interval_task_progress_repo,
+        task_run_time_interval_progress_repo=sa_task_run_time_interval_progress_repo,
         transaction_factory=sa_transaction_factory,
     )
 
@@ -131,7 +134,7 @@ async def test_updates_task_run_status_without_result(
     created_task_run = await sa_task_run_repo.create(task_run)
 
     command = _make_command(created_task_run)
-    created_at = datetime(2024, 6, 15, 12, 0, 0)
+    created_at = make_utc_datetime(2024, 6, 15, 12, 0, 0)
 
     command_response = _make_command_response(
         command=command,
@@ -189,11 +192,11 @@ async def test_creates_progress_when_result_present(
     created_task_run = await sa_task_run_repo.create(task_run)
 
     command = _make_command(created_task_run)
-    created_at = datetime(2024, 6, 15, 14, 30, 0)
+    created_at = make_utc_datetime(2024, 6, 15, 14, 30, 0)
 
     execution_result = TimeIntervalExecutionResults(
-        right_bound_at=datetime(2024, 6, 15),
-        left_bound_at=datetime(2024, 5, 1),
+        right_bound_at=make_utc_datetime(2024, 6, 15),
+        left_bound_at=make_utc_datetime(2024, 5, 1),
         collected_data_amount=100,
         saved_data_amount=95,
     )
@@ -221,8 +224,8 @@ async def test_creates_progress_when_result_present(
     assert len(progress_records) == 1
     progress = progress_records[0]
     assert progress.task_id == 1
-    assert progress.right_bound_at == datetime(2024, 6, 15)
-    assert progress.left_bound_at == datetime(2024, 5, 1)
+    assert progress.right_bound_at == make_utc_datetime(2024, 6, 15)
+    assert progress.left_bound_at == make_utc_datetime(2024, 5, 1)
     assert progress.collected_data_amount == 100
     assert progress.saved_data_amount == 95
 
@@ -248,7 +251,7 @@ async def test_handles_ERROR_status(
     await sa_task_run_repo.create(task_run)
 
     command = _make_command(task_run)
-    created_at = datetime(2024, 6, 15, 15, 0, 0)
+    created_at = make_utc_datetime(2024, 6, 15, 15, 0, 0)
 
     command_response = _make_command_response(
         command=command,
@@ -327,8 +330,8 @@ async def test_handles_large_amounts_in_result(
     command = _make_command(task_run)
 
     execution_result = TimeIntervalExecutionResults(
-        right_bound_at=datetime(2024, 6, 15),
-        left_bound_at=datetime(2024, 6, 1),
+        right_bound_at=make_utc_datetime(2024, 6, 15),
+        left_bound_at=make_utc_datetime(2024, 6, 1),
         collected_data_amount=200,
         saved_data_amount=180,
     )
@@ -412,7 +415,7 @@ async def test_multiple_status_updates(
     cr1 = _make_command_response(
         command=command,
         status=TaskRunStatus.EXECUTION,
-        created_at=datetime(2024, 6, 15, 10, 0, 0),
+        created_at=make_utc_datetime(2024, 6, 15, 10, 0, 0),
     )
     await receive_task_run_execution_status_uc.apply(
         ReceiveTaskRunExecutionStatusUCRq(command_response=cr1)
@@ -422,7 +425,7 @@ async def test_multiple_status_updates(
     cr2 = _make_command_response(
         command=command,
         status=TaskRunStatus.SUCCEED,
-        created_at=datetime(2024, 6, 15, 10, 30, 0),
+        created_at=make_utc_datetime(2024, 6, 15, 10, 30, 0),
     )
     await receive_task_run_execution_status_uc.apply(
         ReceiveTaskRunExecutionStatusUCRq(command_response=cr2)
@@ -461,8 +464,8 @@ async def test_handles_zero_amounts_in_result(
     command = _make_command(task_run)
 
     execution_result = TimeIntervalExecutionResults(
-        right_bound_at=datetime(2024, 6, 15),
-        left_bound_at=datetime(2024, 6, 1),
+        right_bound_at=make_utc_datetime(2024, 6, 15),
+        left_bound_at=make_utc_datetime(2024, 6, 1),
         collected_data_amount=0,
         saved_data_amount=0,
     )
@@ -504,7 +507,7 @@ async def test_status_updated_at_uses_command_response_created_at(
     await sa_task_run_repo.create(task_run)
 
     command = _make_command(task_run)
-    specific_time = datetime(2024, 7, 1, 8, 45, 30)
+    specific_time = make_utc_datetime(2024, 7, 1, 8, 45, 30)
 
     command_response = _make_command_response(
         command=command,

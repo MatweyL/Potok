@@ -19,6 +19,7 @@ from service.ports.outbound.repo.fields import (
     PaginationQuery,
     UpdateFields, UpdateField
 )
+from tests.utils import make_utc_datetime
 
 
 # === Test Models ===
@@ -28,7 +29,7 @@ class UserModel(Base, TablenameMixin):
     name: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class UserDomain(BaseModel):
@@ -131,7 +132,7 @@ def sample_user():
         name="John Doe",
         email="john@example.com",
         age=30,
-        created_at=datetime(2024, 1, 1)
+        created_at=make_utc_datetime(2024, 1, 1)
     )
 
 
@@ -581,7 +582,7 @@ class TestConversionMethods:
             name="Test",
             email="test@test.com",
             age=25,
-            created_at=datetime(2024, 1, 1)
+            created_at=make_utc_datetime(2024, 1, 1)
         )
 
         model = user_repo.to_model(domain)
@@ -591,7 +592,7 @@ class TestConversionMethods:
         assert model.name == "Test"
         assert model.email == "test@test.com"
         assert model.age == 25
-        assert model.created_at == datetime(2024, 1, 1)
+        assert model.created_at == make_utc_datetime(2024, 1, 1)
 
     def test_to_domain(self, user_repo):
         model = UserModel()
@@ -599,7 +600,7 @@ class TestConversionMethods:
         model.name = "Test"
         model.email = "test@test.com"
         model.age = 25
-        model.created_at = datetime(2024, 1, 1)
+        model.created_at = make_utc_datetime(2024, 1, 1)
 
         domain = user_repo.to_domain(model)
 
@@ -608,7 +609,7 @@ class TestConversionMethods:
         assert domain.name == "Test"
         assert domain.email == "test@test.com"
         assert domain.age == 25
-        assert domain.created_at == datetime(2024, 1, 1)
+        assert domain.created_at == make_utc_datetime(2024, 1, 1)
 
     def test_pk_to_model_pk(self, user_repo):
         pk = UserPK(id=123)

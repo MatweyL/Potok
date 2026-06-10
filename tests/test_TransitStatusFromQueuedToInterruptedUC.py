@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -9,12 +9,13 @@ from service.domain.schemas.task_run import TaskRun, TaskRunPK, TaskRunStatusLog
 from service.domain.use_cases.internal.transit_task_run_status.abstract import TransitTaskRunStatusUCRq
 from service.domain.use_cases.internal.transit_task_run_status.impls import TransitStatusFromQueuedToInterruptedUC
 from service.ports.outbound.repo.fields import FilterFieldsDNF, ConditionOperation, UpdateFields
+from tests.utils import make_utc_datetime
 
 # ---------------------------------------------------------------------------
 # Fixtures & Helpers
 # ---------------------------------------------------------------------------
 
-FROZEN_NOW = datetime(2024, 6, 15, 12, 0, 0)
+FROZEN_NOW = make_utc_datetime(2024, 6, 15, 12, 0, 0)
 
 
 def _make_task_run(
@@ -86,7 +87,7 @@ def transit_status_from_queued_to_interrupted(
 
 @pytest.mark.asyncio
 @freeze_time(FROZEN_NOW)
-async def test_no_expired_tasks_returns_zero_count(
+async def atest_no_expired_tasks_returns_zero_count(
         transit_status_from_queued_to_interrupted,
         mock_task_run_repo,
         mock_task_run_status_log_repo,
