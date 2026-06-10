@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 from more_itertools import batched
+from sqlalchemy.util import await_only
 
 from service.domain.schemas.enums import TaskStatus, TaskRunStatus, TaskType
 from service.domain.schemas.execution_bounds import ExecutionBounds
@@ -19,6 +20,7 @@ from service.ports.common.logs import logger
 from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.fields import UpdateFields, FilterFieldsDNF, ConditionOperation, PaginationQuery
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
+from service.ports.outbound.repo.task_run import LatestTaskRunTimeIntervalExecutionBoundsProvider
 from service.ports.outbound.repo.transaction import TransactionFactory
 
 
@@ -190,6 +192,7 @@ class CreateTaskRunsUC(UseCase):
         tasks_to_execute_provider_registry:           TaskToExecuteProviderRegistry,
         payload_provider:                             PayloadProvider,
         task_group_repo:                              Repo[TaskGroup, TaskGroup, TaskGroupPK],
+        latest_task_run_time_interval_execution_bounds_provider: LatestTaskRunTimeIntervalExecutionBoundsProvider,
         tasks_batch_size:                             int = 5000,
     ):
         self._task_repo                                    = task_repo
@@ -201,6 +204,7 @@ class CreateTaskRunsUC(UseCase):
         self._tasks_to_execute_provider_registry           = tasks_to_execute_provider_registry
         self._payload_provider                             = payload_provider
         self._task_group_repo                              = task_group_repo
+        self._latest_task_run_time_interval_execution_bounds_provider = latest_task_run_time_interval_execution_bounds_provider
         self._tasks_batch_size                             = tasks_batch_size
 
         self._undefined_builder     = UndefinedTaskRunBuilder()
@@ -319,27 +323,8 @@ class CreateTaskRunsUC(UseCase):
         tasks: List[Task],
     ) -> Dict[int, TaskRunTimeIntervalExecutionBounds]:
         """
-        Для каждой TIME_INTERVAL задачи загружает последнюю запись bounds
-        (по right_bound_at desc, limit 1) одним запросом на задачу.
-
-        TODO: если репозиторий получит поддержку GROUP BY / DISTINCT ON —
-        заменить на один батч-запрос.
+        Для каждой TIME_INTERVAL задачи батчем загружает последнюю запись bounds
+        (по right_bound_at desc, limit 1).
         """
         task_ids = [t.id for t in tasks]
-        result: Dict[int, TaskRunTimeIntervalExecutionBounds] = {}
-
-        # Загружаем все bounds для задач и берём последнюю на каждую
-        all_bounds = await self._task_run_time_interval_execution_bounds_repo.filter(
-            FilterFieldsDNF.single("task_id", task_ids, ConditionOperation.IN)
-        )
-        # Группируем и выбираем последнюю по right_bound_at
-        for bounds in all_bounds:
-            task_id = bounds.task_id
-            existing = result.get(task_id)
-            if existing is None or (
-                bounds.execution_bounds.right_bound_at >
-                existing.execution_bounds.right_bound_at
-            ):
-                result[task_id] = bounds
-
-        return result
+        return await self._latest_task_run_time_interval_execution_bounds_provider.provide_latest_bounds_by_task_ids(task_ids)

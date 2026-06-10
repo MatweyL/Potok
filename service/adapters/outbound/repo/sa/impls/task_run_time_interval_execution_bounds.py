@@ -11,15 +11,17 @@ from service.domain.schemas.task_run import TaskRunTimeIntervalExecutionBounds, 
 from service.ports.outbound.repo.task_run import LatestTaskRunTimeIntervalExecutionBoundsProvider
 
 
-class SATaskRunTimeIntervalExecutionBoundsRepo(AbstractSARepo):
-    def to_model(self, obj: TaskRunTimeIntervalExecutionBounds) -> models.TaskRunTimeIntervalExecutionBounds:
+class TaskRunTimeIntervalExecutionBoundsMapper:
+    @staticmethod
+    def to_model(obj: TaskRunTimeIntervalExecutionBounds) -> models.TaskRunTimeIntervalExecutionBounds:
         return models.TaskRunTimeIntervalExecutionBounds(task_run_id=obj.task_run_id,
                                                          task_id=obj.task_id,
                                                          right_bound_at=obj.execution_bounds.right_bound_at,
                                                          left_bound_at=obj.execution_bounds.left_bound_at,
                                                          )
 
-    def to_domain(self, obj: models.TaskRunTimeIntervalExecutionBounds) -> TaskRunTimeIntervalExecutionBounds:
+    @staticmethod
+    def to_domain(obj: models.TaskRunTimeIntervalExecutionBounds) -> TaskRunTimeIntervalExecutionBounds:
         return TaskRunTimeIntervalExecutionBounds(task_run_id=obj.task_run_id,
                                                   task_id=obj.task_id,
                                                   execution_bounds=TimeIntervalBounds(
@@ -27,11 +29,18 @@ class SATaskRunTimeIntervalExecutionBoundsRepo(AbstractSARepo):
                                                       left_bound_at=obj.left_bound_at,
                                                   ))
 
+
+class SATaskRunTimeIntervalExecutionBoundsRepo(AbstractSARepo):
+    def to_model(self, obj: TaskRunTimeIntervalExecutionBounds) -> models.TaskRunTimeIntervalExecutionBounds:
+        return TaskRunTimeIntervalExecutionBoundsMapper.to_model(obj)
+
+    def to_domain(self, obj: models.TaskRunTimeIntervalExecutionBounds) -> TaskRunTimeIntervalExecutionBounds:
+        return TaskRunTimeIntervalExecutionBoundsMapper.to_domain(obj)
+
     def pk_to_model_pk(self, pk: TaskRunTimeIntervalExecutionBoundsPK) -> Dict:
         return {
             "task_run_id": pk.task_run_id,
         }
-
 
     async def get_latest_right_bound_by_task_ids(self, task_ids: List[int]) -> Dict[int, datetime]:
         if not task_ids:
@@ -53,12 +62,13 @@ class SALatestTaskRunTimeIntervalExecutionBoundsProvider(LatestTaskRunTimeInterv
     def __init__(self, database: Database, ):
         self._database = database
 
-    async def provide_latest_bounds_by_task_ids(self, task_ids: List[int]) -> Dict[int, TaskRunTimeIntervalExecutionBounds]:
-        async with self._database.session as session:
+    async def provide_latest_bounds_by_task_ids(self, task_ids: List[int]) -> Dict[
+        int, TaskRunTimeIntervalExecutionBounds]:
+        async with self._database.session as session:  # FIXME: проверить, корректно ли делать where task_id = ANY(:task_ids) вмето task IN ...
             query = text("""              
     with task_last_right_bound as (
         select task_id, max(right_bound_at) as right_bound_at from task_run_time_interval_execution_bounds
-        where task_id in :task_ids
+        where task_id = ANY(:task_ids)
         group by 1
     )
     select trtieb1.* from task_run_time_interval_execution_bounds trtieb1
@@ -68,13 +78,5 @@ class SALatestTaskRunTimeIntervalExecutionBoundsProvider(LatestTaskRunTimeInterv
                 "task_ids": task_ids
             })
             rows = result.mappings().all()
-            return {row["task_id"]: self._row_to_domain(row) for row in rows}
-
-    def _row_to_domain(self, row) -> TaskRunTimeIntervalExecutionBounds:
-        return TaskRunTimeIntervalExecutionBounds(task_run_id=row["task_run_id"],
-                                                  task_id=row["task_id"],
-                                                  execution_bounds=TimeIntervalBounds(
-                                                      right_bound_at=row["right_bound_at"],
-                                                      left_bound_at=row["left_bound_at"],
-                                                  ))
+            return {row["task_id"]: TaskRunTimeIntervalExecutionBoundsMapper.to_domain(row) for row in rows}
 

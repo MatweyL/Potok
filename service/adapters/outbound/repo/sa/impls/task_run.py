@@ -45,7 +45,7 @@ class TaskRunMapper:
             payload = Payload.model_validate(payload_json, from_attributes=True)
         execution_bounds = None
         if obj.execution_bounds:
-            if isinstance(obj.execution_bounds, str):
+            if isinstance(obj.execution_bounds, str):  # FIXME: in querying code make object models.TaskRun, not RowMapping
                 execution_bounds_json = json.loads(obj.execution_bounds)
             else:
                 execution_bounds_json = obj.execution_bounds
@@ -371,27 +371,4 @@ class SARecentTaskRunsProvider(RecentTaskRunsProvider):
                 "limit_per_task": limit_per_task,
             })
             rows = result.mappings().all()
-            return [self._row_to_domain(row) for row in rows]
-
-    def _row_to_domain(self, row: RowMapping) -> TaskRun:
-        return TaskRunMapper.to_domain(row)
-        # payload = Payload.model_validate(json.loads(row.payload), from_attributes=True) if row.payload else None
-        # execution_bounds = None
-        # if row.execution_bounds:
-        #     execution_bounds = as_execution_bounds(json.loads(row.execution_bounds))
-        # execution_arguments = None
-        # if row.execution_arguments:
-        #     execution_arguments = json.loads(row["execution_arguments"])
-        # return TaskRun(
-        #     id=row.id,
-        #     task_id=row["task_id"],
-        #     group_name=row["group_name"],
-        #     priority=row["priority"],
-        #     type=row["type"],
-        #     payload=payload,
-        #     execution_bounds=execution_bounds,
-        #     execution_arguments=execution_arguments,
-        #     status=row["status"],
-        #     status_updated_at=row["status_updated_at"],
-        #     description=row["description"],
-        # )
+            return [TaskRunMapper.to_domain(row) for row in rows]

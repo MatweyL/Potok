@@ -16,7 +16,7 @@ from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWa
     SATaskRunMetricsProvider, SARecentTaskRunsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
-    SATaskRunTimeIntervalExecutionBoundsRepo
+    SATaskRunTimeIntervalExecutionBoundsRepo, SALatestTaskRunTimeIntervalExecutionBoundsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_progress import SATaskRunTimeIntervalProgressRepo
 from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
@@ -166,6 +166,10 @@ def sa_task_provider(database):
     return SATaskProvider(database)
 
 @pytest.fixture
+def sa_latest_task_run_time_interval_execution_bounds_provider(database):
+    return SALatestTaskRunTimeIntervalExecutionBoundsProvider(database)
+
+@pytest.fixture
 def recent_task_runs_provider(database):
     return SARecentTaskRunsProvider(database)
 
@@ -180,12 +184,13 @@ def create_task_runs_uc(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo,
                         sa_transaction_factory,
                         task_to_execute_provider_registry, execution_bounds_provider, payload_provider,
                         actual_execution_bounds_provider,
-                        sa_task_group_repo, ):
+                        sa_task_group_repo,sa_latest_task_run_time_interval_execution_bounds_provider, ):
     return CreateTaskRunsUC(sa_task_repo, sa_task_run_repo, sa_task_status_log_repo, sa_task_run_status_log_repo,
                             sa_task_run_time_interval_execution_bounds_repo,
                             sa_transaction_factory, task_to_execute_provider_registry,
                             payload_provider,
-                            sa_task_group_repo, )
+                            sa_task_group_repo,
+                            sa_latest_task_run_time_interval_execution_bounds_provider,)
 
 
 @pytest.fixture

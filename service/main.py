@@ -36,7 +36,7 @@ from service.adapters.outbound.repo.sa.impls.task_run import SATaskRunRepo, SAWa
     SATaskRunMetricsProvider, SARecentTaskRunsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_status_log import SATaskRunStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_execution_bounds import \
-    SATaskRunTimeIntervalExecutionBoundsRepo
+    SATaskRunTimeIntervalExecutionBoundsRepo, SALatestTaskRunTimeIntervalExecutionBoundsProvider
 from service.adapters.outbound.repo.sa.impls.task_run_time_interval_progress import SATaskRunTimeIntervalProgressRepo
 from service.adapters.outbound.repo.sa.impls.task_status_log import SATaskStatusLogRepo
 from service.adapters.outbound.repo.sa.impls.time_interval_task_progress import SATimeIntervalTaskProgressRepo
@@ -172,6 +172,8 @@ async def main():
     task_provider = SATaskProvider(database)
     analytical_metrics_provider = SAAnalyticalMetricsProvider(database)
 
+    latest_task_run_time_interval_execution_bounds_provider = SALatestTaskRunTimeIntervalExecutionBoundsProvider(database)
+
     task_statistics_provider = SATaskStatisticsProvider(database)
     analytical_metrics_service = AnalyticalMetricsService(analytical_metrics_provider, task_statistics_provider)
 
@@ -296,7 +298,7 @@ async def main():
                                            task_run_time_interval_execution_bounds_repo,
                                            transaction_factory,
                                            task_to_execute_provider_registry,
-                                           payload_provider, task_group_repo)
+                                           payload_provider, task_group_repo, latest_task_run_time_interval_execution_bounds_provider)
     receive_task_run_execution_status_uc = ReceiveTaskRunExecutionStatusUC(task_run_repo,
                                                                            task_run_status_log_repo,
                                                                            time_interval_task_progress_repo,
