@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Union
 
-from sqlalchemy import text, select, union_all
+from sqlalchemy import text, select, union_all, RowMapping
 
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.abstract import AbstractSARepo
@@ -17,8 +17,9 @@ from service.ports.outbound.repo.abstract import Repo
 from service.ports.outbound.repo.task_run import WaitingTaskRunProvider, TaskRunMetricsProvider, RecentTaskRunsProvider
 
 
-class SATaskRunRepo(AbstractSARepo):
-    def to_model(self, obj: TaskRun) -> models.TaskRun:
+class TaskRunMapper:
+    @staticmethod
+    def to_model(obj: TaskRun) -> models.TaskRun:
         payload = obj.payload.model_dump() if obj.payload else None
         execution_bounds = obj.execution_bounds.model_dump() if obj.execution_bounds else None
         return models.TaskRun(id=obj.id,
@@ -33,11 +34,29 @@ class SATaskRunRepo(AbstractSARepo):
                               status_updated_at=obj.status_updated_at,
                               description=obj.description)
 
-    def to_domain(self, obj: models.TaskRun) -> TaskRun:
-        payload = Payload.model_validate(obj.payload, from_attributes=True) if obj.payload else None
+    @staticmethod
+    def to_domain(obj: models.TaskRun) -> TaskRun:
+        payload = None
+        if obj.payload:
+            if isinstance(obj.payload, str):
+                payload_json = json.loads(obj.payload)
+            else:
+                payload_json = obj.payload
+            payload = Payload.model_validate(payload_json, from_attributes=True)
         execution_bounds = None
         if obj.execution_bounds:
-            execution_bounds = as_execution_bounds(obj.execution_bounds)
+            if isinstance(obj.execution_bounds, str):
+                execution_bounds_json = json.loads(obj.execution_bounds)
+            else:
+                execution_bounds_json = obj.execution_bounds
+            execution_bounds = as_execution_bounds(execution_bounds_json)
+        execution_arguments = None
+        if obj.execution_arguments:
+            if isinstance(obj.execution_arguments, str):
+                execution_arguments_json = json.loads(obj.execution_arguments)
+            else:
+                execution_arguments_json = obj.execution_arguments
+            execution_arguments = execution_arguments_json
         return TaskRun(id=obj.id,
                        task_id=obj.task_id,
                        group_name=obj.group_name,
@@ -45,11 +64,18 @@ class SATaskRunRepo(AbstractSARepo):
                        type=obj.type,
                        payload=payload,
                        execution_bounds=execution_bounds,
-                       execution_arguments=obj.execution_arguments,
+                       execution_arguments=execution_arguments,
                        status=obj.status,
                        status_updated_at=obj.status_updated_at,
                        description=obj.description,
                        )
+
+class SATaskRunRepo(AbstractSARepo):
+    def to_model(self, obj: TaskRun) -> models.TaskRun:
+        return TaskRunMapper.to_model(obj)
+
+    def to_domain(self, obj: models.TaskRun) -> TaskRun:
+        return TaskRunMapper.to_domain(obj)
 
     def pk_to_model_pk(self, pk: TaskRunPK) -> Dict:
         return {"id": pk.id}
@@ -167,18 +193,18 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
             grouped_metrics_by_name: Dict[str, TaskRunGroupedMetrics] = {}
 
             for row in rows:
-                group_name = row[0]
+                group_name_current = row[0]
                 status = row[1]
                 cnt = row[2]
 
                 # Инициализируем метрики для группы, если ещё нет
-                if group_name not in grouped_metrics_by_name:
-                    grouped_metrics_by_name[group_name] = TaskRunGroupedMetrics(
-                        group_name=group_name,
+                if group_name_current not in grouped_metrics_by_name:
+                    grouped_metrics_by_name[group_name_current] = TaskRunGroupedMetrics(
+                        group_name=group_name_current,
                         period_s=period_s
                     )
 
-                task_run_grouped_metrics = grouped_metrics_by_name[group_name]
+                task_run_grouped_metrics = grouped_metrics_by_name[group_name_current]
 
                 # Обрабатываем все возможные статусы
                 if status == TaskRunStatus.SUCCEED:
@@ -238,17 +264,17 @@ class SATaskRunMetricsProvider(TaskRunMetricsProvider):
             grouped_avg_metrics_by_name: Dict[str, TaskRunGroupedAvgMetrics] = {}
 
             for row in rows:
-                group_name = row[0]
+                group_name_current = row[0]
                 status = row[1]
                 cnt = row[2]
                 # Инициализируем метрики для группы, если ещё нет
-                if group_name not in grouped_avg_metrics_by_name:
-                    grouped_avg_metrics_by_name[group_name] = TaskRunGroupedAvgMetrics(
-                        group_name=group_name,
+                if group_name_current not in grouped_avg_metrics_by_name:
+                    grouped_avg_metrics_by_name[group_name_current] = TaskRunGroupedAvgMetrics(
+                        group_name=group_name_current,
                         period_s=period_s
                     )
 
-                task_run_grouped_avg_metrics = grouped_avg_metrics_by_name[group_name]
+                task_run_grouped_avg_metrics = grouped_avg_metrics_by_name[group_name_current]
                 if status == TaskRunStatus.WAITING:
                     task_run_grouped_avg_metrics.avg_retry_count = max(cnt - 1, 0)
                 elif status == TaskRunStatus.TEMP_ERROR:
@@ -347,24 +373,25 @@ class SARecentTaskRunsProvider(RecentTaskRunsProvider):
             rows = result.mappings().all()
             return [self._row_to_domain(row) for row in rows]
 
-    def _row_to_domain(self, row) -> TaskRun:
-        payload = Payload.model_validate(json.loads(row.payload), from_attributes=True) if row.payload else None
-        execution_bounds = None
-        if row.execution_bounds:
-            execution_bounds = as_execution_bounds(json.loads(row.execution_bounds))
-        execution_arguments = None
-        if row.execution_arguments:
-            execution_arguments = json.loads(row["execution_arguments"])
-        return TaskRun(
-            id=row["id"],
-            task_id=row["task_id"],
-            group_name=row["group_name"],
-            priority=row["priority"],
-            type=row["type"],
-            payload=payload,
-            execution_bounds=execution_bounds,
-            execution_arguments=execution_arguments,
-            status=row["status"],
-            status_updated_at=row["status_updated_at"],
-            description=row["description"],
-        )
+    def _row_to_domain(self, row: RowMapping) -> TaskRun:
+        return TaskRunMapper.to_domain(row)
+        # payload = Payload.model_validate(json.loads(row.payload), from_attributes=True) if row.payload else None
+        # execution_bounds = None
+        # if row.execution_bounds:
+        #     execution_bounds = as_execution_bounds(json.loads(row.execution_bounds))
+        # execution_arguments = None
+        # if row.execution_arguments:
+        #     execution_arguments = json.loads(row["execution_arguments"])
+        # return TaskRun(
+        #     id=row.id,
+        #     task_id=row["task_id"],
+        #     group_name=row["group_name"],
+        #     priority=row["priority"],
+        #     type=row["type"],
+        #     payload=payload,
+        #     execution_bounds=execution_bounds,
+        #     execution_arguments=execution_arguments,
+        #     status=row["status"],
+        #     status_updated_at=row["status_updated_at"],
+        #     description=row["description"],
+        # )

@@ -19,9 +19,10 @@ async def create_tasks(task_repo: Repo,
                        task_status: TaskStatus = TaskStatus.NEW) -> List[Task]:
     algorithm = await algorithm_repo.create(PeriodicMonitoringAlgorithm(timeout=3600.0, timeout_noize=60.0))
     task_group = await task_group_repo.create( TaskGroup(name=group_name, title='', description=''))
-    payload = await payload_repo.create(Payload(data={}))
+    payload = await payload_repo.create(Payload(data={"username": "test_user"}))
     tasks = [Task(group_id=task_group.id,monitoring_algorithm_id=algorithm.id,status=task_status,
-                  status_updated_at=datetime.now(timezone.utc), payload_id=payload.id) for i in range(tasks_amount)]
+                  status_updated_at=datetime.now(timezone.utc), payload_id=payload.id,
+                  execution_arguments={"method_version": 1}) for i in range(tasks_amount)]
     tasks = await task_repo.create_all(tasks)
     return tasks
 
@@ -33,6 +34,8 @@ async def create_tasks_runs(task_run_repo: Repo,
     return await task_run_repo.create_all([TaskRun(task_id=task.id,
                                             group_name=group_name,
                                             status=task_run_status,
+                                            payload=Payload(id=task.payload_id, data={"username": "test_user"}),
+                                            execution_arguments=task.execution_arguments,
                                             status_updated_at=task.status_updated_at) for task in tasks])
 
 
