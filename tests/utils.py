@@ -1,12 +1,15 @@
 from datetime import datetime, timezone
 from typing import List
 
-from service.domain.schemas.enums import TaskStatus, TaskRunStatus
+from service.domain.schemas.enums import TaskRunStatus
+from service.domain.schemas.enums import TaskStatus
+from service.domain.schemas.execution_bounds import TimeIntervalBounds
 from service.domain.schemas.monitoring_algorithm import PeriodicMonitoringAlgorithm
 from service.domain.schemas.payload import Payload
 from service.domain.schemas.task import Task
 from service.domain.schemas.task_group import TaskGroup
-from service.domain.schemas.task_run import TaskRun
+from service.domain.schemas.task_run import TaskRun, TaskRunStatusLog, TaskRunTimeIntervalExecutionBounds
+from service.domain.schemas.task_run import TaskRunTimeIntervalProgress
 from service.ports.outbound.repo.abstract import Repo
 
 
@@ -18,9 +21,9 @@ async def create_tasks(task_repo: Repo,
                        tasks_amount: int,
                        task_status: TaskStatus = TaskStatus.NEW) -> List[Task]:
     algorithm = await algorithm_repo.create(PeriodicMonitoringAlgorithm(timeout=3600.0, timeout_noize=60.0))
-    task_group = await task_group_repo.create( TaskGroup(name=group_name, title='', description=''))
+    task_group = await task_group_repo.create(TaskGroup(name=group_name, title='', description=''))
     payload = await payload_repo.create(Payload(data={"username": "test_user"}))
-    tasks = [Task(group_id=task_group.id,monitoring_algorithm_id=algorithm.id,status=task_status,
+    tasks = [Task(group_id=task_group.id, monitoring_algorithm_id=algorithm.id, status=task_status,
                   status_updated_at=datetime.now(timezone.utc), payload_id=payload.id,
                   execution_arguments={"method_version": 1}) for i in range(tasks_amount)]
     tasks = await task_repo.create_all(tasks)
@@ -30,14 +33,70 @@ async def create_tasks(task_repo: Repo,
 async def create_tasks_runs(task_run_repo: Repo,
                             tasks: List[Task],
                             group_name: str,
-                            task_run_status: TaskRunStatus,) -> List[TaskRun]:
+                            task_run_status: TaskRunStatus, ) -> List[TaskRun]:
     return await task_run_repo.create_all([TaskRun(task_id=task.id,
-                                            group_name=group_name,
-                                            status=task_run_status,
-                                            payload=Payload(id=task.payload_id, data={"username": "test_user"}),
-                                            execution_arguments=task.execution_arguments,
-                                            status_updated_at=task.status_updated_at) for task in tasks])
+                                                   group_name=group_name,
+                                                   status=task_run_status,
+                                                   payload=Payload(id=task.payload_id, data={"username": "test_user"}),
+                                                   execution_arguments=task.execution_arguments,
+                                                   status_updated_at=task.status_updated_at) for task in tasks])
 
 
 def make_utc_datetime(year, month, day, hour: int = 0, minute: int = 0, second: int = 0) -> datetime:
     return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+
+
+async def create_task_run_with_children(
+        task_run_repo: Repo,
+        task_run_status_log_repo: Repo,
+        task_run_execution_bounds_repo: Repo,
+        task_run_progress_repo: Repo,
+        task_id: int,
+        group_name: str,
+        status: TaskRunStatus,
+        status_updated_at: datetime,
+        with_children: bool = True,
+) -> TaskRun:
+    """
+    Создаёт TaskRun со связанными записями во всех трёх дочерних таблицах.
+    Используется для проверки каскадного удаления.
+    """
+    task_run = (await task_run_repo.create_all([TaskRun(
+        task_id=task_id,
+        group_name=group_name,
+        status=status,
+        execution_arguments={},
+        status_updated_at=status_updated_at,
+    )]))[0]
+
+    if with_children:
+        await task_run_status_log_repo.create_all([TaskRunStatusLog(
+            task_run_id=task_run.id,
+            status=status,
+            status_updated_at=status_updated_at,
+        )])
+
+        await task_run_execution_bounds_repo.create_all([TaskRunTimeIntervalExecutionBounds(
+            task_run_id=task_run.id,
+            task_id=task_id,
+            execution_bounds=TimeIntervalBounds(
+                left_bound_at=status_updated_at,
+                right_bound_at=status_updated_at,
+            ),
+        )])
+
+        await task_run_progress_repo.create_all([TaskRunTimeIntervalProgress(
+            task_run_id=task_run.id,
+            right_bound_at=status_updated_at,
+            left_bound_at=status_updated_at,
+            collected_data_amount=10,
+            saved_data_amount=10,
+        )])
+
+    return task_run
+
+
+async def count_rows(repo: Repo) -> int:
+    """Возвращает количество строк в таблице через repo.get_all()."""
+    rows = await repo.get_all()
+    return len(rows)

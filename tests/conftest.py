@@ -36,6 +36,8 @@ from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC
 from service.domain.use_cases.internal.transit_task_status import TransitTaskStatusUC
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
 
+from service.domain.use_cases.internal.cleanup_task_runs import CleanupTaskRunsUC
+
 
 @pytest_asyncio.fixture
 async def postgres_database():
@@ -266,3 +268,23 @@ def create_first_admin_uc(create_user_uc, sa_app_user_repo):
 def get_all_task_group_statistics_uc(sa_task_group_repo, sa_task_run_metrics_provider):
     return GetAllTaskGroupStatisticsUC(sa_task_group_repo, sa_task_run_metrics_provider)
 
+
+
+@pytest.fixture
+def cleanup_task_runs_uc(
+    sa_task_run_repo,
+    sa_task_run_status_log_repo,
+    sa_task_run_time_interval_execution_bounds_repo,
+    sa_task_run_time_interval_progress_repo,
+    sa_transaction_factory,
+):
+    return CleanupTaskRunsUC(
+        task_run_repo=sa_task_run_repo,
+        task_run_status_log_repo=sa_task_run_status_log_repo,
+        task_run_execution_bounds_repo=sa_task_run_time_interval_execution_bounds_repo,
+        task_run_progress_repo=sa_task_run_time_interval_progress_repo,
+        transaction_factory=sa_transaction_factory,
+        retention_days=30,
+        batch_size=10_000,
+        pause_seconds=0,
+    )
