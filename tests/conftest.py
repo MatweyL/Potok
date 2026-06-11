@@ -32,6 +32,7 @@ from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
     GetAllMonitoringAlgorithmsUC
+from service.domain.use_cases.internal.compress_task_progress import CompressTaskProgressUC
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC
 from service.domain.use_cases.internal.transit_task_status import TransitTaskStatusUC
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
@@ -287,4 +288,15 @@ def cleanup_task_runs_uc(
         retention_days=30,
         batch_size=10_000,
         pause_seconds=0,
+    )
+
+
+@pytest.fixture
+def compress_task_progress_uc(
+        sa_time_interval_task_progress_repo,
+        sa_transaction_factory,
+):
+    return CompressTaskProgressUC(
+        time_interval_task_progress_repo=sa_time_interval_task_progress_repo,
+        transaction_factory=sa_transaction_factory,
     )
