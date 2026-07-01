@@ -23,6 +23,7 @@ from service.adapters.outbound.repo.ch.impls.time_interval_task_progress import 
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.database import Database
 from service.adapters.outbound.repo.sa.impls.analytical_metrics import SAAnalyticalMetricsProvider
+from service.adapters.outbound.repo.sa.impls.api_token import SAApiTokenRepo
 from service.adapters.outbound.repo.sa.impls.app_user import SAAppUserRepo
 from service.adapters.outbound.repo.sa.impls.monitoring_algorithm import SAMonitoringAlgorithmRepo, \
     SAPeriodicMonitoringAlgorithmRepo, SASingleMonitoringAlgorithmRepo
@@ -58,6 +59,8 @@ from service.domain.use_cases.external.admin.activate_user import ActivateUserUC
 from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUC
 from service.domain.use_cases.external.admin.facade import AdminUseCaseFacade
 from service.domain.use_cases.external.admin.get_all_users import GetAllUsersUC
+from service.domain.use_cases.external.api_token import ApiTokenFacade, DeleteApiTokenUC, RevokeApiTokenUC, \
+    CreateApiTokenUC, VerifyApiTokenUC, GetApiTokensUC
 from service.domain.use_cases.external.auth.create_first_admin import CreateFirstAdminUC, CreateFirstAdminUCRq
 from service.domain.use_cases.external.auth.create_user import CreateUserUC
 from service.domain.use_cases.external.auth.facade import AuthUseCaseFacade
@@ -66,10 +69,12 @@ from service.domain.use_cases.external.auth.login import LoginUC
 from service.domain.use_cases.external.auth.logout import LogoutUC
 from service.domain.use_cases.external.auth.refresh_token import RefreshTokenUC
 from service.domain.use_cases.external.auth.reset_password import ResetPasswordUC
+from service.domain.use_cases.external.cancel_tasks import CancelTasksUC
+from service.domain.use_cases.external.create_payload import CreatePayloadUC
 from service.domain.use_cases.external.create_tasks import CreateTasksUC
 from service.domain.use_cases.external.facade import UseCaseFacade
 from service.domain.use_cases.external.get_payload import GetPayloadUC
-from service.domain.use_cases.external.get_payloads import GetPayloadsUC
+from service.domain.use_cases.external.get_payloads import GetPayloadsUC, GetPayloadsByGroupUCRq, GetPayloadsByGroupUC
 from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUC
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUC, \
     GetTaskGroupStatisticsUC
@@ -80,10 +85,12 @@ from service.domain.use_cases.external.get_task_runs import GetTaskRunsUC, GetTa
 from service.domain.use_cases.external.get_tasks import GetTasksUC
 from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUC
 from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUC, \
-    GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC, UpdateMonitoringAlgorithmUC
+    GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC, UpdateMonitoringAlgorithmUC, \
+    FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUC
 from service.domain.use_cases.external.project import GetAllProjectsUC, CreateProjectUC, GetProjectTaskGroupsUC, \
     GetTaskGroupsWithoutProjectUC, AddTaskGroupToProjectUC, RemoveTaskGroupFromProjectUC, UpdateProjectUC, \
     GetAllTaskGroupByProjectDetailedUC, GetProjectByTaskGroupUC
+from service.domain.use_cases.external.resume_tasks import ResumeTasksUC
 from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetAllTaskGroupUC, CreateTaskGroupUC, \
     UpdateTaskGroupUC
 from service.domain.use_cases.external.update_payload import UpdatePayloadUC
@@ -168,6 +175,9 @@ async def main():
     task_group_repo = SATaskGroupRepo(database, models.TaskGroup)
     project_repo = SAProjectRepo(database, models.Project)
     task_group_by_project_repo = SATaskGroupByProjectRepo(database, models.TaskGroupByProject)
+
+    api_token_repo = SAApiTokenRepo(database, models.ApiToken)
+
     task_run_metrics_provider = SATaskRunMetricsProvider(database)
     task_provider = SATaskProvider(database)
     analytical_metrics_provider = SAAnalyticalMetricsProvider(database)
@@ -183,14 +193,9 @@ async def main():
     task_runs_producer = DirectDataProducer(settings.rmq_producer_task_run.routing_key, rmq_producer)
     queue_creator = AioPikaRMQQueueBoundToExchangeCreator(rmq_producer, rmq_producer_connection)
 
-    execution_bounds_provider = DefaultExecutionBoundsProvider(
-        task_run_time_interval_execution_bounds_repo=task_run_time_interval_execution_bounds_repo,
-        default_left_date=datetime(2026, 1, 1),
-        default_first_interval_days=31,
-    )
+
     payload_provider = PayloadProvider(payload_repo)
     uniqueness_payload_checker = UniquenessPayloadChecker(payload_repo)
-    actual_execution_bounds_provider = ActualTimeIntervalExecutionBoundsProvider(time_interval_task_progress_repo)
     task_status_log_cleaner = TaskRunStatusLogCleaner(task_run_status_log_repo)
     hasher = Hasher()
     token_service = TokenService(settings.jwt_secret_key)
@@ -221,7 +226,7 @@ async def main():
     get_tasks_runs_uc = GetTasksRunsUC(task_run_repo)
     get_task_progress_uc = GetTaskProgressUC(task_repo, time_interval_task_progress_repo)
     get_payloads_uc = GetPayloadsUC(payload_repo)
-    update_payload_uc = UpdatePayloadUC(payload_repo)
+    update_payload_uc = UpdatePayloadUC(payload_repo, uniqueness_payload_checker)
     update_task_uc = UpdateTaskUC(task_repo)
     get_monitoring_algorithm_uc = GetMonitoringAlgorithmUC(monitoring_algorithm_repo,
                                                            periodic_monitoring_algorithm_repo,
@@ -244,6 +249,7 @@ async def main():
                                                                        task_group_by_project_repo)
 
     get_payload_uc = GetPayloadUC(payload_repo, task_repo, get_tasks_detailed_uc, )
+    create_payload_uc = CreatePayloadUC(uniqueness_payload_checker, payload_repo)
 
     get_all_projects_uc = GetAllProjectsUC(project_repo)
     create_project_uc = CreateProjectUC(project_repo)
@@ -259,6 +265,12 @@ async def main():
                                                                                    task_group_by_project_repo, )
     get_project_by_task_group_uc = GetProjectByTaskGroupUC(project_repo, task_group_repo, task_group_by_project_repo)
     update_task_group_uc = UpdateTaskGroupUC(task_group_repo)
+
+    resume_tasks_uc = ResumeTasksUC(task_repo, task_run_repo, task_run_status_log_repo, transaction_factory)
+    cancel_tasks_uc = CancelTasksUC(task_repo, task_run_repo, task_run_status_log_repo, transaction_factory)
+    get_payloads_by_group_uc = GetPayloadsByGroupUC(payload_repo, task_repo)
+    find_or_create_simplified_periodic_monitoring_algorithm = FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUC(
+        create_monitoring_algorithm_uc, periodic_monitoring_algorithm_repo)
     use_case_facade = UseCaseFacade(create_tasks_uc,
                                     create_monitoring_algorithm_uc,
                                     get_all_monitoring_algorithms_uc,
@@ -290,8 +302,25 @@ async def main():
                                     get_task_run_status_logs_uc,
                                     get_task_run_detailed_uc,
                                     update_task_uc,
-                                    update_monitoring_algorithm_uc,)
+                                    update_monitoring_algorithm_uc,
+                                    create_payload_uc,
+                                    resume_tasks_uc,
+                                    cancel_tasks_uc,
+                                    get_payloads_by_group_uc,
+                                    find_or_create_simplified_periodic_monitoring_algorithm,)
     set_use_case_facade(use_case_facade)
+
+    delete_api_token_uc = DeleteApiTokenUC(api_token_repo)
+    revoke_api_token_uc = RevokeApiTokenUC(api_token_repo)
+    create_api_token_uc = CreateApiTokenUC(api_token_repo)
+    verify_api_token_uc = VerifyApiTokenUC(api_token_repo)
+    get_api_tokens_uc = GetApiTokensUC(api_token_repo)
+    api_token_facade = ApiTokenFacade(delete_api_token_uc,
+                                      revoke_api_token_uc,
+                                      create_api_token_uc,
+                                      verify_api_token_uc,
+                                      get_api_tokens_uc,
+                                      )
 
     # USE CASE: internal
     create_task_runs_uc = CreateTaskRunsUC(task_repo, task_run_repo, task_status_log_repo, task_run_status_log_repo,
@@ -366,6 +395,7 @@ async def main():
     fastapi_server.app.state.token_service = token_service
     fastapi_server.app.state.admin_use_case_facade = admin_use_case_facade
     fastapi_server.app.state.analytical_metrics_service = analytical_metrics_service
+    fastapi_server.app.state.api_token_facade = api_token_facade
     fastapi_server.app.add_middleware(AuthMiddleware)
 
     startable = [

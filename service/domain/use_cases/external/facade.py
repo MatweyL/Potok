@@ -1,7 +1,11 @@
+from service.domain.use_cases.external.cancel_tasks import CancelTasksUC, CancelTasksUCRq, CancelTasksUCRs
+from service.domain.use_cases.external.create_payload import CreatePayloadUCRq, CreatePayloadUCRs, CreatePayloadUC
 from service.domain.use_cases.external.create_tasks import CreateTasksUCRq, CreateTasksUCRs, CreateTasksUC
 from service.domain.use_cases.external.get_payload import GetPayloadUCRq, GetPayloadUCRs, GetPayloadUC
-from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq, GetPayloadsUCRs, GetPayloadsUC
-from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUC, GetTaskDetailedUCRq, GetTaskDetailedUCRs
+from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq, GetPayloadsUCRs, GetPayloadsUC, \
+    GetPayloadsByGroupUCRq, GetPayloadsByGroupUCRs, GetPayloadsByGroupUC
+from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUC, GetTaskDetailedUCRq, \
+    GetTaskDetailedUCRs
 from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUC, \
     GetAllTaskGroupStatisticsUCRs, GetAllTaskGroupStatisticsUCRq, GetTaskGroupStatisticsUC, GetTaskGroupStatisticsUCRq, \
     GetTaskGroupStatisticsUCRs
@@ -20,7 +24,8 @@ from service.domain.use_cases.external.monitoring_algorithm import CreateMonitor
     CreateMonitoringAlgorithmUCRs, GetAllMonitoringAlgorithmsUCRq, GetAllMonitoringAlgorithmsUCRs, \
     CreateMonitoringAlgorithmUC, GetAllMonitoringAlgorithmsUC, GetMonitoringAlgorithmUC, GetMonitoringAlgorithmUCRq, \
     GetMonitoringAlgorithmUCRs, UpdateMonitoringAlgorithmUC, UpdateMonitoringAlgorithmUCRq, \
-    UpdateMonitoringAlgorithmUCRs
+    UpdateMonitoringAlgorithmUCRs, FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUC, \
+    FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRs, FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRq
 from service.domain.use_cases.external.project import GetAllProjectsUCRs, GetAllProjectsUCRq, CreateProjectUCRs, \
     CreateProjectUCRq, GetProjectTaskGroupsUCRq, GetProjectTaskGroupsUCRs, GetAllProjectsUC, CreateProjectUC, \
     GetProjectTaskGroupsUC, GetTaskGroupsWithoutProjectUCRs, GetTaskGroupsWithoutProjectUCRq, \
@@ -28,6 +33,7 @@ from service.domain.use_cases.external.project import GetAllProjectsUCRs, GetAll
     RemoveTaskGroupFromProjectUCRq, RemoveTaskGroupFromProjectUCRs, RemoveTaskGroupFromProjectUC, UpdateProjectUCRq, \
     UpdateProjectUCRs, UpdateProjectUC, GetAllTaskGroupByProjectDetailedUC, GetAllTaskGroupByProjectDetailedUCRs, \
     GetAllTaskGroupByProjectDetailedUCRq, GetProjectByTaskGroupUC, GetProjectByTaskGroupUCRq, GetProjectByTaskGroupUCRs
+from service.domain.use_cases.external.resume_tasks import ResumeTasksUC, ResumeTasksUCRq, ResumeTasksUCRs
 from service.domain.use_cases.external.task_group import GetAllTaskGroupUC, GetAllTaskGroupUCRq, GetAllTaskGroupUCRs, \
     CreateTaskGroupUCRq, CreateTaskGroupUCRs, CreateTaskGroupUC, GetTaskGroupUCRq, GetTaskGroupUCRs, GetTaskGroupUC, \
     UpdateTaskGroupUCRq, UpdateTaskGroupUC, UpdateTaskGroupUCRs
@@ -69,6 +75,11 @@ class UseCaseFacade:
                  get_task_run_detailed_uc: GetTaskRunDetailedUC,
                  update_task_uc: UpdateTaskUC,
                  update_monitoring_algorithm_uc: UpdateMonitoringAlgorithmUC,
+                 create_payload_uc: CreatePayloadUC,
+                 resume_tasks_uc: ResumeTasksUC,
+                 cancel_tasks_uc: CancelTasksUC,
+                 get_payloads_by_group_uc: GetPayloadsByGroupUC,
+                 find_or_create_simplified_periodic_algorithm_uc: FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUC,
                  ):
         self._create_tasks_uc = create_tasks_uc
         self._create_monitoring_algorithm_uc = create_monitoring_algorithm_uc
@@ -102,6 +113,11 @@ class UseCaseFacade:
         self._get_task_run_detailed_uc = get_task_run_detailed_uc
         self._update_task_uc = update_task_uc
         self._update_monitoring_algorithm_uc = update_monitoring_algorithm_uc
+        self._create_payload_uc = create_payload_uc
+        self._resume_tasks_uc = resume_tasks_uc
+        self._cancel_tasks_uc = cancel_tasks_uc
+        self._find_or_create_simplified_periodic_algorithm_uc = find_or_create_simplified_periodic_algorithm_uc
+        self._get_payloads_by_group_uc = get_payloads_by_group_uc
 
     async def create_tasks(self, request: CreateTasksUCRq) -> CreateTasksUCRs:
         return await self._create_tasks_uc.apply(request)
@@ -199,5 +215,21 @@ class UseCaseFacade:
     async def update_task(self, request: UpdateTaskUCRq) -> UpdateTaskUCRs:
         return await self._update_task_uc.apply(request)
 
-    async def update_monitoring_algorithm(self, request: UpdateMonitoringAlgorithmUCRq) -> UpdateMonitoringAlgorithmUCRs:
+    async def update_monitoring_algorithm(self,
+                                          request: UpdateMonitoringAlgorithmUCRq) -> UpdateMonitoringAlgorithmUCRs:
         return await self._update_monitoring_algorithm_uc.apply(request)
+
+    async def cancel_tasks(self, request: CancelTasksUCRq) -> CancelTasksUCRs:
+        return await self._cancel_tasks_uc.apply(request)
+
+    async def resume_tasks(self, request: ResumeTasksUCRq) -> ResumeTasksUCRs:
+        return await self._resume_tasks_uc.apply(request)
+
+    async def find_or_create_simplified_periodic_algorithm(self, request: FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRq) -> FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRs:
+        return await self._find_or_create_simplified_periodic_algorithm_uc.apply(request)
+
+    async def create_payload(self, request: CreatePayloadUCRq) -> CreatePayloadUCRs:
+        return await self._create_payload_uc.apply(request)
+
+    async def get_payloads_by_group(self, request: GetPayloadsByGroupUCRq) -> GetPayloadsByGroupUCRs:
+        return await self._get_payloads_by_group_uc.apply(request)

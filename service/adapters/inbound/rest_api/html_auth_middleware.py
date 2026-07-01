@@ -1,7 +1,8 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import RedirectResponse
+from starlette.responses import RedirectResponse, JSONResponse
 
+from service.domain.use_cases.external.api_token import VerifyApiTokenUCRq
 from service.domain.use_cases.external.auth.get_me import GetMeUCRq
 from service.domain.use_cases.external.auth.refresh_token import RefreshTokenUCRq
 from service.ports.common.logs import logger
@@ -11,10 +12,39 @@ PUBLIC_PATHS = {"/login", "/auth/login", "/auth/logout", "/", "/static"}
 # Пути, с которых авторизованного пользователя редиректим на дашборд
 AUTH_REDIRECT_PATHS = {"/login", }
 
-
+API_PREFIX = "/api/"
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
+
+        # ── REST API: проверяем X-API-Key ────────────────────────────────────
+        if path.startswith(API_PREFIX):
+            api_key = request.headers.get("X-API-Key")
+
+            if not api_key:
+                return JSONResponse(
+                    {"error": "Missing X-API-Key header"},
+                    status_code=401,
+                )
+
+            try:
+                verify_api_token = VerifyApiTokenUCRq(raw_key=api_key)
+                is_valid = await request.app.state.api_token_facade.verify_api_token(verify_api_token)
+            except Exception as e:
+                logger.warning(f"API key verification error: {e}")
+                return JSONResponse(
+                    {"error": "API key verification failed"},
+                    status_code=500,
+                )
+
+            if not is_valid:
+                return JSONResponse(
+                    {"error": "Invalid API key"},
+                    status_code=401,
+                )
+
+            logger.info(f"API key verified for {path}")
+            return await call_next(request)
 
         # ── Для страниц логина и лендинга — проверяем токен
         # Если валиден — сразу на дашборд

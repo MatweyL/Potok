@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+{% set active_nav = 'api_keys' %}
+{% block title %}API-ключи — Поток{% endblock %}
+
+{% block body %}
+<div class="flow-page">
+
+  {# ── Заголовок ── #}
+  <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="flow-page-title" style="margin-bottom:4px;">API-ключи</h1>
+      <p style="font-size:13.5px;color:var(--flow-text-muted,#6b7280);margin:0;">
+        Управление ключами для программного доступа к API
+      </p>
+    </div>
+    <button id="openCreateModal"
+            style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;
+                   background:var(--flow-primary,#2563eb);color:#fff;border:none;
+                   border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;
+                   transition:background .15s;"
+            onmouseenter="this.style.background='#1d4ed8'"
+            onmouseleave="this.style.background='var(--flow-primary,#2563eb)'">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 2v10M2 7h10" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Создать ключ
+    </button>
+  </div>
+
+  {# ── Инфо-блок ── #}
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+              padding:12px 16px;margin-bottom:24px;font-size:13px;color:#92400e;
+              display:flex;align-items:flex-start;gap:10px;">
+    <span style="font-size:16px;flex-shrink:0;">⚠</span>
+    <span>
+      Сырой ключ показывается <strong>только один раз</strong> при создании.
+      Сохраните его в безопасном месте — восстановить невозможно.
+      Передавайте ключ в заголовке <code style="background:#fef3c7;padding:1px 5px;border-radius:4px;">X-API-Key</code> каждого запроса.
+    </span>
+  </div>
+
+  {# ── Таблица ключей ── #}
+  {% if tokens %}
+  <div class="flow-chart-card" style="padding:0;overflow:hidden;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:#f9fafb;border-bottom:1px solid var(--flow-border,#e5e7eb);">
+          <th style="padding:10px 16px;font-size:11px;font-weight:600;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;text-align:left;">Название</th>
+          <th style="padding:10px 16px;font-size:11px;font-weight:600;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;text-align:left;">Префикс</th>
+          <th style="padding:10px 16px;font-size:11px;font-weight:600;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;text-align:left;">Пользователь</th>
+          <th style="padding:10px 16px;font-size:11px;font-weight:600;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;text-align:left;">Статус</th>
+          <th style="padding:10px 16px;font-size:11px;font-weight:600;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;text-align:left;">Последнее использование</th>
+          <th style="padding:10px 16px;font-size:11px;font-weight:600;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;text-align:left;">Истекает</th>
+          <th style="padding:10px 16px;font-size:11px;font-weight:600;color:#9ca3af;
+                     text-transform:uppercase;letter-spacing:.06em;text-align:left;">Создан</th>
+          <th style="padding:10px 16px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for token in tokens %}
+        <tr style="border-bottom:1px solid var(--flow-border,#e5e7eb);"
+            id="token-row-{{ token.id }}">
+
+          {# Название #}
+          <td style="padding:12px 16px;">
+            <span style="font-size:13.5px;font-weight:600;color:#111827;">{{ token.name }}</span>
+          </td>
+
+          {# Префикс #}
+          <td style="padding:12px 16px;">
+            <code style="font-size:12px;background:#f3f4f6;padding:2px 8px;
+                         border-radius:6px;color:#374151;">{{ token.key_prefix }}…</code>
+          </td>
+
+          {# Пользователь #}
+          <td style="padding:12px 16px;font-size:13px;color:#6b7280;">
+            ID {{ token.user_id }}
+          </td>
+
+          {# Статус #}
+          <td style="padding:12px 16px;">
+            {% if token.is_active %}
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 10px;
+                         border-radius:20px;font-size:12px;font-weight:500;
+                         background:#dcfce7;color:#15803d;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span>
+              Активен
+            </span>
+            {% else %}
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 10px;
+                         border-radius:20px;font-size:12px;font-weight:500;
+                         background:#f3f4f6;color:#6b7280;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;"></span>
+              Отозван
+            </span>
+            {% endif %}
+          </td>
+
+          {# Последнее использование #}
+          <td style="padding:12px 16px;font-size:12.5px;font-family:ui-monospace,monospace;color:#6b7280;">
+            {% if token.last_used_at %}
+              {{ token.last_used_at.strftime('%d.%m.%Y %H:%M') }}
+            {% else %}
+              <span style="color:#d1d5db;">Не использовался</span>
+            {% endif %}
+          </td>
+
+          {# Истекает #}
+          <td style="padding:12px 16px;font-size:12.5px;font-family:ui-monospace,monospace;color:#6b7280;">
+            {% if token.expires_at %}
+              {{ token.expires_at.strftime('%d.%m.%Y') }}
+            {% else %}
+              <span style="color:#d1d5db;">Бессрочный</span>
+            {% endif %}
+          </td>
+
+          {# Создан #}
+          <td style="padding:12px 16px;font-size:12.5px;font-family:ui-monospace,monospace;color:#6b7280;">
+            {{ token.created_at.strftime('%d.%m.%Y %H:%M') }}
+          </td>
+
+          {# Действия #}
+          <td style="padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              {% if token.is_active %}
+              <button onclick="revokeToken({{ token.id }}, this)"
+                      style="padding:4px 10px;border:1px solid #fca5a5;background:#fff;
+                             color:#ef4444;border-radius:6px;font-size:12px;font-weight:500;
+                             cursor:pointer;white-space:nowrap;transition:background .15s;"
+                      onmouseenter="this.style.background='#fef2f2'"
+                      onmouseleave="this.style.background='#fff'">
+                Отозвать
+              </button>
+              {% endif %}
+              <button onclick="deleteToken({{ token.id }}, this)"
+                      style="padding:4px 10px;border:1px solid #e5e7eb;background:#fff;
+                             color:#6b7280;border-radius:6px;font-size:12px;font-weight:500;
+                             cursor:pointer;white-space:nowrap;transition:background .15s;"
+                      onmouseenter="this.style.background='#f9fafb'"
+                      onmouseleave="this.style.background='#fff'">
+                Удалить
+              </button>
+            </div>
+          </td>
+
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+              gap:10px;padding:64px 24px;text-align:center;background:#fff;
+              border:1px dashed var(--flow-border,#e5e7eb);border-radius:14px;color:#9ca3af;">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="opacity:.35;">
+      <path d="M28 16a8 8 0 1 0-16 0v4H8v16h24V20h-4v-4z" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="20" cy="28" r="2" fill="currentColor"/>
+    </svg>
+    <div style="font-size:16px;font-weight:600;color:#374151;">API-ключей пока нет</div>
+    <div style="font-size:13px;">Создайте первый ключ для программного доступа к API</div>
+  </div>
+  {% endif %}
+
+</div>
+
+{# ── Модалка создания ── #}
+<div id="createModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+            z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:480px;
+              box-shadow:0 24px 64px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:18px 20px 16px;border-bottom:1px solid #e5e7eb;">
+      <span style="font-size:15px;font-weight:600;color:#111827;">Создать API-ключ</span>
+      <button id="closeCreateModal"
+              style="width:28px;height:28px;border:none;background:none;cursor:pointer;
+                     border-radius:6px;color:#6b7280;font-size:20px;line-height:1;
+                     display:flex;align-items:center;justify-content:center;">×</button>
+    </div>
+
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
+
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:13px;font-weight:500;color:#374151;">
+          Название <span style="color:#dc2626;">*</span>
+        </label>
+        <input id="newTokenName" type="text" maxlength="255"
+               placeholder="Ключ сервиса мониторинга ключевых слов"
+               style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+                      font-size:13.5px;color:#111827;outline:none;font-family:inherit;
+                      box-sizing:border-box;width:100%;"
+               onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.1)'"
+               onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow=''"/>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:13px;font-weight:500;color:#374151;">
+          ID пользователя <span style="color:#dc2626;">*</span>
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;">— от чьего имени действует ключ</span>
+        </label>
+        <input id="newTokenUserId" type="number" min="1"
+               placeholder="1"
+               style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+                      font-size:13.5px;color:#111827;outline:none;font-family:inherit;
+                      box-sizing:border-box;width:100%;"
+               onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.1)'"
+               onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow=''"/>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:13px;font-weight:500;color:#374151;">
+          Дата истечения
+          <span style="font-weight:400;color:#9ca3af;font-size:12px;">— оставьте пустым для бессрочного</span>
+        </label>
+        <input id="newTokenExpiresAt" type="date"
+               style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+                      font-size:13.5px;color:#111827;outline:none;font-family:inherit;
+                      box-sizing:border-box;width:100%;"
+               onfocus="this.style.borderColor='#2563eb';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.1)'"
+               onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow=''"/>
+      </div>
+
+      <div id="createError"
+           style="font-size:12.5px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;
+                  border-radius:8px;padding:8px 12px;display:none;"></div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #e5e7eb;">
+      <button id="cancelCreateModal"
+              style="padding:7px 16px;border:1px solid #e5e7eb;border-radius:8px;
+                     background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;">
+        Отмена
+      </button>
+      <button id="submitCreateBtn"
+              style="padding:7px 20px;border:none;border-radius:8px;background:#2563eb;
+                     color:#fff;font-size:13px;font-weight:600;cursor:pointer;"
+              onmouseenter="this.style.background='#1d4ed8'"
+              onmouseleave="this.style.background='#2563eb'">
+        Создать
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Модалка показа нового ключа ── #}
+<div id="showKeyModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+            z-index:9999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:14px;width:100%;max-width:520px;
+              box-shadow:0 24px 64px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:18px 20px 16px;border-bottom:1px solid #e5e7eb;">
+      <span style="font-size:15px;font-weight:600;color:#111827;">Ключ создан</span>
+    </div>
+
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;
+                  padding:12px 14px;font-size:13px;color:#92400e;">
+        ⚠ Сохраните ключ прямо сейчас — после закрытия окна он больше не отобразится.
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:13px;font-weight:500;color:#374151;">Ваш API-ключ</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="rawKeyDisplay" type="text" readonly
+                 style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;
+                        font-size:12.5px;font-family:ui-monospace,monospace;color:#111827;
+                        background:#f9fafb;outline:none;box-sizing:border-box;"/>
+          <button id="copyKeyBtn"
+                  onclick="copyKey()"
+                  style="padding:8px 14px;border:1px solid #e5e7eb;border-radius:8px;
+                         background:#fff;color:#374151;font-size:13px;font-weight:500;
+                         cursor:pointer;white-space:nowrap;transition:background .15s;"
+                  onmouseenter="this.style.background='#f9fafb'"
+                  onmouseleave="this.style.background='#fff'">
+            Скопировать
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid #e5e7eb;">
+      <button onclick="closeShowKey()"
+              style="padding:7px 20px;border:none;border-radius:8px;background:#2563eb;
+                     color:#fff;font-size:13px;font-weight:600;cursor:pointer;">
+        Понял, сохранил
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const createModal  = document.getElementById('createModal');
+const showKeyModal = document.getElementById('showKeyModal');
+
+/* ── Открытие/закрытие модалки создания ── */
+document.getElementById('openCreateModal').addEventListener('click', () => {
+  document.getElementById('createError').style.display = 'none';
+  document.getElementById('newTokenName').value = '';
+  document.getElementById('newTokenUserId').value = '';
+  document.getElementById('newTokenExpiresAt').value = '';
+  createModal.style.display = 'flex';
+});
+document.getElementById('closeCreateModal').addEventListener('click',  () => createModal.style.display = 'none');
+document.getElementById('cancelCreateModal').addEventListener('click', () => createModal.style.display = 'none');
+createModal.addEventListener('click', e => { if (e.target === createModal) createModal.style.display = 'none'; });
+
+/* ── Создание ключа ── */
+document.getElementById('submitCreateBtn').addEventListener('click', async function () {
+  const errEl   = document.getElementById('createError');
+  const name    = document.getElementById('newTokenName').value.trim();
+  const userId  = parseInt(document.getElementById('newTokenUserId').value);
+  const expires = document.getElementById('newTokenExpiresAt').value;
+
+  errEl.style.display = 'none';
+
+  if (!name) {
+    errEl.textContent   = 'Укажите название ключа';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!userId || userId < 1) {
+    errEl.textContent   = 'Укажите корректный ID пользователя';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  this.disabled    = true;
+  const orig       = this.textContent;
+  this.textContent = 'Создание…';
+
+  try {
+    const res = await fetch('/api-keys', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        user_id:    userId,
+        expires_at: expires ? new Date(expires).toISOString() : null,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Ошибка ${res.status}`);
+    }
+
+    const data = await res.json();
+    createModal.style.display = 'none';
+
+    /* Показываем ключ */
+    document.getElementById('rawKeyDisplay').value = data.raw_key;
+    showKeyModal.style.display = 'flex';
+
+    /* Добавляем строку в таблицу без перезагрузки */
+    addTokenRow(data);
+
+  } catch (e) {
+    errEl.textContent   = 'Не удалось создать ключ: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    this.disabled    = false;
+    this.textContent = orig;
+  }
+});
+
+function closeShowKey() {
+  showKeyModal.style.display = 'none';
+  document.getElementById('rawKeyDisplay').value = '';
+}
+
+function copyKey() {
+  const val = document.getElementById('rawKeyDisplay').value;
+  navigator.clipboard.writeText(val).then(() => {
+    const btn = document.getElementById('copyKeyBtn');
+    btn.textContent = '✓ Скопировано';
+    setTimeout(() => { btn.textContent = 'Скопировать'; }, 2000);
+  });
+}
+
+/* ── Отзыв ── */
+async function revokeToken(tokenId, btn) {
+  if (btn.dataset.confirming) {
+    delete btn.dataset.confirming;
+    btn.disabled    = true;
+    btn.textContent = '…';
+
+    try {
+      const res = await fetch(`/api-keys/${tokenId}/revoke`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      /* Меняем бейдж и убираем кнопку "Отозвать" */
+      const row = document.getElementById(`token-row-${tokenId}`);
+      const badge = row.querySelector('[data-status-badge]');
+      if (badge) {
+        badge.innerHTML = `
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 10px;
+                       border-radius:20px;font-size:12px;font-weight:500;
+                       background:#f3f4f6;color:#6b7280;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;"></span>
+            Отозван
+          </span>`;
+      }
+      btn.remove();
+    } catch {
+      btn.disabled    = false;
+      btn.textContent = 'Отозвать';
+    }
+    return;
+  }
+
+  btn.dataset.confirming  = '1';
+  const orig              = btn.textContent;
+  btn.textContent         = 'Подтвердить?';
+  btn.style.background    = '#fef2f2';
+
+  const reset = () => {
+    delete btn.dataset.confirming;
+    btn.textContent      = orig;
+    btn.style.background = '#fff';
+    document.removeEventListener('click', outside);
+  };
+  const outside = ev => { if (!btn.contains(ev.target)) reset(); };
+  setTimeout(() => document.addEventListener('click', outside), 50);
+}
+
+/* ── Удаление ── */
+async function deleteToken(tokenId, btn) {
+  if (btn.dataset.confirming) {
+    delete btn.dataset.confirming;
+    btn.disabled    = true;
+    btn.textContent = '…';
+
+    try {
+      const res = await fetch(`/api-keys/${tokenId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      document.getElementById(`token-row-${tokenId}`)?.remove();
+    } catch {
+      btn.disabled    = false;
+      btn.textContent = 'Удалить';
+    }
+    return;
+  }
+
+  btn.dataset.confirming  = '1';
+  btn.textContent         = 'Подтвердить?';
+  btn.style.background    = '#fef2f2';
+  btn.style.borderColor   = '#fca5a5';
+  btn.style.color         = '#ef4444';
+
+  const reset = () => {
+    delete btn.dataset.confirming;
+    btn.textContent      = 'Удалить';
+    btn.style.background = '#fff';
+    btn.style.borderColor = '#e5e7eb';
+    btn.style.color       = '#6b7280';
+    document.removeEventListener('click', outside);
+  };
+  const outside = ev => { if (!btn.contains(ev.target)) reset(); };
+  setTimeout(() => document.addEventListener('click', outside), 50);
+}
+
+/* ── Добавление строки без перезагрузки ── */
+function addTokenRow(data) {
+  const tbody = document.querySelector('tbody');
+  if (!tbody) { location.reload(); return; }
+
+  const tr = document.createElement('tr');
+  tr.id = `token-row-${data.id}`;
+  tr.style.cssText = 'border-bottom:1px solid var(--flow-border,#e5e7eb);';
+  tr.innerHTML = `
+    <td style="padding:12px 16px;">
+      <span style="font-size:13.5px;font-weight:600;color:#111827;">${esc(data.name)}</span>
+    </td>
+    <td style="padding:12px 16px;">
+      <code style="font-size:12px;background:#f3f4f6;padding:2px 8px;border-radius:6px;color:#374151;">
+        ${esc(data.key_prefix)}…
+      </code>
+    </td>
+    <td style="padding:12px 16px;font-size:13px;color:#6b7280;">ID ${data.user_id}</td>
+    <td style="padding:12px 16px;" data-status-badge>
+      <span style="display:inline-flex;align-items:center;gap:5px;padding:2px 10px;
+                   border-radius:20px;font-size:12px;font-weight:500;
+                   background:#dcfce7;color:#15803d;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span>
+        Активен
+      </span>
+    </td>
+    <td style="padding:12px 16px;font-size:12.5px;font-family:ui-monospace,monospace;color:#d1d5db;">
+      Не использовался
+    </td>
+    <td style="padding:12px 16px;font-size:12.5px;font-family:ui-monospace,monospace;color:#6b7280;">
+      ${data.expires_at ? new Date(data.expires_at).toLocaleDateString('ru-RU') : '<span style="color:#d1d5db;">Бессрочный</span>'}
+    </td>
+    <td style="padding:12px 16px;font-size:12.5px;font-family:ui-monospace,monospace;color:#6b7280;">
+      ${new Date(data.created_at).toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+    </td>
+    <td style="padding:12px 16px;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button onclick="revokeToken(${data.id}, this)"
+                style="padding:4px 10px;border:1px solid #fca5a5;background:#fff;
+                       color:#ef4444;border-radius:6px;font-size:12px;font-weight:500;
+                       cursor:pointer;white-space:nowrap;"
+                onmouseenter="this.style.background='#fef2f2'"
+                onmouseleave="this.style.background='#fff'">Отозвать</button>
+        <button onclick="deleteToken(${data.id}, this)"
+                style="padding:4px 10px;border:1px solid #e5e7eb;background:#fff;
+                       color:#6b7280;border-radius:6px;font-size:12px;font-weight:500;
+                       cursor:pointer;white-space:nowrap;"
+                onmouseenter="this.style.background='#f9fafb'"
+                onmouseleave="this.style.background='#fff'">Удалить</button>
+      </div>
+    </td>`;
+  tbody.appendChild(tr);
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

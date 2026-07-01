@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from service.domain.schemas.enums import MonitoringAlgorithmType
+from service.domain.schemas.enums import MonitoringAlgorithmType, SimplifiedMonitoringPeriod
 from service.domain.schemas.monitoring_algorithm import (
     MonitoringAlgorithm,
     MonitoringAlgorithmPK,
@@ -9,7 +9,8 @@ from service.domain.schemas.monitoring_algorithm import (
 )
 from service.domain.use_cases.abstract import UseCase, UCRequest, UCResponse
 from service.ports.outbound.repo.abstract import Repo
-from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF, ConditionOperation, UpdateFields
+from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF, ConditionOperation, UpdateFields, \
+    FilterField
 from service.ports.outbound.repo.transaction import TransactionFactory
 
 
@@ -227,3 +228,56 @@ class UpdateMonitoringAlgorithmUC(UseCase):
         monitoring_algorithm.title = base_algorithm.title
         monitoring_algorithm.description = base_algorithm.description
         return UpdateMonitoringAlgorithmUCRs(success=True, request=request, monitoring_algorithm=monitoring_algorithm)
+
+
+class FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRq(UCRequest):
+    simplified_monitoring_period: SimplifiedMonitoringPeriod
+
+
+class FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRs(UCResponse):
+    request: FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRq
+    monitoring_algorithm: PeriodicMonitoringAlgorithm
+
+
+class FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUC(UseCase):
+    def __init__(
+            self,
+            create_monitoring_algorithm_uc: CreateMonitoringAlgorithmUC,
+            periodic_monitoring_algorithm_repo: Repo[
+                PeriodicMonitoringAlgorithm, PeriodicMonitoringAlgorithm, MonitoringAlgorithmPK
+            ],
+    ):
+        self._create_monitoring_algorithm_uc  = create_monitoring_algorithm_uc
+        self._periodic_monitoring_algorithm_repo = periodic_monitoring_algorithm_repo
+
+    async def apply(self, request: FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRq) -> FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRs:
+        timeout = period_to_seconds(request.simplified_monitoring_period)
+        filter_fields_dnf = FilterFieldsDNF.single_conjunct([FilterField.new('timeout', timeout, ConditionOperation.EQ),
+                                                             FilterField.new('timeout_noize', 0, ConditionOperation.EQ)])
+        periodic_monitoring_algorithms = await self._periodic_monitoring_algorithm_repo.filter(filter_fields_dnf)
+        if periodic_monitoring_algorithms:
+            periodic_monitoring_algorithm = periodic_monitoring_algorithms[0]
+        else:
+            create_rq = CreateMonitoringAlgorithmUCRq(algorithm=PeriodicMonitoringAlgorithm(timeout=timeout))
+            create_rs = await self._create_monitoring_algorithm_uc.apply(create_rq)
+            periodic_monitoring_algorithm: PeriodicMonitoringAlgorithm = create_rs.created_algorithm
+        return FindOrCreateSimplifiedPeriodicMonitoringAlgorithmUCRs(request=request,
+                                                                     success=True,
+                                                                     monitoring_algorithm=periodic_monitoring_algorithm)
+
+
+
+def period_to_seconds(period: SimplifiedMonitoringPeriod) -> int:
+    """Convert enum period to seconds."""
+    mapping = {
+        SimplifiedMonitoringPeriod.THIRTY_MINUTES: 30 * 60,
+        SimplifiedMonitoringPeriod.HOUR: 60 * 60,
+        SimplifiedMonitoringPeriod.TWO_HOURS: 2 * 60 * 60,
+        SimplifiedMonitoringPeriod.FOUR_HOURS: 4 * 60 * 60,
+        SimplifiedMonitoringPeriod.EIGHT_HOURS: 8 * 60 * 60,
+        SimplifiedMonitoringPeriod.TWELVE_HOURS: 12 * 60 * 60,
+        SimplifiedMonitoringPeriod.DAY: 24 * 60 * 60,
+        SimplifiedMonitoringPeriod.WEEK: 7 * 24 * 60 * 60,
+        SimplifiedMonitoringPeriod.MONTH: 30 * 24 * 60 * 60,  # 30 дней
+    }
+    return mapping[period]

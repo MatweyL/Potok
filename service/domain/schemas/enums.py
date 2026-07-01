@@ -55,3 +55,15 @@ class BalancingAlgorithmType(str, enum.Enum):
     CONSTANT_SIZE = "CONSTANT_SIZE"
     AIMD = "AIMD"
     ADAPTIVE_MODEL = "ADAPTIVE_MODEL"
+
+
+class SimplifiedMonitoringPeriod(str, enum.Enum):
+    THIRTY_MINUTES = "THIRTY_MINUTES"
+    HOUR = "HOUR"
+    TWO_HOURS = "TWO_HOURS"
+    FOUR_HOURS = "FOUR_HOURS"
+    EIGHT_HOURS = "EIGHT_HOURS"
+    TWELVE_HOURS = "TWELVE_HOURS"
+    DAY = "DAY"
+    WEEK = "WEEK"
+    MONTH = "MONTH"

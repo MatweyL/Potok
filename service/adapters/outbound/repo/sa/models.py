@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Dict, List
 
-from sqlalchemy import JSON, BIGINT, ForeignKey, VARCHAR, Enum, INT, DateTime, FLOAT, TEXT, UUID, Boolean
+from sqlalchemy import JSON, BIGINT, ForeignKey, VARCHAR, Enum, INT, DateTime, FLOAT, TEXT, UUID, Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from service.adapters.outbound.repo.sa.base import Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin, \
@@ -12,7 +12,7 @@ from service.domain.schemas.enums import TaskStatus, TaskType, PriorityType, Mon
 
 class Payload(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
     data: Mapped[dict] = mapped_column(JSONWithDatetime, )
-    checksum: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False)
+    checksum: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
 
 
 class Task(Base, TablenameMixin, SerialBigIntPKMixin, LoadTimestampMixin):
@@ -132,3 +132,62 @@ class TaskRunTimeIntervalProgress(Base, TablenameMixin, LoadTimestampMixin):
     left_bound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     collected_data_amount: Mapped[int] = mapped_column(INT, )
     saved_data_amount: Mapped[int] = mapped_column(INT, )
+
+
+class ApiToken(Base, TablenameMixin, SerialIntPKMixin, LoadTimestampMixin):
+    name: Mapped[str] = mapped_column(
+        TEXT,
+        nullable=False,
+        comment="Человекочитаемое название ключа, напр. 'Ключ сервиса мониторинга'",
+    )
+    # Первые 12 символов сырого ключа (ptk_ + 8 hex символов).
+    # Используется для быстрого поиска кандидатов по индексу
+    # без перебора всех хэшей в таблице.
+    key_prefix: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        index=True,
+        comment="Первые 12 символов ключа для быстрого поиска",
+    )
+
+    # SHA-256 хэш полного сырого ключа
+    key_hash: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        unique=True,
+        comment="SHA-256 хэш ключа",
+    )
+
+    # От чьего имени действует ключ
+    user_id : Mapped[int]= mapped_column(
+        BIGINT,
+        ForeignKey("app_user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+        comment="False — ключ отозван, но запись остаётся для аудита",
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        comment="Дата создания ключа",
+    )
+
+    last_used_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Последнее успешное использование ключа",
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Срок действия ключа. NULL — бессрочный",
+    )

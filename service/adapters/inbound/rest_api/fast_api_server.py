@@ -16,6 +16,7 @@ from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
 from .annotations import HTTPMethod, EveryType
 from .html.analytical_metrics import analytical_metrics_router
+from .html.api_key import api_key_router
 from .html.monitoring_algorithms import monitoring_algorithms_router
 from .html.payloads import payloads_router
 from .html.task_groups import task_groups_router
@@ -74,6 +75,7 @@ class FastAPIServer(Startable):
         self._app.include_router(monitoring_algorithms_router)
         self._app.include_router(analytical_metrics_router)
         self._app.include_router(task_groups_router)
+        self._app.include_router(api_key_router)
         self._app.mount("/static", StaticFiles(directory=get_project_root().joinpath('static')), name="static")
         handle_422_exceptions(self._app)
 

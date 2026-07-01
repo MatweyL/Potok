@@ -11,6 +11,7 @@ from service.ports.outbound.repo.fields import FilterFieldsDNF, PaginationQuery
 
 class GetPayloadUCRq(UCRequest):
     payload_id: int
+    with_tasks: bool = True
 
 
 class GetPayloadUCRs(UCResponse):
@@ -32,9 +33,14 @@ class GetPayloadUC(UseCase):
         payload = await self._payload_repo.get(PayloadPK(id=request.payload_id))
         if not payload:
             return GetPayloadUCRs(success=False, error="Not found", request=request)
-        tasks = await self._task_repo.filter(FilterFieldsDNF.single('payload_id', payload.id))
-        tasks_detailed_rs = await self._get_tasks_detailed_uc.apply(
-            GetTasksDetailedUCRq(tasks_ids=[task.id for task in tasks],
-                                 pagination=PaginationQuery()))
+        if request.with_tasks:
+            tasks = await self._task_repo.filter(FilterFieldsDNF.single('payload_id', payload.id))
+        else:
+            tasks = []
+        if tasks:
+            tasks_detailed_rs = await self._get_tasks_detailed_uc.apply(
+                GetTasksDetailedUCRq(tasks_ids=[task.id for task in tasks],
+                                     pagination=PaginationQuery()))
+            tasks = tasks_detailed_rs.tasks
         return GetPayloadUCRs(success=True, request=request, payload=payload,
-                              tasks_detailed_linked=tasks_detailed_rs.tasks)
+                              tasks_detailed_linked=tasks)
