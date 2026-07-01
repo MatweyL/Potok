@@ -387,7 +387,8 @@ async def main():
                                                               settings.rmq_task_run_execution_status_queue,
                                                               receive_task_run_execution_status_uc.apply,
                                                               CommandResponseToReceiveTaskRunExecutionStatusUCRq(),
-                                                              durable=True,)
+                                                              durable=True,
+                                                              passive=True,)
 
     fastapi_server = FastAPIServer.from_settings(settings.fastapi_server)
     fastapi_server.app.state.auth_facade = auth_use_case_facade
