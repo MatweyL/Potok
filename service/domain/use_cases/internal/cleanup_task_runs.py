@@ -29,7 +29,7 @@ class CleanupTaskRunsUCRs(UCResponse):
 
 
 # Статусы, которые считаются "завершёнными" и подлежат очистке
-TERMINAL_STATUSES = ["SUCCEED", "CANCELLED", "ERROR"]
+TERMINAL_STATUSES = ["SUCCEED", "ERROR"]
 
 
 class CleanupTaskRunsUC(UseCase):

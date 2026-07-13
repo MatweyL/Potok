@@ -12,14 +12,6 @@ from service.adapters.inbound.rest_api.fast_api_server import FastAPIServer
 from service.adapters.inbound.rest_api.html_auth_middleware import AuthMiddleware
 from service.adapters.outbound.producer.rmq import AioPikaRMQProducerConnection, AioPikaRMQProducer, \
     AioPikaRMQQueueBoundToExchangeCreator
-from service.adapters.outbound.repo.ch.impls.task_run_status_log import CHTaskRunStatusLogRepo, \
-    create_task_run_status_log_repo
-from service.adapters.outbound.repo.ch.impls.task_run_time_interval_execution_bounds import \
-    CHTaskRunTimeIntervalExecutionBoundsRepo, create_task_run_time_interval_execution_bounds_repo
-from service.adapters.outbound.repo.ch.impls.task_run_time_interval_progress import CHTaskRunTimeIntervalProgressRepo, \
-    create_task_run_time_interval_progress_repo
-from service.adapters.outbound.repo.ch.impls.time_interval_task_progress import CHTimeIntervalTaskProgressRepo, \
-    create_time_interval_task_progress_repo
 from service.adapters.outbound.repo.sa import models
 from service.adapters.outbound.repo.sa.database import Database
 from service.adapters.outbound.repo.sa.impls.analytical_metrics import SAAnalyticalMetricsProvider
@@ -95,6 +87,8 @@ from service.domain.use_cases.external.task_group import GetTaskGroupUC, GetAllT
     UpdateTaskGroupUC
 from service.domain.use_cases.external.update_payload import UpdatePayloadUC
 from service.domain.use_cases.external.update_task import UpdateTaskUC
+from service.domain.use_cases.internal.cleanup_task_runs import CleanupTaskRunsUC, CleanupTaskRunsUCRq
+from service.domain.use_cases.internal.compress_task_progress import CompressTaskProgressUC, CompressTaskProgressUCRq
 from service.domain.use_cases.internal.create_task_runs import CreateTaskRunsUC, CreateTaskRunsUCRq
 from service.domain.use_cases.internal.receive_task_run_execution_status import ReceiveTaskRunExecutionStatusUC, \
     ReceiveTaskRunExecutionStatusUCRq
@@ -113,6 +107,7 @@ from service.ports.common.periodic_runner import PeriodicRunner
 from service.ports.outbound.producer import DirectDataProducer
 from service.ports.outbound.repo.monitoring_algorithm import TaskToExecuteProviderRegistry
 from service.settings import ServiceSettings, ServiceType
+from tests.conftest import compress_task_progress_uc
 
 
 class CommandResponseToReceiveTaskRunExecutionStatusUCRq(InputConverterI):
@@ -126,46 +121,26 @@ async def main():
     set_log_level(logging.INFO)
     settings = ServiceSettings()
     database = Database(settings.database_uri)
-    if (settings.use_ch_task_run_time_interval_execution_bounds_repo
-            or settings.use_ch_task_run_time_interval_execution_bounds_repo
-            or settings.use_ch_time_interval_task_progress_repo
-            or settings.use_ch_task_run_status_log_repo):
-        ch_client = await get_async_client(**settings.ch_uri_as_params())
-    else:
-        ch_client = None
     transaction_factory = SATransactionFactory(database)
     monitoring_algorithm_repo = SAMonitoringAlgorithmRepo(database, models.MonitoringAlgorithm)
     periodic_monitoring_algorithm_repo = SAPeriodicMonitoringAlgorithmRepo(database, models.PeriodicMonitoringAlgorithm)
     single_monitoring_algorithm_repo = SASingleMonitoringAlgorithmRepo(database, models.SingleMonitoringAlgorithm)
-    task_repo = SATaskRepo(database, models.Task)
+    task_repo = SATaskRepo(database, models.Task, chunk_size=2000)
     task_run_repo = SATaskRunRepo(database, models.TaskRun, chunk_size=2000)
     monitoring_algorithms = [periodic_monitoring_algorithm_repo, single_monitoring_algorithm_repo]
     task_to_execute_provider_registry = TaskToExecuteProviderRegistry(monitoring_algorithms)
     task_status_log_repo = SATaskStatusLogRepo(database, models.TaskStatusLog)
     recent_task_runs_provider = SARecentTaskRunsProvider(database)
 
-    if settings.use_ch_task_run_status_log_repo:
-        task_run_status_log_repo = await create_task_run_status_log_repo(ch_client)
-    else:
-        task_run_status_log_repo = SATaskRunStatusLogRepo(database, models.TaskRunStatusLog)
+    task_run_status_log_repo = SATaskRunStatusLogRepo(database, models.TaskRunStatusLog)
 
-    if settings.use_ch_task_run_time_interval_progress_repo:
-        task_run_time_interval_progress_repo = await create_task_run_time_interval_progress_repo(ch_client)
-    else:
-        task_run_time_interval_progress_repo = SATaskRunTimeIntervalProgressRepo(database,
+    task_run_time_interval_progress_repo = SATaskRunTimeIntervalProgressRepo(database,
                                                                                  models.TaskRunTimeIntervalProgress)
 
-    if settings.use_ch_task_run_time_interval_execution_bounds_repo:
-        task_run_time_interval_execution_bounds_repo = await create_task_run_time_interval_execution_bounds_repo(
-            ch_client)
-    else:
-        task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database,
+    task_run_time_interval_execution_bounds_repo = SATaskRunTimeIntervalExecutionBoundsRepo(database,
                                                                                                 models.TaskRunTimeIntervalExecutionBounds)
 
-    if settings.use_ch_time_interval_task_progress_repo:
-        time_interval_task_progress_repo = await create_time_interval_task_progress_repo(ch_client)
-    else:
-        time_interval_task_progress_repo = SATimeIntervalTaskProgressRepo(database, models.TimeIntervalTaskProgress)
+    time_interval_task_progress_repo = SATimeIntervalTaskProgressRepo(database, models.TimeIntervalTaskProgress)
 
     waiting_task_run_provider = SAWaitingTaskRunProvider(database, task_run_repo)
     payload_repo = SAPayloadRepo(database, models.Payload)
@@ -363,6 +338,9 @@ async def main():
         task_status_log_repo=task_status_log_repo,
         transaction_factory=transaction_factory,
     )
+    cleanup_task_runs_uc = CleanupTaskRunsUC(task_run_repo, task_run_status_log_repo, task_run_time_interval_execution_bounds_repo,
+                                             task_run_time_interval_progress_repo, transaction_factory,)
+    compress_task_progress_uc = CompressTaskProgressUC(time_interval_task_progress_repo, transaction_factory)
 
     # USE CASE: Auth
     create_user_uc = CreateUserUC(app_user_repo, hasher)
@@ -426,6 +404,10 @@ async def main():
         PeriodicRunner(task_status_log_cleaner.clean_logs, 86_400, 30, run_name="Clean task run status logs"),
         PeriodicRunner(receive_task_run_execution_status_uc.upload_command_responses, 30,
                        run_name="Upload received task run statuses"),
+        PeriodicRunner(cleanup_task_runs_uc.apply, 86400, 600, run_name="Clean old task run",
+                       method_args=[CleanupTaskRunsUCRq()]),
+        PeriodicRunner(compress_task_progress_uc.apply, 86400, 60, run_name="Compress task progress",
+                       method_args=[CompressTaskProgressUCRq()]),
 
     ]
     logger.info(f"service configured as {settings.service_type}")

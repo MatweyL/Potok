@@ -42,7 +42,8 @@ build-backend = "poetry.core.masonry.api"
 [dependency-groups]
 dev = [
     "aiosqlite (>=0.21.0,<0.22.0)",
-    "pandas (>=3.0.1,<4.0.0)"
+    "pandas (>=3.0.1,<4.0.0)",
+    "import-linter[ui] (>=2.13,<3.0)"
 ]
 imitation_modelling = [
     "plotly (>=6.7.0,<7.0.0)"
