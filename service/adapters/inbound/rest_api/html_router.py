@@ -1,41 +1,25 @@
+import asyncio
 from typing import Optional
 
-from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from fastapi import APIRouter
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, Response, RedirectResponse
 from starlette.templating import Jinja2Templates
 
-from service.domain.schemas.enums import AppUserRole, TaskRunStatus
-from service.domain.use_cases.external.admin.activate_user import ActivateUserUCRq
-from service.domain.use_cases.external.admin.deactivate_user import DeactivateUserUCRq
-from service.domain.use_cases.external.admin.get_all_users import GetAllUsersUCRq
-from service.domain.use_cases.external.auth.create_user import CreateUserUCRq
 from service.domain.use_cases.external.auth.login import LoginUCRq
 from service.domain.use_cases.external.auth.logout import LogoutUCRq
-from service.domain.use_cases.external.auth.reset_password import ResetPasswordUCRq
 from service.domain.use_cases.external.create_tasks import CreateTasksUCRq
-from service.domain.use_cases.external.get_payload import GetPayloadUCRq
-from service.domain.use_cases.external.get_payloads import GetPayloadsUCRq
 from service.domain.use_cases.external.get_task_detailed import GetTaskDetailedUCRq, GetTaskDetailedUCRs
-from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUCRq, \
-    GetTaskGroupStatisticsUCRq
+from service.domain.use_cases.external.get_task_group_statistics import GetAllTaskGroupStatisticsUCRq
 from service.domain.use_cases.external.get_task_run_detailed import GetTaskRunDetailedUCRs, GetTaskRunDetailedUCRq
 from service.domain.use_cases.external.get_task_run_status_logs import GetTaskRunStatusLogsUCRq, \
     GetTaskRunStatusLogsUCRs
-from service.domain.use_cases.external.get_task_runs import GetTaskRunsUCRq, GetTaskRunsUCRs
-from service.domain.use_cases.external.get_tasks_detailed import GetTasksDetailedUCRq
-from service.domain.use_cases.external.monitoring_algorithm import CreateMonitoringAlgorithmUCRq, \
-    GetMonitoringAlgorithmUCRq
 from service.domain.use_cases.external.project import CreateProjectUCRq, GetProjectTaskGroupsUCRq, \
-    RemoveTaskGroupFromProjectUCRq, AddTaskGroupToProjectUCRq, UpdateProjectUCRq, GetProjectByTaskGroupUCRq
-from service.domain.use_cases.external.task_group import GetAllTaskGroupUCRq, GetTaskGroupUCRq, UpdateTaskGroupUCRq
-from service.domain.use_cases.external.update_payload import UpdatePayloadUCRq
+    RemoveTaskGroupFromProjectUCRq, AddTaskGroupToProjectUCRq, UpdateProjectUCRq
 from service.domain.use_cases.external.update_task import UpdateTaskUCRq
-from service.ports.common.logs import logger
 from service.ports.common.path_utils import get_project_root
-from service.ports.outbound.repo.fields import PaginationQuery, FilterFieldsDNF, ConditionOperation
+from service.ports.outbound.repo.fields import PaginationQuery
 
 router = APIRouter(tags=["HTML Router"])
 
@@ -158,11 +142,19 @@ async def update_project(request: Request, project_id: int, rq: UpdateProjectUCR
 @router.get("/dashboard")
 async def dashboard(request: Request):
     analytics = request.app.state.analytical_metrics_service
-    summary  = await analytics.get_dashboard_summary()
-    statuses = await analytics.get_run_status_distribution()
-    heatmap  = await analytics.get_run_heatmap()
-    trends   = await analytics.get_performance_trends(period="day")
-    duration = await analytics.get_duration_distribution()
+    (
+        summary,
+        statuses,
+        heatmap,
+        trends,
+        duration,
+    ) = await asyncio.gather(
+        analytics.get_dashboard_summary(),
+        analytics.get_run_status_distribution(),
+        analytics.get_run_heatmap(),
+        analytics.get_performance_trends(period="day"),
+        analytics.get_duration_distribution(),
+    )
 
     STATUS_COLORS = {
         'SUCCEED': '#16a34a', 'EXECUTION': '#2563eb', 'QUEUED': '#60a5fa',

@@ -84,9 +84,9 @@
       ? `<span>
            ${formatDuration(row.timeout)} ${row.timeout_noize === 0? '' : ' ± ' + formatDuration(row.timeout_noize) }
          </span>`
-      : `<span>
-            ${row.timeouts} ± ${row.timeout_noize} сек.
-         </span>`;
+      :  `<span>
+         ${row.timeouts.map(timeout => formatDuration(timeout)).join(', ')} ± ${row.timeout_noize} сек.
+       </span>`;
     const algoId = `<a href="/monitoring-algorithms/${row.id}" class="text-decoration-none fw-medium">#${row.id}</a>`
     return `<tr>
       <td class="ft-cell ft-cell--muted ft-cell--mono">${algoId}</td>
